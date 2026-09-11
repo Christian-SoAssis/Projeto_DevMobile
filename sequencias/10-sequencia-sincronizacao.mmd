@@ -1,0 +1,32 @@
+```mermaid
+sequenceDiagram
+    participant N as NetInfo
+    participant S as SyncService
+    participant Q as SyncQueueRepository
+    participant R as RemoteRepositories
+    participant L as LocalRepositories
+    participant UI as SyncStatusStore
+
+    N->>S: connectionRestored()
+    S->>UI: status = SYNCING
+    S->>Q: listPending()
+    Q-->>S: actions
+
+    loop cada ação pendente
+        S->>R: apply(action)
+        alt sucesso
+            R-->>S: remoteVersion
+            S->>L: reconcile(remoteVersion)
+            S->>Q: markCompleted(action)
+        else falha
+            R-->>S: error
+            S->>Q: incrementAttempts(action)
+            S->>Q: markFailed(action)
+        end
+    end
+
+    S->>R: fetchUpdates()
+    R-->>S: updatedRecords
+    S->>L: upsert(updatedRecords)
+    S->>UI: status = UPDATED
+```

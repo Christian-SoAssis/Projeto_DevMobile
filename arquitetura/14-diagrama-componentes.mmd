@@ -1,0 +1,74 @@
+```mermaid
+flowchart TB
+    subgraph UI["Frameworks / UI"]
+        Expo[Expo Router]
+        Screens[Telas React Native]
+        NetInfo[NetInfo]
+        Camera[Câmera / Galeria]
+        Geo[Geolocalização]
+    end
+
+    subgraph Adapters["Interface Adapters"]
+        Controllers[Controllers / Hooks de feature]
+        LocalAdapters[SQLite Repositories]
+        RemoteAdapters[Supabase Repositories]
+        PhotoAdapter[Photo Storage Adapter]
+        AuthAdapter[Supabase Auth Adapter]
+        LocationAdapter[Location Adapter]
+    end
+
+    subgraph Application["Application / Use Cases"]
+        SearchUC[SearchAnimalsUseCase]
+        CreateUC[CreateAnimalUseCase]
+        UpdateUC[UpdateAnimalUseCase]
+        FavoriteUC[ToggleFavoriteUseCase]
+        InterestUC[RegisterAdoptionInterestUseCase]
+        SyncUC[ProcessSyncQueueUseCase]
+        ConflictUC[ResolveSyncConflictUseCase]
+    end
+
+    subgraph Domain["Domain"]
+        AnimalD[Animal]
+        UserD[User]
+        FavoriteD[Favorite]
+        InterestD[AdoptionInterest]
+        SyncD[SyncAction]
+        Ports[[Repository / Service Ports]]
+    end
+
+    subgraph Infra["External Systems"]
+        SQLite[(SQLite)]
+        SupabaseDB[(Supabase PostgreSQL)]
+        SupabaseStorage[(Supabase Storage)]
+        SupabaseAuth[(Supabase Auth)]
+    end
+
+    Expo --> Screens
+    Screens --> Controllers
+    Controllers --> Application
+
+    SearchUC --> AnimalD
+    CreateUC --> AnimalD
+    UpdateUC --> AnimalD
+    FavoriteUC --> FavoriteD
+    InterestUC --> InterestD
+    SyncUC --> SyncD
+    ConflictUC --> AnimalD
+
+    Application --> Ports
+
+    LocalAdapters -. implementa .-> Ports
+    RemoteAdapters -. implementa .-> Ports
+    PhotoAdapter -. implementa .-> Ports
+    AuthAdapter -. implementa .-> Ports
+    LocationAdapter -. implementa .-> Ports
+
+    LocalAdapters --> SQLite
+    RemoteAdapters --> SupabaseDB
+    PhotoAdapter --> SupabaseStorage
+    AuthAdapter --> SupabaseAuth
+
+    NetInfo --> Controllers
+    Camera --> PhotoAdapter
+    Geo --> LocationAdapter
+```

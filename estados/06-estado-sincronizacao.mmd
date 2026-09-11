@@ -1,0 +1,10 @@
+```mermaid
+stateDiagram-v2
+    [*] --> Pendente
+    Pendente --> Sincronizando : iniciarSincronizacao()
+    Sincronizando --> Concluida : envioConfirmado
+    Sincronizando --> Falhou : erroDeRedeOuServidor
+    Falhou --> Pendente : retry()
+    Pendente --> Pendente : permaneceOffline
+    Concluida --> [*]
+```

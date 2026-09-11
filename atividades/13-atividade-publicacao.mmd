@@ -1,0 +1,23 @@
+```mermaid
+flowchart TD
+    Start((Início)) --> A[Preencher dados do animal]
+    A --> B[Adicionar fotos]
+    B --> C[Informar localização aproximada]
+    C --> D[Validar formulário]
+    D --> E{Dados válidos?}
+    E -- Não --> F[Exibir erros]
+    F --> A
+    E -- Sim --> G[Salvar no SQLite]
+    G --> H{Online?}
+    H -- Não --> I[Adicionar CREATE à fila]
+    I --> J[Exibir sincronização pendente]
+    H -- Sim --> K[Enviar anúncio ao Supabase]
+    K --> L[Enviar fotos ao Storage]
+    L --> M{Sucesso?}
+    M -- Sim --> N[Reconciliar dados locais]
+    M -- Não --> O[Registrar ação pendente/falha]
+    N --> P[Exibir dados atualizados]
+    O --> J
+    J --> End((Fim))
+    P --> End
+```

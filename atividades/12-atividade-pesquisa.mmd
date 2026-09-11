@@ -1,0 +1,21 @@
+```mermaid
+flowchart TD
+    Start((Início)) --> A[Carregar cache local]
+    A --> B{Há conexão?}
+    B -- Não --> C[Exibir dados locais]
+    B -- Sim --> D[Consultar Supabase]
+    D --> E[Atualizar cache SQLite]
+    E --> C
+    C --> F[Usuário informa busca]
+    F --> G{Aplicou filtros?}
+    G -- Sim --> H[Filtrar por espécie/porte/idade/sexo/distância]
+    G -- Não --> I[Manter conjunto atual]
+    H --> J{Visualização}
+    I --> J
+    J -- Lista --> K[Mostrar cards]
+    J -- Mapa --> L[Mostrar pinos em localização aproximada]
+    K --> M[Selecionar animal]
+    L --> M
+    M --> N[Exibir detalhes]
+    N --> End((Fim))
+```

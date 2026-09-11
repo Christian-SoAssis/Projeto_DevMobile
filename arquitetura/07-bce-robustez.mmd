@@ -1,0 +1,17 @@
+```mermaid
+flowchart LR
+    Actor((Responsável))
+    B[NewAnimalScreen «boundary»]
+    C[CreateAnimalUseCase «control»]
+    E1[Animal «entity»]
+    E2[AnimalPhoto «entity»]
+    Q[SyncAction «entity local»]
+    R[[AnimalRepository «port»]]
+
+    Actor --> B
+    B --> C
+    C --> E1
+    C --> E2
+    C --> R
+    C --> Q
+```

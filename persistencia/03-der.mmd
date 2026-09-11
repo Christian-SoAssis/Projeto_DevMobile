@@ -1,0 +1,61 @@
+```mermaid
+erDiagram
+    PROFILES ||--o{ ANIMALS : publica
+    ANIMALS ||--|{ ANIMAL_PHOTOS : possui
+    PROFILES ||--o{ FAVORITES : salva
+    ANIMALS ||--o{ FAVORITES : recebe
+    PROFILES ||--o{ ADOPTION_INTERESTS : manifesta
+    ANIMALS ||--o{ ADOPTION_INTERESTS : recebe
+
+    PROFILES {
+        uuid id PK
+        string name
+        string email
+        string contact_info
+        datetime created_at
+    }
+
+    ANIMALS {
+        uuid id PK
+        uuid owner_id FK
+        string name
+        string species
+        string size
+        string approximate_age
+        string sex
+        string characteristics
+        string behavior
+        string special_care
+        string adoption_status
+        string neighborhood
+        string city
+        string region
+        decimal latitude_approx
+        decimal longitude_approx
+        datetime created_at
+        datetime updated_at
+        int version
+    }
+
+    ANIMAL_PHOTOS {
+        uuid id PK
+        uuid animal_id FK
+        string storage_path
+        string public_or_signed_url
+        int sort_order
+        datetime created_at
+    }
+
+    FAVORITES {
+        uuid user_id PK,FK
+        uuid animal_id PK,FK
+        datetime created_at
+    }
+
+    ADOPTION_INTERESTS {
+        uuid id PK
+        uuid user_id FK
+        uuid animal_id FK
+        datetime created_at
+    }
+```

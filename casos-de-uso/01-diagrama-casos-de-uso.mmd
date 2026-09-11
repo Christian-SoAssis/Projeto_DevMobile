@@ -1,0 +1,70 @@
+```mermaid
+flowchart LR
+    Visitante((Visitante))
+    Usuario((Usuário autenticado))
+    Interessado((Interessado))
+    Responsavel((Responsável pelo anúncio))
+    Admin((Administrador))
+    Supabase((Supabase))
+
+    Usuario --|> Visitante
+    Interessado --|> Usuario
+    Responsavel --|> Usuario
+    Admin --|> Usuario
+
+    UC01[Consultar animais]
+    UC02[Pesquisar anúncios]
+    UC03[Filtrar anúncios]
+    UC04[Visualizar mapa]
+    UC05[Visualizar detalhes]
+    UC06[Autenticar-se]
+    UC07[Criar anúncio]
+    UC08[Adicionar fotos]
+    UC09[Editar anúncio]
+    UC10[Excluir anúncio]
+    UC11[Marcar como adotado]
+    UC12[Gerenciar meus anúncios]
+    UC13[Gerenciar favoritos]
+    UC14[Demonstrar interesse]
+    UC15[Consultar dados offline]
+    UC16[Registrar alteração offline]
+    UC17[Sincronizar alterações]
+    UC18[Revisar conflito]
+    UC19[Capturar localização]
+    UC20[Moderar anúncio]
+
+    Visitante --> UC01
+    Visitante --> UC02
+    Visitante --> UC05
+
+    UC03 -. "<<extend>>" .-> UC02
+    UC04 -. "<<extend>>" .-> UC02
+
+    Usuario --> UC06
+    Usuario --> UC15
+
+    Interessado --> UC13
+    Interessado --> UC14
+    UC14 -. "<<extend>>" .-> UC05
+
+    Responsavel --> UC07
+    Responsavel --> UC09
+    Responsavel --> UC10
+    Responsavel --> UC11
+    Responsavel --> UC12
+
+    UC07 -. "<<include>>" .-> UC08
+    UC07 -. "<<include>>" .-> UC19
+    UC16 -. "<<extend>>" .-> UC07
+    UC16 -. "<<extend>>" .-> UC09
+
+    Usuario --> UC17
+    UC17 -. "<<include>>" .-> UC16
+    UC18 -. "<<extend>>" .-> UC17
+
+    Admin --> UC20
+
+    UC06 --> Supabase
+    UC17 --> Supabase
+    UC20 --> Supabase
+```

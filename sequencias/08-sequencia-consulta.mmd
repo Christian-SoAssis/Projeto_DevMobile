@@ -1,0 +1,23 @@
+```mermaid
+sequenceDiagram
+    actor U as Visitante
+    participant B as SearchScreen
+    participant C as SearchAnimalsUseCase
+    participant L as LocalAnimalRepository
+    participant R as RemoteAnimalRepository
+
+    U->>B: pesquisar(filtros)
+    B->>C: execute(filtros)
+    C->>L: searchCached(filtros)
+    L-->>C: resultadosLocais
+    C-->>B: mostrarResultadosIniciais
+
+    alt online
+        C->>R: search(filtros)
+        R-->>C: resultadosRemotos
+        C->>L: upsertCache(resultadosRemotos)
+        C-->>B: atualizarResultados
+    else offline
+        C-->>B: indicarModoOffline
+    end
+```

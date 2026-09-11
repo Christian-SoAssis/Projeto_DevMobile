@@ -1,0 +1,30 @@
+```mermaid
+sequenceDiagram
+    actor R as Responsável
+    participant B as NewAnimalScreen
+    participant C as CreateAnimalUseCase
+    participant V as AnimalValidator
+    participant Repo as AnimalRepository
+    participant Photos as PhotoRepository
+    participant Q as SyncQueueRepository
+
+    R->>B: confirmarCadastro(dados, fotos)
+    B->>C: execute(input)
+    C->>V: validate(input)
+    V-->>C: válido
+    C->>Repo: saveLocal(animal)
+    C->>Photos: persistLocalFiles(fotos)
+
+    alt online
+        C->>Repo: createRemote(animal)
+        C->>Photos: uploadPending(animal)
+        Repo-->>C: animalRemoto
+        C->>Repo: reconcileLocal(animalRemoto)
+        C-->>B: sucesso(sincronizado)
+    else offline
+        C->>Q: enqueue(CREATE, animal)
+        C-->>B: sucesso(pendente)
+    end
+
+    B-->>R: exibirEstado
+```

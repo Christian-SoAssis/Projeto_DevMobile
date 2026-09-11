@@ -1,0 +1,15 @@
+```mermaid
+flowchart LR
+    U["u1:User<br/>name = Ana<br/>email = ana@exemplo"]
+    A["a42:Animal<br/>name = Luna<br/>species = Cão<br/>status = AVAILABLE<br/>city = Varginha"]
+    P1["p1:AnimalPhoto<br/>remoteUrl = .../luna-1.jpg"]
+    P2["p2:AnimalPhoto<br/>localPath = file://luna-2.jpg<br/>sync = PENDING"]
+    F["f1:Favorite<br/>userId = u1<br/>animalId = a42"]
+    Q["q7:SyncAction<br/>operation = UPDATE_IMAGE<br/>entityId = a42<br/>attempts = 0"]
+
+    U --> F
+    F --> A
+    A --> P1
+    A --> P2
+    P2 --> Q
+```

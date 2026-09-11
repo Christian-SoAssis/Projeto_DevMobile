@@ -1,0 +1,114 @@
+```mermaid
+classDiagram
+    class User {
+        +UUID id
+        +String name
+        +String email
+        +String contactInfo
+    }
+
+    class Admin {
+        +moderateAnimal()
+    }
+
+    class Animal {
+        +UUID id
+        +UUID ownerId
+        +String name
+        +String species
+        +String size
+        +String approximateAge
+        +String sex
+        +String characteristics
+        +String behavior
+        +String specialCare
+        +AdoptionStatus status
+        +ApproximateLocation location
+        +DateTime createdAt
+        +DateTime updatedAt
+        +Int version
+        +markAdopted()
+        +updateData()
+    }
+
+    class AnimalPhoto {
+        +UUID id
+        +UUID animalId
+        +String localPath
+        +String remoteUrl
+        +SyncState syncState
+    }
+
+    class Favorite {
+        +UUID userId
+        +UUID animalId
+        +DateTime createdAt
+    }
+
+    class AdoptionInterest {
+        +UUID id
+        +UUID userId
+        +UUID animalId
+        +DateTime createdAt
+    }
+
+    class SyncAction {
+        +UUID id
+        +String operation
+        +String entityType
+        +UUID entityId
+        +JSON payload
+        +DateTime changedAt
+        +Int attempts
+        +SyncState status
+        +String lastError
+    }
+
+    class SyncMetadata {
+        +String key
+        +DateTime lastSyncAt
+        +Int version
+    }
+
+    class SearchPreferences {
+        +String species
+        +String size
+        +String age
+        +String sex
+        +Float distance
+        +String region
+    }
+
+    class ApproximateLocation {
+        +String neighborhood
+        +String city
+        +String region
+        +Float latitudeApprox
+        +Float longitudeApprox
+    }
+
+    class AdoptionStatus {
+        <<enumeration>>
+        AVAILABLE
+        ADOPTED
+    }
+
+    class SyncState {
+        <<enumeration>>
+        PENDING
+        SYNCING
+        FAILED
+        COMPLETED
+    }
+
+    Admin --|> User
+    User "1" --> "0..*" Animal : publica
+    Animal "1" *-- "1..*" AnimalPhoto : fotos
+    Animal *-- ApproximateLocation : localização
+    User "1" -- "0..*" Favorite : possui
+    Animal "1" -- "0..*" Favorite : é favoritado
+    User "1" -- "0..*" AdoptionInterest : manifesta
+    Animal "1" -- "0..*" AdoptionInterest : recebe
+    SyncAction --> SyncState
+    Animal --> AdoptionStatus
+```

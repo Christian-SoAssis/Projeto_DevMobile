@@ -1,0 +1,25 @@
+```mermaid
+sequenceDiagram
+    actor R as Responsável
+    participant S as SyncService
+    participant Remote as Supabase
+    participant L as SQLite
+    participant C as ResolveSyncConflictUseCase
+    participant B as ConflictReviewScreen
+
+    S->>Remote: update(entity, localVersion)
+    Remote-->>S: versão remota divergente
+    S->>L: loadLocalVersion()
+    S->>C: evaluate(local, remote)
+
+    alt conflito simples
+        C-->>S: usar versão mais recente
+        S->>L: reconcile()
+    else risco de perda
+        C-->>B: apresentar diferenças
+        B-->>R: solicitar revisão
+        R->>B: escolher resolução
+        B->>C: resolve(escolha)
+        C->>Remote: persistResolvedVersion()
+    end
+```

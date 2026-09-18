@@ -105,10 +105,10 @@ flowchart LR
     Admin((Administrador))
     Supabase((Supabase))
 
-    Usuario --|> Visitante
-    Interessado --|> Usuario
-    Responsavel --|> Usuario
-    Admin --|> Usuario
+    Usuario -->|é um| Visitante
+    Interessado -->|é um| Usuario
+    Responsavel -->|é um| Usuario
+    Admin -->|é um| Usuario
 
     UC01[Consultar animais]
     UC02[Pesquisar anúncios]
@@ -134,16 +134,17 @@ flowchart LR
     Visitante --> UC01
     Visitante --> UC02
     Visitante --> UC05
+    Visitante --> UC06
 
-    UC03 -. "<<extend>>" .-> UC02
-    UC04 -. "<<extend>>" .-> UC02
+    UC03 -.->|extend| UC02
+    UC04 -.->|extend| UC02
 
-    Usuario --> UC06
     Usuario --> UC15
+    Usuario --> UC17
 
     Interessado --> UC13
     Interessado --> UC14
-    UC14 -. "<<extend>>" .-> UC05
+    UC14 -.->|extend| UC05
 
     Responsavel --> UC07
     Responsavel --> UC09
@@ -151,14 +152,11 @@ flowchart LR
     Responsavel --> UC11
     Responsavel --> UC12
 
-    UC07 -. "<<include>>" .-> UC08
-    UC07 -. "<<include>>" .-> UC19
-    UC16 -. "<<extend>>" .-> UC07
-    UC16 -. "<<extend>>" .-> UC09
+    UC07 -.->|include| UC08
+    UC07 -.->|include| UC19
 
-    Usuario --> UC17
-    UC17 -. "<<include>>" .-> UC16
-    UC18 -. "<<extend>>" .-> UC17
+    Usuario --> UC16
+    UC18 -.->|extend| UC17
 
     Admin --> UC20
 

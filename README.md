@@ -170,7 +170,6 @@ npm start
 | Documento | Descrição |
 |---|---|
 | [documentacao-software-rede-adocao-animais.md](file:///home/alunos/Downloads/Projeto_DevMobile/documentacao-software-rede-adocao-animais.md) | Especificação completa de requisitos (RF/RNF), diagrama de casos de uso, DER, diagramas de sequência, atividades, componentes e decisões de arquitetura do app **Enlace**. |
-| [criteriosapresentacao1.md](file:///home/alunos/Downloads/Projeto_DevMobile/criteriosapresentacao1.md) | Guia e checklist sequencial de avaliação para a Fase "Domínio e Interface Primeiro". |
 
 ---
 

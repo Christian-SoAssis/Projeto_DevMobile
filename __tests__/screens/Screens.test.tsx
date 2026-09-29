@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { SearchScreen } from '../../src/adapters/screens/SearchScreen';
 import { AnimalDetailsScreen } from '../../src/adapters/screens/AnimalDetailsScreen';
 import { AnimalFormScreen } from '../../src/adapters/screens/AnimalFormScreen';
@@ -56,8 +56,8 @@ describe('React Native Screens UI Tests (RNTL)', () => {
 
       const input = getByTestId('search-input');
       fireEvent.changeText(input, 'Luna');
-      fireEvent.press(getByTestId('search-button'));
-
+      fireEvent.press(getByTestId('filter-chip-Cão'));
+      fireEvent.press(getByTestId('filter-chip-Todos'));
       fireEvent.press(getByTestId('toggle-map'));
       await waitFor(() => {
         expect(getByTestId('map-view')).toBeTruthy();
@@ -117,6 +117,33 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       fireEvent.press(getByTestId('interest-button'));
       await waitFor(() => {
         expect(getByText('Faça login para demonstrar interesse.')).toBeTruthy();
+      });
+    });
+
+    it('deve permitir favoritar e demonstrar interesse quando usuário estiver autenticado', async () => {
+      const animal = new Animal({ id: 'a1', ownerId: 'usr_owner', name: 'Rex', characteristics: dummyChar, location: dummyLoc });
+      const animalRepo = new AnimalRepositoryFake([animal]);
+      const favRepo = new FavoriteRepositoryFake();
+      const intrRepo = new AdoptionInterestRepositoryFake();
+
+      const { getByTestId, getByText } = render(
+        <AnimalDetailsScreen
+          animal={animal}
+          currentUserId="usr_interessado"
+          animalRepository={animalRepo}
+          favoriteRepository={favRepo}
+          interestRepository={intrRepo}
+        />
+      );
+
+      fireEvent.press(getByTestId('favorite-button'));
+      await waitFor(() => {
+        expect(getByText('Adicionado aos favoritos!')).toBeTruthy();
+      });
+
+      fireEvent.press(getByTestId('interest-button'));
+      await waitFor(() => {
+        expect(getByText('Manifestação de interesse enviada ao responsável!')).toBeTruthy();
       });
     });
 
@@ -213,6 +240,25 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       expect(onSuccessMock).toHaveBeenCalled();
     });
 
+    it('deve salvar localmente quando estiver offline (isOnline=false)', async () => {
+      const animalRepo = new AnimalRepositoryFake();
+      const queueRepo = new SyncQueueRepositoryFake();
+
+      const { getByTestId, getByText } = render(
+        <AnimalFormScreen
+          animalRepository={animalRepo}
+          syncQueueRepository={queueRepo}
+          isOnline={false}
+        />
+      );
+
+      fireEvent.changeText(getByTestId('input-name'), 'Thor Offline');
+      fireEvent.press(getByTestId('btn-submit-animal'));
+      await waitFor(() => {
+        expect(getByText(/Anúncio salvo localmente/)).toBeTruthy();
+      });
+    });
+
     it('deve tratar erro na validação do formulário', async () => {
       const animalRepo = new AnimalRepositoryFake();
       const queueRepo = new SyncQueueRepositoryFake();
@@ -254,9 +300,39 @@ describe('React Native Screens UI Tests (RNTL)', () => {
         expect(getByText('Assinatura digital inválida.')).toBeTruthy();
       });
     });
+
+    it('deve usar props padrão no AssinaturaScreen e tratar fallback de erro', async () => {
+      const { getByTestId, getByText } = render(<AssinaturaScreen />);
+      fireEvent.press(getByTestId('btn-submit-signature'));
+      await waitFor(() => {
+        expect(getByText('Período de avaliação não encontrado.')).toBeTruthy();
+      });
+    });
   });
 
   describe('AtividadesFormScreen & HistoricoRelatoriosScreen Components', () => {
+    it('deve validar horas inválidas e descrição vazia no AtividadesFormScreen', async () => {
+      const { getByTestId, getByText } = render(<AtividadesFormScreen />);
+
+      fireEvent.changeText(getByTestId('input-horas'), '-2');
+      fireEvent.press(getByTestId('btn-salvar-atividade'));
+      await waitFor(() => {
+        expect(getByText('Horas informadas devem ser um valor positivo.')).toBeTruthy();
+      });
+
+      fireEvent.changeText(getByTestId('input-horas'), '5');
+      fireEvent.changeText(getByTestId('input-descricao'), '');
+      fireEvent.press(getByTestId('btn-salvar-atividade'));
+      await waitFor(() => {
+        expect(getByText('Descrição da atividade é obrigatória.')).toBeTruthy();
+      });
+    });
+
+    it('deve renderizar HistoricoRelatoriosScreen com props padrão', async () => {
+      const { getByTestId } = render(<HistoricoRelatoriosScreen />);
+      expect(getByTestId('historico-relatorios-screen')).toBeTruthy();
+    });
+
     it('deve registrar atividades e exibir histórico de relatórios', async () => {
       const repo = new PeriodoAvaliacaoRepositoryFake();
       await repo.save(new PeriodoAvaliacao({ id: 'per_1', estagioId: 'est_1', alunoId: 'al_1' }));
@@ -290,6 +366,11 @@ describe('React Native Screens UI Tests (RNTL)', () => {
   });
 
   describe('SyncStatusScreen Component', () => {
+    it('deve renderizar SyncStatusScreen com props padrão', async () => {
+      const { getByTestId } = render(<SyncStatusScreen />);
+      expect(getByTestId('sync-status-screen')).toBeTruthy();
+    });
+
     it('deve exibir lista de itens pendentes e acionar sincronização manual', async () => {
       const animalRepo = new AnimalRepositoryFake();
       const queueRepo = new SyncQueueRepositoryFake();
@@ -312,7 +393,9 @@ describe('React Native Screens UI Tests (RNTL)', () => {
         expect(getByText(/Conexão rejeitada/)).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('btn-trigger-sync'));
+      await act(async () => {
+        fireEvent.press(getByTestId('btn-trigger-sync'));
+      });
       await waitFor(() => {
         expect(getByTestId('sync-result-banner')).toBeTruthy();
       });

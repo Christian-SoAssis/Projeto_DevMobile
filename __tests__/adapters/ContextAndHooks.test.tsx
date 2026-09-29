@@ -92,7 +92,9 @@ describe('Context API & Custom Bridge Hooks', () => {
     });
 
     it('deve lançar erro se useAuth for usado fora de AuthProvider', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       expect(() => renderHook(() => useAuth())).toThrow('useAuth deve ser utilizado dentro de um AuthProvider');
+      consoleErrorSpy.mockRestore();
     });
 
     it('deve permitir acesso via token', async () => {
@@ -113,9 +115,50 @@ describe('Context API & Custom Bridge Hooks', () => {
 
       expect(result.current.isAuthenticated).toBe(true);
     });
+    it('deve permitir usar AuthProvider sem fornecer gateway/storage explicitamente', async () => {
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <AuthProvider>{children}</AuthProvider>
+      );
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect(result.current.isLoading).toBe(false);
+    });
   });
 
   describe('useAnimals Custom Hook', () => {
+    it('deve permitir instanciar com repositórios padrão e tratar exceções sem mensagem', async () => {
+      const { result } = renderHook(() => useAnimals());
+      const animalRepoFake = new AnimalRepositoryFake();
+      animalRepoFake.search = jest.fn().mockRejectedValue('Erro string sem message');
+
+      const { result: customResult } = renderHook(() => useAnimals(animalRepoFake));
+      await act(async () => {
+        await customResult.current.searchAnimals();
+      });
+      expect(customResult.current.error).toBe('Erro ao carregar anúncios.');
+
+      animalRepoFake.saveLocal = jest.fn().mockRejectedValue('Erro sem message');
+      const animal = new Animal({
+        id: 'a1',
+        ownerId: 'usr_1',
+        name: 'Rex',
+        characteristics: new AnimalCharacteristics({ species: 'Cão', size: 'Médio', approximateAge: '1 ano', sex: 'Macho' }),
+        location: new ApproximateLocation({ latitude: -21.5, longitude: -45.4, neighborhood: 'Centro', city: 'Varginha', region: 'MG' }),
+      });
+      await act(async () => {
+        try { await customResult.current.createAnimal(animal); } catch {}
+      });
+      expect(customResult.current.error).toBe('Erro ao criar anúncio.');
+
+      animalRepoFake.findById = jest.fn().mockRejectedValue('Erro sem message');
+      await act(async () => {
+        try { await customResult.current.markAdopted('usr_1', 'a1'); } catch {}
+      });
+      expect(customResult.current.error).toBe('Erro ao marcar como adotado.');
+    });
+
     it('deve realizar buscas, cadastros e alterar status do animal', async () => {
       const animalRepo = new AnimalRepositoryFake();
       const syncQueueRepo = new SyncQueueRepositoryFake();
@@ -249,6 +292,17 @@ describe('Context API & Custom Bridge Hooks', () => {
         } catch {}
       });
       expect(result.current.error).toBe('Período de avaliação não encontrado.');
+
+      const repoFake = new PeriodoAvaliacaoRepositoryFake();
+      repoFake.findById = jest.fn().mockRejectedValue('Erro string');
+      const { result: defaultHook } = renderHook(() => useAtividades(repoFake));
+      await act(async () => {
+        await defaultHook.current.carregarPeriodo('p1');
+      });
+      expect(defaultHook.current.error).toBe('Erro ao carregar período.');
+
+      const { result: useSyncDefault } = renderHook(() => useSync());
+      expect(useSyncDefault.current.isSyncing).toBe(false);
     });
   });
 });

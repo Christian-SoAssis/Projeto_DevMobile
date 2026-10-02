@@ -4,6 +4,7 @@ import { User } from '../../src/domain/entities/User';
 import { Favorite } from '../../src/domain/entities/Favorite';
 import { AdoptionInterest } from '../../src/domain/entities/AdoptionInterest';
 import { SyncAction } from '../../src/domain/entities/SyncAction';
+import { SyncMetadata } from '../../src/domain/entities/SyncMetadata';
 import { PeriodoAvaliacao } from '../../src/domain/entities/PeriodoAvaliacao';
 import { Estagio } from '../../src/domain/entities/Estagio';
 import { TokenSupervisor } from '../../src/domain/entities/TokenSupervisor';
@@ -108,6 +109,28 @@ describe('Domain Entities & Aggregates', () => {
       action.markFailed('Err');
       action.resetForRetry();
       expect(action.status.isPending()).toBe(true);
+    });
+  });
+
+  describe('SyncMetadata', () => {
+    it('deve exigir chave e iniciar sem marcas de sincronização', () => {
+      expect(() => new SyncMetadata({ key: '' })).toThrow('Chave do estado de sincronização é obrigatória.');
+
+      const meta = new SyncMetadata({ key: 'animals' });
+      expect(meta.key).toBe('animals');
+      expect(meta.version).toBe(0);
+      expect(meta.lastSyncAt).toBeUndefined();
+      expect(meta.lastSuccessAt).toBeUndefined();
+    });
+
+    it('deve registrar marcas de sincronização e sucesso', () => {
+      const meta = new SyncMetadata({ key: 'animals', version: 3 });
+      meta.markSynced('2026-01-01T00:00:00.000Z');
+      meta.markSuccess('2026-01-02T00:00:00.000Z');
+
+      expect(meta.version).toBe(3);
+      expect(meta.lastSyncAt).toBe('2026-01-01T00:00:00.000Z');
+      expect(meta.lastSuccessAt).toBe('2026-01-02T00:00:00.000Z');
     });
   });
 

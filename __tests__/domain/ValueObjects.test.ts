@@ -7,6 +7,7 @@ import { Assinatura } from '../../src/domain/value-objects/Assinatura';
 import { CargaHoraria } from '../../src/domain/value-objects/CargaHoraria';
 import { StatusPeriodo } from '../../src/domain/value-objects/StatusPeriodo';
 import { ContactInfo } from '../../src/domain/value-objects/ContactInfo';
+import { SearchPreferences } from '../../src/domain/value-objects/SearchPreferences';
 
 describe('Domain Value Objects', () => {
   describe('ApproximateLocation', () => {
@@ -194,6 +195,29 @@ describe('Domain Value Objects', () => {
       expect(ci.phone).toBe('11999998888');
 
       expect(() => new ContactInfo('email_invalido')).toThrow();
+    });
+  });
+
+  describe('SearchPreferences', () => {
+    it('deve iniciar vazio quando nenhum filtro é informado', () => {
+      const prefs = new SearchPreferences();
+      expect(prefs.isEmpty()).toBe(true);
+    });
+
+    it('deve armazenar filtros sem impor limites (limites são decisão de produto)', () => {
+      const prefs = new SearchPreferences({
+        species: 'Cão',
+        size: 'Médio',
+        age: '2 anos',
+        sex: 'Fêmea',
+        distance: 50,
+        region: 'MG',
+      });
+
+      expect(prefs.isEmpty()).toBe(false);
+      expect(prefs.species).toBe('Cão');
+      expect(prefs.distance).toBe(50);
+      expect(prefs.region).toBe('MG');
     });
   });
 });

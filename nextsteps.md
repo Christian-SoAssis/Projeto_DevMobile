@@ -29,16 +29,16 @@ Ordem de construção exigida por `criteriosapresentacao1.md` §7, com o status 
 
 | # | Item do checklist (§7) | Status | Evidência no repo |
 |---|---|---|---|
-| 1 | Value Objects | ✅ Feito | `src/domain/value-objects/` — `ApproximateLocation.ts`, `AnimalCharacteristics.ts`, `AdoptionStatus.ts`, `SyncState.ts`, `ContactInfo.ts` (trilha adoção) + `Criterio.ts`, `Assinatura.ts`, `CargaHoraria.ts`, `StatusPeriodo.ts` (trilha estágio, ver §7) |
-| 2 | Entities & Aggregates | ✅ Feito | `src/domain/entities/` — `Animal.ts`, `AnimalPhoto.ts`, `Favorite.ts`, `AdoptionInterest.ts`, `SyncAction.ts`, `User.ts` + `PeriodoAvaliacao.ts`, `Estagio.ts`, `TokenSupervisor.ts` (trilha estágio) |
+| 1 | Value Objects | ✅ Feito | `src/domain/value-objects/` — `ApproximateLocation.ts`, `AnimalCharacteristics.ts`, `AdoptionStatus.ts`, `SyncState.ts`, `ContactInfo.ts`, `SearchPreferences.ts` (trilha adoção, sem regras — limites são decisão §4) + `Criterio.ts`, `Assinatura.ts`, `CargaHoraria.ts`, `StatusPeriodo.ts` (trilha estágio, ver §7) |
+| 2 | Entities & Aggregates | ✅ Feito | `src/domain/entities/` — `Animal.ts`, `AnimalPhoto.ts`, `Favorite.ts`, `AdoptionInterest.ts`, `SyncAction.ts`, `SyncMetadata.ts`, `User.ts` + `PeriodoAvaliacao.ts`, `Estagio.ts`, `TokenSupervisor.ts` (trilha estágio) |
 | 3 | Domain Services | ✅ Feito | `src/domain/services/` — `SincronizacaoService.ts`, `ConflictResolutionService.ts`, `RegraDevolucaoService.ts`, `RegraGeracaoPdfService.ts` |
 | 4 | Interfaces Repository/Gateway | ✅ Feito | `src/domain/ports/` com 11 contratos, incluindo `PhotoStorage.ts` (doc §13) + `PhotoStorageFake` em `src/application/fakes/` com teste dedicado |
-| 5 | Use Cases com fakes in-memory (TDD Red-Green-Refactor) | ✅ Feito | `src/application/use-cases/` (19 arquivos) + `src/application/fakes/` (10 fakes em `Map`). Cobrem UC01–UC02/UC05/UC07/UC09–UC11/UC13–UC18 (adoção) e relatório/avaliação/assinatura/aprovação/devolução/PDF/token (estágio) |
+| 5 | Use Cases com fakes in-memory (TDD Red-Green-Refactor) | ✅ Feito | `src/application/use-cases/` (19 arquivos) + `src/application/fakes/` (11 fakes em `Map`, incluindo `PhotoStorageFake`). Cobrem UC01–UC02/UC05/UC07/UC09–UC11/UC13–UC18 (adoção) e relatório/avaliação/assinatura/aprovação/devolução/PDF/token (estágio) |
 | 6 | Context API + Custom Hooks | ✅ Feito | `src/adapters/context/AuthContext.tsx`, `src/adapters/hooks/useAnimals.ts`, `useSync.ts`, `useAtividades.ts` |
-| 7 | Telas com RNTL + fakes injetados | ⚠️ Parcial | 7 screens existem em `src/adapters/screens/`, mas `app/` só tem `app/_layout.tsx` + `app/index.tsx` (só `SearchScreen` roteada). Faltam as rotas da tabela Boundary da documentação §8: detalhes, novo/editar anúncio, meus anúncios, favoritos, sync, conflito, moderação, login/cadastro |
+| 7 | Telas com RNTL + fakes injetados | ⚠️ Parcial | 9 screens em `src/adapters/screens/` (`FavoritesScreen.tsx` e `MyAnimalsScreen.tsx` novas, com testes RNTL dedicados). Rotas em `app/`: `/(tabs)` (Início, Favoritos, Meus anúncios, Sync), `/animal/[id]` (detalhes), `/(protected)/novo-anuncio` (criação), `/` → `/(tabs)`; fakes compartilhados em `src/adapters/demo/sharedFakes.ts`. Faltam: edição de anúncio (`AnimalFormScreen.tsx` é só-criação), revisão de conflito (sem tela — Fase 6), moderação (bloqueada UC20), login/cadastro (sem telas) |
 | 8 | Sessão segura (`SessionStorageSecureStore` + `expo-secure-store` mockado) | ⚠️ Parcial | `src/adapters/auth/SessionStorageSecureStore.ts` existe, mas `expo-secure-store` **não** está em `package.json:14-25` — opera apenas mockada, como manda o critério §5 |
 
-**Base técnica validada:** Expo SDK 57 (`package.json:15`), `expo-doctor` 21/21, `tsc --noEmit` limpo, 97/97 testes verdes, bundle Android + manifest `exposdk:57.0.0` confirmados.
+**Base técnica validada:** Expo SDK 57 (`package.json:15`), `expo-doctor` 21/21, `tsc --noEmit` limpo, 103/103 testes verdes, bundle Android + manifest `exposdk:57.0.0` confirmados.
 
 **Gaps nominais a registrar (sem renomear nada por conta própria):**
 - Critério §7 pede `Coordenada` / `StatusSincronizacao` / `SincronizarFilaUseCase`; o código tem `ApproximateLocation` / `SyncState` / `ProcessSyncQueueUseCase`. Manter os nomes do código; eventual unificação é decisão futura, não próximo passo.
@@ -87,8 +87,8 @@ Cópia estrita de `criteriosapresentacao1.md` §5:
 
 ### Fase 5 — Rotas Expo Router completas
 - **Origem:** tabela Boundary doc §8; estrutura doc §13 (`(public)/`, `(tabs)/`, `(protected)/`); UC01–UC06.
-- **Criar em `app/`:** pública (busca/lista/mapa/detalhes), tabs (início, busca, favoritos), protegidas (novo/editar anúncio, meus anúncios, gestão/adoção, sync, revisão de conflito, moderação admin, login/cadastro). Hoje só existem `app/_layout.tsx` e `app/index.tsx`.
-- **Testes:** RNTL por tela com fakes (padrão critérios §6: `render`, `fireEvent.press`, `fireEvent.changeText` dentro de `<AuthProvider>`); E2E §16.4 item 1 (visitante pesquisa e abre um animal).
+- **Criar em `app/`:** ✅ feito `/(tabs)` (Início, Favoritos, Meus anúncios, Sync), `/animal/[id]` (detalhes), `/(protected)/novo-anuncio` (criação), `/` → `/(tabs)`. Pendentes: edição de anúncio (exige modo edição na `AnimalFormScreen`), revisão de conflito (Fase 6), moderação (bloqueada UC20), login/cadastro (sem telas).
+- **Testes:** RNTL por tela com fakes (padrão critérios §6: `render`, `fireEvent.press`, `fireEvent.changeText` dentro de `<AuthProvider>`); E2E §16.4 item 1 ✅ feito (`__tests__/e2e/SearchToDetails.test.tsx`).
 - **Pronto:** todas as telas da tabela §8 roteadas; deep links via `scheme: "enlace"` (`app.json:7`) funcionais.
 - **Bloqueadores (doc §19):** visibilidade exata dos dados de contato — decidir **antes** da tela de detalhes final.
 
@@ -106,7 +106,7 @@ Cópia estrita de `criteriosapresentacao1.md` §5:
 
 ### Fase 8 — E2E finais + apresentação
 - **Origem:** doc §16.4 (8 fluxos) + pirâmide de testes critérios §6 (E2E pouquíssimos, só críticos).
-- **Executar na ordem:** 1) visitante pesquisa e abre animal; 2) autentica e favorita; 3) responsável cria online; 4) cria offline→fecha→reabre→sincroniza; 5) edita offline→chega ao servidor; 6) conflito; 7) marca adotado; 8) terceiro não edita.
+- **Executar na ordem:** 1) ✅ visitante pesquisa e abre um animal (`__tests__/e2e/SearchToDetails.test.tsx`, rotas com `expo-router` mockado e fakes compartilhados); 2) autentica e favorita; 3) responsável cria online; 4) cria offline→fecha→reabre→sincroniza; 5) edita offline→chega ao servidor; 6) conflito; 7) marca adotado; 8) terceiro não edita.
 - **Pronto:** 8/8 verdes; cobertura global ≥ 80%; `expo-doctor` 21/21.
 
 ---
@@ -155,7 +155,7 @@ RNFs: RNF01/02/09 → Fase 2; RNF03/04/10 → Fase 3; RNF05/06 → Fase 4; RNF07
 
 ```bash
 npm run typecheck   # tsc --noEmit, 0 erros
-npm test            # 97 testes atuais + novos; cobertura ≥ 80% (jest.config.js:12-19)
+npm test            # 103 testes atuais + novos; cobertura ≥ 80% (jest.config.js:12-19)
 npx expo-doctor     # 21/21
 npx expo start      # bundle Android + manifest exposdk:57.0.0
 ```
@@ -164,6 +164,6 @@ npx expo start      # bundle Android + manifest exposdk:57.0.0
 
 ## §7 — Registro de discrepância entre os dois documentos-fonte
 
-`criteriosapresentacao1.md` descreve também uma trilha "estágio/relatórios" (`PeriodoAvaliacao`, `Estagio`, `TokenSupervisor`, `Criterio`, `Assinatura`, `CargaHoraria`, `StatusPeriodo`, telas `AssinaturaScreen`/`AtividadesFormScreen`/`HistoricoRelatoriosScreen`) que **não existe** na documentação do software (cujo domínio é `Animal`, `AnimalPhoto`, `Favorite`, `AdoptionInterest`, `SyncAction` — doc §§4–5). O código contém as duas trilhas e os 89 testes cobrem ambas.
+`criteriosapresentacao1.md` descreve também uma trilha "estágio/relatórios" (`PeriodoAvaliacao`, `Estagio`, `TokenSupervisor`, `Criterio`, `Assinatura`, `CargaHoraria`, `StatusPeriodo`, telas `AssinaturaScreen`/`AtividadesFormScreen`/`HistoricoRelatoriosScreen`) que **não existe** na documentação do software (cujo domínio é `Animal`, `AnimalPhoto`, `Favorite`, `AdoptionInterest`, `SyncAction`, `SyncMetadata` — doc §§4–5). O código contém as duas trilhas e os 103 testes cobrem ambas.
 
 **Decisão registrada:** a trilha adoção é o escopo deste planejamento. Nenhum próximo passo cria, remove ou renomeia nada da trilha estágio sem decisão explícita posterior — este arquivo apenas a documenta como legado existente.

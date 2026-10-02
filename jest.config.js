@@ -17,7 +17,6 @@ module.exports = {
       statements: 80,
     },
   },
-  setupFilesAfterEnv: ['@testing-library/react-native/extend-expect'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalFormScreen } from '../../src/adapters/screens/AnimalFormScreen';
 import {
   DEMO_OWNER_ID,
@@ -26,16 +27,16 @@ export default function EditarAnuncioRoute() {
     load();
   }, [id]);
 
+  let content = null;
+
   if (loading) {
-    return (
+    content = (
       <View style={styles.center} testID="edit-loading">
         <ActivityIndicator size="large" color="#0066cc" />
       </View>
     );
-  }
-
-  if (!animal) {
-    return (
+  } else if (!animal) {
+    content = (
       <View style={styles.center} testID="edit-not-found">
         <Text style={styles.message}>Anúncio não encontrado para edição.</Text>
         <TouchableOpacity
@@ -47,20 +48,30 @@ export default function EditarAnuncioRoute() {
         </TouchableOpacity>
       </View>
     );
+  } else {
+    content = (
+      <AnimalFormScreen
+        ownerId={DEMO_OWNER_ID}
+        initialAnimal={animal}
+        animalRepository={animalRepository}
+        syncQueueRepository={syncQueueRepository}
+        onSuccess={() => router.back()}
+      />
+    );
   }
 
   return (
-    <AnimalFormScreen
-      ownerId={DEMO_OWNER_ID}
-      initialAnimal={animal}
-      animalRepository={animalRepository}
-      syncQueueRepository={syncQueueRepository}
-      onSuccess={() => router.back()}
-    />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+      {content}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -84,3 +95,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+

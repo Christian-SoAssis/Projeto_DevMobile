@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalDetailsScreen } from '../../src/adapters/screens/AnimalDetailsScreen';
 import {
   DEMO_OWNER_ID,
@@ -29,16 +30,16 @@ export default function AnimalDetailsRoute() {
     load();
   }, [id]);
 
+  let content = null;
+
   if (loading) {
-    return (
+    content = (
       <View style={styles.center} testID="details-loading">
         <ActivityIndicator size="large" color="#0066cc" />
       </View>
     );
-  }
-
-  if (!animal) {
-    return (
+  } else if (!animal) {
+    content = (
       <View style={styles.center} testID="details-not-found">
         <Text style={styles.message}>Anúncio não encontrado.</Text>
         <TouchableOpacity
@@ -50,22 +51,32 @@ export default function AnimalDetailsRoute() {
         </TouchableOpacity>
       </View>
     );
+  } else {
+    content = (
+      <AnimalDetailsScreen
+        animal={animal}
+        currentUserId={animal.ownerId === DEMO_OWNER_ID ? DEMO_OWNER_ID : DEMO_USER_ID}
+        animalRepository={animalRepository}
+        favoriteRepository={favoriteRepository}
+        interestRepository={interestRepository}
+        syncQueueRepository={syncQueueRepository}
+        onBack={() => router.back()}
+      />
+    );
   }
 
   return (
-    <AnimalDetailsScreen
-      animal={animal}
-      currentUserId={animal.ownerId === DEMO_OWNER_ID ? DEMO_OWNER_ID : DEMO_USER_ID}
-      animalRepository={animalRepository}
-      favoriteRepository={favoriteRepository}
-      interestRepository={interestRepository}
-      syncQueueRepository={syncQueueRepository}
-      onBack={() => router.back()}
-    />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+      {content}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f5f5f7',
+  },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -89,3 +100,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+

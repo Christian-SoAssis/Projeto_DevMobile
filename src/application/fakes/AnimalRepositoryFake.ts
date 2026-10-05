@@ -29,6 +29,10 @@ export class AnimalRepositoryFake implements AnimalRepository {
     if (filters.sex) {
       result = result.filter((a) => a.characteristics.sex.toLowerCase() === filters.sex!.toLowerCase());
     }
+    if (filters.approximateAge) {
+      const age = filters.approximateAge.toLowerCase();
+      result = result.filter((a) => a.characteristics.approximateAge.toLowerCase().includes(age));
+    }
     if (filters.ownerId) {
       result = result.filter((a) => a.ownerId === filters.ownerId);
     }

@@ -25,6 +25,9 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [selectedSpecies, setSelectedSpecies] = useState<string>('');
+  const [selectedSize, setSelectedSize] = useState<string>('');
+  const [selectedSex, setSelectedSex] = useState<string>('');
+  const [ageQuery, setAgeQuery] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,6 +39,9 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
       const filters: AnimalFilterOptions = {
         searchQuery: query,
         species: selectedSpecies || undefined,
+        size: selectedSize || undefined,
+        sex: selectedSex || undefined,
+        approximateAge: ageQuery || undefined,
       };
       const useCase = new SearchAnimalsUseCase(animalRepository);
       const res = await useCase.execute(filters, !isOffline);
@@ -50,7 +56,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
 
   useEffect(() => {
     performSearch();
-  }, [selectedSpecies]);
+  }, [selectedSpecies, selectedSize, selectedSex]);
 
   return (
     <View style={styles.container} testID="search-screen">
@@ -93,6 +99,54 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
             </TouchableOpacity>
           );
         })}
+      </View>
+
+      {/* Size Filter Pills (RF04) */}
+      <View style={styles.filterRow}>
+        {['Todos', 'Pequeno', 'Médio', 'Grande'].map((sz) => {
+          const active = (sz === 'Todos' && !selectedSize) || selectedSize === sz;
+          return (
+            <TouchableOpacity
+              key={sz}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => setSelectedSize(sz === 'Todos' ? '' : sz)}
+              testID={`filter-size-${sz}`}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{sz}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Sex Filter Pills (RF04) */}
+      <View style={styles.filterRow}>
+        {['Todos', 'Macho', 'Fêmea'].map((sx) => {
+          const active = (sx === 'Todos' && !selectedSex) || selectedSex === sx;
+          return (
+            <TouchableOpacity
+              key={sx}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => setSelectedSex(sx === 'Todos' ? '' : sx)}
+              testID={`filter-sex-${sx}`}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{sx}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Age Filter (RF04, mock contains) */}
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Filtrar por idade aproximada..."
+          value={ageQuery}
+          onChangeText={setAgeQuery}
+          testID="search-age-input"
+        />
+        <TouchableOpacity style={styles.searchButton} onPress={performSearch} testID="search-age-button">
+          <Text style={styles.buttonText}>Filtrar</Text>
+        </TouchableOpacity>
       </View>
 
       {/* List / Map View Toggle */}

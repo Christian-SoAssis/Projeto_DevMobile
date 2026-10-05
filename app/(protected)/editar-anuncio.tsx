@@ -1,17 +1,14 @@
 import React from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { AnimalDetailsScreen } from '../../src/adapters/screens/AnimalDetailsScreen';
+import { AnimalFormScreen } from '../../src/adapters/screens/AnimalFormScreen';
 import {
   DEMO_OWNER_ID,
-  DEMO_USER_ID,
   animalRepository,
-  favoriteRepository,
-  interestRepository,
   syncQueueRepository,
 } from '../../src/adapters/demo/sharedFakes';
 
-export default function AnimalDetailsRoute() {
+export default function EditarAnuncioRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [animal, setAnimal] = React.useState<Awaited<
@@ -31,7 +28,7 @@ export default function AnimalDetailsRoute() {
 
   if (loading) {
     return (
-      <View style={styles.center} testID="details-loading">
+      <View style={styles.center} testID="edit-loading">
         <ActivityIndicator size="large" color="#0066cc" />
       </View>
     );
@@ -39,12 +36,12 @@ export default function AnimalDetailsRoute() {
 
   if (!animal) {
     return (
-      <View style={styles.center} testID="details-not-found">
-        <Text style={styles.message}>Anúncio não encontrado.</Text>
+      <View style={styles.center} testID="edit-not-found">
+        <Text style={styles.message}>Anúncio não encontrado para edição.</Text>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
-          testID="details-back"
+          testID="edit-back"
         >
           <Text style={styles.backText}>Voltar</Text>
         </TouchableOpacity>
@@ -53,14 +50,12 @@ export default function AnimalDetailsRoute() {
   }
 
   return (
-    <AnimalDetailsScreen
-      animal={animal}
-      currentUserId={animal.ownerId === DEMO_OWNER_ID ? DEMO_OWNER_ID : DEMO_USER_ID}
+    <AnimalFormScreen
+      ownerId={DEMO_OWNER_ID}
+      initialAnimal={animal}
       animalRepository={animalRepository}
-      favoriteRepository={favoriteRepository}
-      interestRepository={interestRepository}
       syncQueueRepository={syncQueueRepository}
-      onBack={() => router.back()}
+      onSuccess={() => router.back()}
     />
   );
 }

@@ -35,10 +35,10 @@ Ordem de construção exigida por `criteriosapresentacao1.md` §7, com o status 
 | 4 | Interfaces Repository/Gateway | ✅ Feito | `src/domain/ports/` com 11 contratos, incluindo `PhotoStorage.ts` (doc §13) + `PhotoStorageFake` em `src/application/fakes/` com teste dedicado |
 | 5 | Use Cases com fakes in-memory (TDD Red-Green-Refactor) | ✅ Feito | `src/application/use-cases/` (19 arquivos) + `src/application/fakes/` (11 fakes em `Map`, incluindo `PhotoStorageFake`). Cobrem UC01–UC02/UC05/UC07/UC09–UC11/UC13–UC18 (adoção) e relatório/avaliação/assinatura/aprovação/devolução/PDF/token (estágio) |
 | 6 | Context API + Custom Hooks | ✅ Feito | `src/adapters/context/AuthContext.tsx`, `src/adapters/hooks/useAnimals.ts`, `useSync.ts`, `useAtividades.ts` |
-| 7 | Telas com RNTL + fakes injetados | ⚠️ Parcial | 9 screens em `src/adapters/screens/` (`FavoritesScreen.tsx` e `MyAnimalsScreen.tsx` novas, com testes RNTL dedicados). Rotas em `app/`: `/(tabs)` (Início, Favoritos, Meus anúncios, Sync), `/animal/[id]` (detalhes), `/(protected)/novo-anuncio` (criação), `/` → `/(tabs)`; fakes compartilhados em `src/adapters/demo/sharedFakes.ts`. Faltam: edição de anúncio (`AnimalFormScreen.tsx` é só-criação), revisão de conflito (sem tela — Fase 6), moderação (bloqueada UC20), login/cadastro (sem telas) |
-| 8 | Sessão segura (`SessionStorageSecureStore` + `expo-secure-store` mockado) | ⚠️ Parcial | `src/adapters/auth/SessionStorageSecureStore.ts` existe, mas `expo-secure-store` **não** está em `package.json:14-25` — opera apenas mockada, como manda o critério §5 |
+| 7 | Telas com RNTL + fakes injetados | ✅ Feito | 11 screens em `src/adapters/screens/` (`LoginScreen.tsx` e `RegisterScreen.tsx` novas, stubs mock com testes RNTL dedicados; `AnimalFormScreen.tsx` com modo edição via `UpdateAnimalUseCase`; `MyAnimalsScreen.tsx` com Editar/Excluir/Marcar adotado; `SearchScreen.tsx` com filtros RF04 espécie/porte/sexo/idade). Rotas em `app/`: `/(tabs)` (Início, Favoritos, Meus anúncios, Sync), `/animal/[id]` (detalhes, com fluxo dono via `DEMO_OWNER_ID`), `/(protected)/novo-anuncio` (criação), `/(protected)/editar-anuncio` (edição), `/login`, `/cadastro` (stubs), `/` → `/(tabs)`; fakes compartilhados em `src/adapters/demo/sharedFakes.ts`. Pendentes por desenho (não são Fase 1): revisão de conflito (Fase 6), moderação (bloqueada UC20) |
+| 8 | Sessão segura (`SessionStorageSecureStore` + `expo-secure-store` mockado) | ✅ Feito (mock) | `src/adapters/auth/SessionStorageSecureStore.ts` existe com teste dedicado (`__tests__/adapters/SessionStorageSecureStore.test.ts`, 4 casos); `expo-secure-store` **não** está em `package.json` — opera apenas mockada, como manda o critério §5 |
 
-**Base técnica validada:** Expo SDK 57 (`package.json:15`), `expo-doctor` 21/21, `tsc --noEmit` limpo, 103/103 testes verdes, bundle Android + manifest `exposdk:57.0.0` confirmados.
+**Base técnica validada:** Expo SDK 57 (`package.json:15`), `expo-doctor` 21/21, `tsc --noEmit` limpo, 128/128 testes verdes (`npm test` = `jest --runInBand`; cobertura 99,5% linhas / 93,5% branches, meta ≥ 80%), bundle Android + manifest `exposdk:57.0.0` confirmados.
 
 **Gaps nominais a registrar (sem renomear nada por conta própria):**
 - Critério §7 pede `Coordenada` / `StatusSincronizacao` / `SincronizarFilaUseCase`; o código tem `ApproximateLocation` / `SyncState` / `ProcessSyncQueueUseCase`. Manter os nomes do código; eventual unificação é decisão futura, não próximo passo.
@@ -87,8 +87,8 @@ Cópia estrita de `criteriosapresentacao1.md` §5:
 
 ### Fase 5 — Rotas Expo Router completas
 - **Origem:** tabela Boundary doc §8; estrutura doc §13 (`(public)/`, `(tabs)/`, `(protected)/`); UC01–UC06.
-- **Criar em `app/`:** ✅ feito `/(tabs)` (Início, Favoritos, Meus anúncios, Sync), `/animal/[id]` (detalhes), `/(protected)/novo-anuncio` (criação), `/` → `/(tabs)`. Pendentes: edição de anúncio (exige modo edição na `AnimalFormScreen`), revisão de conflito (Fase 6), moderação (bloqueada UC20), login/cadastro (sem telas).
-- **Testes:** RNTL por tela com fakes (padrão critérios §6: `render`, `fireEvent.press`, `fireEvent.changeText` dentro de `<AuthProvider>`); E2E §16.4 item 1 ✅ feito (`__tests__/e2e/SearchToDetails.test.tsx`).
+- **Criar em `app/`:** ✅ feito `/(tabs)` (Início, Favoritos, Meus anúncios, Sync), `/animal/[id]` (detalhes, com fluxo dono), `/(protected)/novo-anuncio` (criação), `/(protected)/editar-anuncio` (edição), `/login`, `/cadastro` (stubs mock), `/` → `/(tabs)`. Pendentes por desenho (não são Fase 1): revisão de conflito (Fase 6), moderação (bloqueada UC20).
+- **Testes:** RNTL por tela com fakes (padrão critérios §6: `render`, `fireEvent.press`, `fireEvent.changeText` dentro de `<AuthProvider>`); E2E §16.4 itens 1, 2, 3, 7, 8 ✅ feitos (`SearchToDetails.test.tsx` + `MockFlows.test.ts`); itens 4–6 seguem Fase 6.
 - **Pronto:** todas as telas da tabela §8 roteadas; deep links via `scheme: "enlace"` (`app.json:7`) funcionais.
 - **Bloqueadores (doc §19):** visibilidade exata dos dados de contato — decidir **antes** da tela de detalhes final.
 
@@ -106,8 +106,8 @@ Cópia estrita de `criteriosapresentacao1.md` §5:
 
 ### Fase 8 — E2E finais + apresentação
 - **Origem:** doc §16.4 (8 fluxos) + pirâmide de testes critérios §6 (E2E pouquíssimos, só críticos).
-- **Executar na ordem:** 1) ✅ visitante pesquisa e abre um animal (`__tests__/e2e/SearchToDetails.test.tsx`, rotas com `expo-router` mockado e fakes compartilhados); 2) autentica e favorita; 3) responsável cria online; 4) cria offline→fecha→reabre→sincroniza; 5) edita offline→chega ao servidor; 6) conflito; 7) marca adotado; 8) terceiro não edita.
-- **Pronto:** 8/8 verdes; cobertura global ≥ 80%; `expo-doctor` 21/21.
+- **Executar na ordem:** 1) ✅ visitante pesquisa e abre um animal (`__tests__/e2e/SearchToDetails.test.tsx`, rotas com `expo-router` mockado e fakes compartilhados); 2) ✅ autentica e favorita; 3) ✅ responsável cria online; 4) cria offline→fecha→reabre→sincroniza (Fase 6 — exige SQLite); 5) edita offline→chega ao servidor (Fase 6); 6) conflito (Fase 6); 7) ✅ marca adotado; 8) ✅ terceiro não edita (2, 3, 7, 8 em `__tests__/e2e/MockFlows.test.ts`, 100% mock).
+- **Pronto:** 5/8 verdes em mock; 8/8 só ao fim da Fase 6; cobertura global ≥ 80%; `expo-doctor` 21/21.
 
 ---
 
@@ -155,7 +155,7 @@ RNFs: RNF01/02/09 → Fase 2; RNF03/04/10 → Fase 3; RNF05/06 → Fase 4; RNF07
 
 ```bash
 npm run typecheck   # tsc --noEmit, 0 erros
-npm test            # 103 testes atuais + novos; cobertura ≥ 80% (jest.config.js:12-19)
+npm test            # 128 testes atuais + novos; cobertura ≥ 80% (jest.config.js:12-19)
 npx expo-doctor     # 21/21
 npx expo start      # bundle Android + manifest exposdk:57.0.0
 ```
@@ -164,6 +164,6 @@ npx expo start      # bundle Android + manifest exposdk:57.0.0
 
 ## §7 — Registro de discrepância entre os dois documentos-fonte
 
-`criteriosapresentacao1.md` descreve também uma trilha "estágio/relatórios" (`PeriodoAvaliacao`, `Estagio`, `TokenSupervisor`, `Criterio`, `Assinatura`, `CargaHoraria`, `StatusPeriodo`, telas `AssinaturaScreen`/`AtividadesFormScreen`/`HistoricoRelatoriosScreen`) que **não existe** na documentação do software (cujo domínio é `Animal`, `AnimalPhoto`, `Favorite`, `AdoptionInterest`, `SyncAction`, `SyncMetadata` — doc §§4–5). O código contém as duas trilhas e os 103 testes cobrem ambas.
+`criteriosapresentacao1.md` descreve também uma trilha "estágio/relatórios" (`PeriodoAvaliacao`, `Estagio`, `TokenSupervisor`, `Criterio`, `Assinatura`, `CargaHoraria`, `StatusPeriodo`, telas `AssinaturaScreen`/`AtividadesFormScreen`/`HistoricoRelatoriosScreen`) que **não existe** na documentação do software (cujo domínio é `Animal`, `AnimalPhoto`, `Favorite`, `AdoptionInterest`, `SyncAction`, `SyncMetadata` — doc §§4–5). O código contém as duas trilhas e os 128 testes cobrem ambas.
 
 **Decisão registrada:** a trilha adoção é o escopo deste planejamento. Nenhum próximo passo cria, remove ou renomeia nada da trilha estágio sem decisão explícita posterior — este arquivo apenas a documenta como legado existente.

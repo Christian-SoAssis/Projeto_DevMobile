@@ -9,11 +9,13 @@ import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
 import { CameraGateway } from '../../domain/ports/CameraGateway';
 import { LocationGateway } from '../../domain/ports/LocationGateway';
 import { CreateAnimalUseCase } from '../../application/use-cases/CreateAnimalUseCase';
+import { UpdateAnimalUseCase } from '../../application/use-cases/UpdateAnimalUseCase';
 import { CameraGatewayFake } from '../../application/fakes/CameraGatewayFake';
 import { LocationGatewayFake } from '../../application/fakes/LocationGatewayFake';
 
 export interface AnimalFormScreenProps {
   ownerId?: string;
+  initialAnimal?: Animal;
   animalRepository: AnimalRepository;
   syncQueueRepository: SyncQueueRepository;
   cameraGateway?: CameraGateway;
@@ -24,6 +26,7 @@ export interface AnimalFormScreenProps {
 
 export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
   ownerId = 'usr_1',
+  initialAnimal,
   animalRepository,
   syncQueueRepository,
   cameraGateway = new CameraGatewayFake(),
@@ -31,18 +34,19 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
   onSuccess,
   isOnline = true,
 }) => {
-  const [name, setName] = useState('');
-  const [species, setSpecies] = useState('Cão');
-  const [size, setSize] = useState('Médio');
-  const [approximateAge, setApproximateAge] = useState('2 anos');
-  const [sex, setSex] = useState('Macho');
-  const [city, setCity] = useState('Varginha');
-  const [neighborhood, setNeighborhood] = useState('Centro');
+  const isEdit = !!initialAnimal;
+  const [name, setName] = useState(initialAnimal?.name ?? '');
+  const [species, setSpecies] = useState(initialAnimal?.characteristics.species ?? 'Cão');
+  const [size, setSize] = useState(initialAnimal?.characteristics.size ?? 'Médio');
+  const [approximateAge, setApproximateAge] = useState(initialAnimal?.characteristics.approximateAge ?? '2 anos');
+  const [sex, setSex] = useState(initialAnimal?.characteristics.sex ?? 'Macho');
+  const [city, setCity] = useState(initialAnimal?.location.city ?? 'Varginha');
+  const [neighborhood, setNeighborhood] = useState(initialAnimal?.location.neighborhood ?? 'Centro');
   const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
   const [locationStatus, setLocationStatus] = useState<string>('Não capturada');
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [latitude, setLatitude] = useState<number>(-21.554);
-  const [longitude, setLongitude] = useState<number>(-45.435);
+  const [latitude, setLatitude] = useState<number>(initialAnimal?.location.latitude ?? -21.554);
+  const [longitude, setLongitude] = useState<number>(initialAnimal?.location.longitude ?? -45.435);
 
   const handleCapturePhoto = async () => {
     const photo = await cameraGateway.capturePhoto();
@@ -65,6 +69,27 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
   const handleSubmit = async () => {
     setFeedback(null);
     try {
+      if (isEdit && initialAnimal) {
+        const location = new ApproximateLocation({
+          latitude,
+          longitude,
+          city,
+          neighborhood,
+          region: 'MG',
+        });
+        const characteristics = new AnimalCharacteristics({
+          species,
+          size,
+          approximateAge,
+          sex,
+        });
+
+        const useCase = new UpdateAnimalUseCase(animalRepository, syncQueueRepository);
+        await useCase.execute(ownerId, initialAnimal.id, { name, characteristics, location }, isOnline);
+        setFeedback('Anúncio atualizado com sucesso!');
+        if (onSuccess) onSuccess();
+        return;
+      }
       const animalId = `anim_${Date.now()}`;
       const location = new ApproximateLocation({
         latitude,
@@ -115,7 +140,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
 
   return (
     <ScrollView style={styles.container} testID="animal-form-screen">
-      <Text style={styles.formTitle}>Cadastrar Novo Animal</Text>
+      <Text style={styles.formTitle} testID="form-title">{isEdit ? 'Editar Anúncio' : 'Cadastrar Novo Animal'}</Text>
 
       {feedback && (
         <View style={styles.feedbackBanner} testID="form-feedback">
@@ -142,6 +167,20 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
             testID={`radio-species-${sp}`}
           >
             <Text style={[styles.radioText, species === sp && styles.radioTextActive]}>{sp}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={styles.label}>Sexo *</Text>
+      <View style={styles.radioGroup}>
+        {['Macho', 'Fêmea'].map((sx) => (
+          <TouchableOpacity
+            key={sx}
+            style={[styles.radio, sex === sx && styles.radioActive]}
+            onPress={() => setSex(sx)}
+            testID={`radio-sex-${sx}`}
+          >
+            <Text style={[styles.radioText, sex === sx && styles.radioTextActive]}>{sx}</Text>
           </TouchableOpacity>
         ))}
       </View>

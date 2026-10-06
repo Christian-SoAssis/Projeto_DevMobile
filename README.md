@@ -82,8 +82,10 @@ Projeto_DevMobile/
 │   ├── application/                      # Testes dos Casos de Uso com Fakes In-Memory
 │   ├── adapters/                         # Testes do AuthContext, Session Storage e Hooks de Ponte
 │   └── screens/                          # Testes de Componentes e Telas com React Native Testing Library (RNTL)
-├── documentacao-software-rede-adocao-animais.md  # Especificação técnica e documento de arquitetura
-├── criteriosapresentacao1.md             # Rubrica da Fase "Domínio e Interface Primeiro"
+├── docs/                                 # Documentação do projeto
+│   ├── documentacao-software-rede-adocao-animais.md  # Especificação técnica e documento de arquitetura
+│   ├── criteriosapresentacao1.md         # Rubrica da Fase "Domínio e Interface Primeiro"
+│   └── nextsteps.md                      # Próximos passos por fase
 ├── jest.config.js                        # Configuração do Jest com limite de cobertura (80%+)
 ├── tsconfig.json                         # Configuração de Paths do TypeScript (@/*)
 └── package.json                          # Scripts e dependências do projeto
@@ -169,7 +171,9 @@ npm start
 
 | Documento | Descrição |
 |---|---|
-| [documentacao-software-rede-adocao-animais.md](file:///home/alunos/Downloads/Projeto_DevMobile/documentacao-software-rede-adocao-animais.md) | Especificação completa de requisitos (RF/RNF), diagrama de casos de uso, DER, diagramas de sequência, atividades, componentes e decisões de arquitetura do app **Enlace**. |
+| [docs/documentacao-software-rede-adocao-animais.md](docs/documentacao-software-rede-adocao-animais.md) | Especificação completa de requisitos (RF/RNF), diagrama de casos de uso, DER, diagramas de sequência, atividades, componentes e decisões de arquitetura do app **Enlace**. |
+| [docs/criteriosapresentacao1.md](docs/criteriosapresentacao1.md) | Rubrica da Fase "Domínio e Interface Primeiro" (100% mock, cobertura 80%+). |
+| [docs/nextsteps.md](docs/nextsteps.md) | Mapeamento dos próximos passos por fase a partir dos dois documentos-fonte. |
 
 ---
 

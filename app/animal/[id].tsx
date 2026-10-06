@@ -14,7 +14,7 @@ import {
 
 export default function AnimalDetailsRoute() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, asOwner } = useLocalSearchParams<{ id: string; asOwner?: string }>();
   const [animal, setAnimal] = React.useState<Awaited<
     ReturnType<typeof animalRepository.findById>
   > | null>(null);
@@ -55,7 +55,11 @@ export default function AnimalDetailsRoute() {
     content = (
       <AnimalDetailsScreen
         animal={animal}
-        currentUserId={animal.ownerId === DEMO_OWNER_ID ? DEMO_OWNER_ID : DEMO_USER_ID}
+        // Identidade 100% mock: Meus anúncios abre com ?asOwner=1 (dono, pode
+        // marcar adotado, NÃO pode favoritar o próprio anúncio). Início e
+        // Favoritos abrem sem o parâmetro (visitante usr_2: pode favoritar —
+        // e o favorito fica visível na aba Favoritos, que lista usr_2).
+        currentUserId={asOwner === '1' ? DEMO_OWNER_ID : DEMO_USER_ID}
         animalRepository={animalRepository}
         favoriteRepository={favoriteRepository}
         interestRepository={interestRepository}

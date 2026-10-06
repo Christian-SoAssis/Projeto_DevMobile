@@ -41,11 +41,18 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
 
   useEffect(() => {
     async function checkState() {
+      // favoriteRepository/interestRepository são singletons estáveis em app/
+      // (sharedFakes). Não entram nas deps para não recriar loop quando o
+      // default `new ...Fake()` gera nova referência a cada render em testes.
       if (currentUserId) {
-        const fav = await favoriteRepository.isFavorite(currentUserId, animal.id);
-        setIsFav(fav);
-        const intr = await interestRepository.hasInterest(currentUserId, animal.id);
-        setHasInterest(intr);
+        try {
+          const fav = await favoriteRepository.isFavorite(currentUserId, animal.id);
+          setIsFav(fav);
+          const intr = await interestRepository.hasInterest(currentUserId, animal.id);
+          setHasInterest(intr);
+        } catch {
+          // Mantém estado padrão (não favoritado) se a leitura falhar.
+        }
       }
     }
     checkState();
@@ -56,10 +63,18 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       setFeedback('Faça login para favoritar.');
       return;
     }
-    const useCase = new ToggleFavoriteUseCase(favoriteRepository);
-    const newState = await useCase.execute(currentUserId, animal.id);
-    setIsFav(newState);
-    setFeedback(newState ? 'Adicionado aos favoritos!' : 'Removido dos favoritos.');
+    if (isOwner) {
+      setFeedback('Você não pode favoritar seu próprio anúncio.');
+      return;
+    }
+    try {
+      const useCase = new ToggleFavoriteUseCase(favoriteRepository);
+      const newState = await useCase.execute(currentUserId, animal.id);
+      setIsFav(newState);
+      setFeedback(newState ? 'Adicionado aos favoritos!' : 'Removido dos favoritos.');
+    } catch (err: any) {
+      setFeedback(err.message || 'Erro ao favoritar. Tente novamente.');
+    }
   };
 
   const handleDemonstrateInterest = async () => {

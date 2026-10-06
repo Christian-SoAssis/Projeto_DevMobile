@@ -15,7 +15,7 @@ export default function MeusAnunciosTab() {
         syncQueueRepository={syncQueueRepository}
         ownerId={DEMO_OWNER_ID}
         onSelectAnimal={(animal) =>
-          router.push({ pathname: '/animal/[id]', params: { id: animal.id } })
+          router.push({ pathname: '/animal/[id]', params: { id: animal.id, asOwner: '1' } })
         }
         onEditAnimal={(animal) =>
           router.push({ pathname: '/(protected)/editar-anuncio', params: { id: animal.id } })

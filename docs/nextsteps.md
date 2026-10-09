@@ -60,13 +60,19 @@ Cópia estrita de `criteriosapresentacao1.md` §5:
 
 > Regra de abertura: nenhuma fase começa sem a anterior ter seus "Critérios de pronto" cumpridos **e** sem os bloqueadores do §4 correspondentes estarem decididos.
 
-### Fase 2 — Persistência local real (SQLite)
-- **Origem:** RNF01, RNF02, RNF09 (cache/fila sobrevivem ao reinício); RF17–RF19; UC15/UC16; documentação §§5.1, 13, 16.3.
+### Fase 2 — Persistência local real (SQLite + ORM + sessão segura + offline-first)
+- **Origem:** RNF01, RNF02, RNF09 (cache/fila sobrevivem ao reinício); RF17–RF19 + RF22 (estado de sincronização), RF26 (imagens offline até upload); UC15/UC16; documentação §§4.2, 5.1, 9.2, 13, 14, 16.3. Esta revisão amplia a Fase 2 original sem remover nada dela: todo o escopo anterior permanece obrigatório.
+- **Abertura formal:** Fase 1 declarada concluída (`npm run typecheck`, `npm test` ≥ 80%, `expo-doctor` verdes); a partir daqui `expo-sqlite` (+ driver ORM) e `expo-secure-store` passam a ser permitidos em `package.json` (exceção explícita à proibição do §2, válida só desta fase em diante).
 - **Criar:**
-  - `src/infrastructure/database/sqlite/migrations/` — tabelas `sync_queue`, `local_images`, `sync_state`, `search_preferences` (colunas exatas da doc §5.1) + cache de `animals`, `animal_photos`, `favorites`, `adoption_interests` (doc §4.2).
+  - `src/infrastructure/database/sqlite/migrations/` — tabelas `sync_queue`, `local_images`, `sync_state`, `search_preferences` (colunas exatas da doc §5.1) + cache de `animals`, `animal_photos`, `favorites`, `adoption_interests` (doc §4.2). Migrations versionadas e reversíveis; nenhuma coluna inventada fora da doc.
   - `src/infrastructure/database/sqlite/repositories/` — implementações SQLite dos ports existentes (`AnimalRepository`, `FavoriteRepository`, `AdoptionInterestRepository`, `SyncQueueRepository`, `UserRepository`) + criar `SearchPreferences` persistido (doc §§4.1/5.1).
-- **Testes (doc §16.3 SQLite):** migrations criam todas as tabelas; cache persiste após reinício; fila mantém payload e tentativas; transação anúncio + ação pendente é atômica.
-- **Pronto:** testes §16.3 SQLite verdes; cobertura ≥ 80%; domínio/application sem import de `expo-sqlite` (regra §13.1).
+  - **ORM sobre `expo-sqlite` (detalhe interno, sem mudar contratos):** decisão explícita desta fase: `drizzle-orm` + driver `expo-sqlite` (`src/infrastructure/database/sqlite/schema.ts` como mapeador: tabelas + tipos inferidos; queries via query builder tipado). O driver continua `expo-sqlite`. Proibido importar o ORM em `src/domain/` ou `src/application/` (regras §13.1 mantidas). O teste de contrato dos ports deve passar com ou sem ORM.
+  - **Entidade-Relacionamento (ER) local:** diagrama/registro do ER SQLite derivado de doc §§4.2/5.1 (`animals` 1—N `animal_photos`, `animals` 1—N `favorites`, `animals` 1—N `adoption_interests`, `sync_queue` e `local_images` como apoio operacional, `sync_state` por `key`, `search_preferences` por usuário). O ER documenta o que é cache (espelho do remoto) vs. o que é só local (`sync_queue`, `local_images`, `sync_state`, `search_preferences`). O DDL normativo é `src/infrastructure/database/sqlite/migrations/001_initial_schema.sql`.
+  - **Mapeamento offline-first (funcionalidade → comportamento sem rede):** matriz explícita — offline total: RF17 (consultar cache/favoritos/próprios), RF18 (criar/editar local + enfileirar), RF19 (fila), RF22 (banner/estado inequívoco), RF26 (foto `local_path` + `upload_status` pendente); somente leitura local nesta fase: favoritos/interesses (offline completo de mutações segue bloqueador do §4 → Fase 6, não implementar por suposição). Fluxo doc §9.2 (criação offline-first) é a referência. A matriz normativa RF → comportamento offline está em `__tests__/infrastructure/SqliteRepositories.test.ts` (cobertura §16.3) e no DDL de `migrations/`.
+  - **`expo-secure-store` (antecipação parcial da Fase 4, só sessão):** instalar `expo-secure-store` e ligar `SessionStorageSecureStore.ts` ao Keychain/Keystore real somente para o token de sessão (critério §3). Câmera, localização e conectividade (`expo-camera`, `expo-location`, netinfo, `LocationAdapter`/`PhotoAdapter`) permanecem na Fase 4 — ver nota de compatibilidade abaixo.
+- **Testes (doc §16.3 SQLite + adições sem conflito):** migrations criam todas as tabelas; cache persiste após reinício; fila mantém payload e tentativas; transação anúncio + ação pendente é atômica; + ER consistente com §§4.2/5.1 (FKs/tabelas conferidas); + repositórios ORM passam nos mesmos testes de contrato dos ports; + sessão persiste após reinício via `expo-secure-store` (mockado em Jest, real em dispositivo).
+- **Pronto:** testes §16.3 SQLite verdes (+ adições acima); cobertura ≥ 80%; domínio/application sem import de `expo-sqlite`, ORM ou `expo-secure-store` (regra §13.1); nenhuma tela acessa SQLite/secure-store direto (só via ports/use-cases); somente localização aproximada na UI (§0 item 5).
+- **Nota de compatibilidade (sem conflito):** nada da Fase 3 muda (Supabase/RLS continuam depois); a Fase 4 perde apenas o item "ligar `SessionStorageSecureStore` ao store real" (já feito aqui) e mantém todo o resto (câmera, localização, conectividade + bloqueadores limite de fotos/anonimização).
 
 ### Fase 3 — Backend Supabase (Auth, PostgreSQL, Storage, RLS)
 - **Origem:** RNF03, RNF04, RNF10; RF08–RF13, RF16; UC06/UC07/UC17/UC20; documentação §§14.2, 15, 16.3.
@@ -78,9 +84,9 @@ Cópia estrita de `criteriosapresentacao1.md` §5:
 - **Pronto:** integração Supabase verde; defesa em profundidade §15.3 (caso de uso + repository remoto + RLS); cobertura ≥ 80%.
 - **Bloqueador:** método de autenticação (e-mail/senha, magic link, OAuth…) — doc §19 item 1 — decidir **antes** de implementar `supabase/auth/`.
 
-### Fase 4 — Dispositivo real (câmera, localização, conectividade, sessão segura)
+### Fase 4 — Dispositivo real (câmera, localização, conectividade; sessão segura já antecipada na Fase 2)
 - **Origem:** RNF05, RNF06; RF09, RF24–RF26; UC07–UC08/UC17; documentação §§11, 16.3.
-- **Criar/instalar:** `expo-secure-store`, `expo-camera` (ou image-picker conforme decisão), `expo-location`, `@react-native-community/netinfo`; `src/infrastructure/device/{camera,location,connectivity}/` + `LocationAdapter` e `PhotoAdapter` implementando os ports (doc §11); ligar `SessionStorageSecureStore.ts` ao store real (Keychain/Keystore, critério §3).
+- **Criar/instalar:** `expo-camera` (ou image-picker conforme decisão), `expo-location`, `@react-native-community/netinfo`; `src/infrastructure/device/{camera,location,connectivity}/` + `LocationAdapter` e `PhotoAdapter` implementando os ports (doc §11); `expo-secure-store` e ligação de `SessionStorageSecureStore.ts` ao store real já feitos na Fase 2 (sem duplicar aqui; critério §3 mantido).
 - **Testes (doc §16.3 Dispositivo):** permissão de localização negada não quebra a busca (UC01-A3); câmera negada permite galeria quando aplicável; reconexão dispara sincronização uma única vez por ciclo.
 - **Pronto:** telas usam gateways reais com fallback fake em teste; nenhum endereço exato chega à UI pública (§0 item 5).
 - **Bloqueadores (doc §19):** limite de fotos por anúncio; precisão de anonimização de coordenadas — decidir **antes**.
@@ -123,7 +129,7 @@ Direto da documentação §19 + indefinição da UC20 (doc §3.2). Cada item pre
 - [ ] Visibilidade exata dos dados de contato → antes da **Fase 5**
 - [ ] Política de retenção de manifestações de interesse → antes das **Fases 3/6**
 - [ ] Limite de fotos por anúncio → antes da **Fase 4**
-- [ ] Raio máximo de pesquisa → antes das **Fases 2/5**
+- [x] Raio máximo de pesquisa = **50 km** (decidido; teto do campo `distance` em `search_preferences`; VO `SearchPreferences` segue puro — teto aplicado na UI de filtros, Fase 5) → era antes das **Fases 2/5**
 - [ ] Precisão de anonimização de coordenadas → antes da **Fase 4**
 - [ ] Conflito simples vs. conflito com revisão (política definitiva) → antes da **Fase 6**
 - [ ] Offline completo de favoritos/interesses (quais mutações entram na fila) → antes da **Fase 6**

@@ -5,14 +5,9 @@ import { Favorite } from '../../src/domain/entities/Favorite';
 import { AdoptionInterest } from '../../src/domain/entities/AdoptionInterest';
 import { SyncAction } from '../../src/domain/entities/SyncAction';
 import { SyncMetadata } from '../../src/domain/entities/SyncMetadata';
-import { PeriodoAvaliacao } from '../../src/domain/entities/PeriodoAvaliacao';
-import { Estagio } from '../../src/domain/entities/Estagio';
-import { TokenSupervisor } from '../../src/domain/entities/TokenSupervisor';
 import { AnimalCharacteristics } from '../../src/domain/value-objects/AnimalCharacteristics';
 import { ApproximateLocation } from '../../src/domain/value-objects/ApproximateLocation';
 import { ContactInfo } from '../../src/domain/value-objects/ContactInfo';
-import { Assinatura } from '../../src/domain/value-objects/Assinatura';
-import { Criterio } from '../../src/domain/value-objects/Criterio';
 
 describe('Domain Entities & Aggregates', () => {
   const dummyLoc = new ApproximateLocation({
@@ -134,35 +129,4 @@ describe('Domain Entities & Aggregates', () => {
     });
   });
 
-  describe('PeriodoAvaliacao, Estagio e TokenSupervisor', () => {
-    it('deve validar obrigatoriedade de id, estagioId e alunoId', () => {
-      expect(() => new PeriodoAvaliacao({ id: '', estagioId: 'e1', alunoId: 'al1' })).toThrow();
-      expect(() => new PeriodoAvaliacao({ id: 'p1', estagioId: '', alunoId: 'al1' })).toThrow();
-      expect(() => new PeriodoAvaliacao({ id: 'p1', estagioId: 'e1', alunoId: '' })).toThrow();
-    });
-
-    it('deve impedir alterar atividades ou autoavaliação em período APROVADO', () => {
-      const p = new PeriodoAvaliacao({ id: 'p1', estagioId: 'e1', alunoId: 'al1' });
-      p.adicionarAtividade({ id: 'at1', descricao: 'Code', horas: 5 });
-      p.adicionarAssinatura(new Assinatura('data:image/png;base64,123456789012', 'resp1'));
-      p.aprovar();
-
-      expect(() => p.adicionarAtividade({ id: 'at2', descricao: 'Doc', horas: 2 })).toThrow('Não é possível alterar um período já APROVADO.');
-      expect(() => p.registrarAutoAvaliacao([new Criterio('C', 8)])).toThrow('Não é possível alterar autoavaliação em um período já APROVADO.');
-    });
-
-    it('deve impedir aprovar sem assinatura', () => {
-      const p = new PeriodoAvaliacao({ id: 'p1', estagioId: 'e1', alunoId: 'al1' });
-      expect(() => p.aprovar()).toThrow('Para aprovar o período é necessária ao menos uma assinatura.');
-    });
-
-    it('deve validar contrutor de Estagio e TokenSupervisor', () => {
-      expect(() => new Estagio('', 'al1', 'sup1', 'Emp')).toThrow();
-      expect(() => new Estagio('e1', '', 'sup1', 'Emp')).toThrow();
-      expect(() => new Estagio('e1', 'al1', '', 'Emp')).toThrow();
-
-      expect(() => new TokenSupervisor('', 'sup1', new Date())).toThrow();
-      expect(() => new TokenSupervisor('tok', '', new Date())).toThrow();
-    });
-  });
 });

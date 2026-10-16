@@ -1,9 +1,9 @@
+import { AcessarViaTokenUseCase } from '../../src/application/use-cases/AcessarViaTokenUseCase';
 import { AnimalRepositoryFake } from '../../src/application/fakes/AnimalRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../src/application/fakes/SyncQueueRepositoryFake';
 import { FavoriteRepositoryFake } from '../../src/application/fakes/FavoriteRepositoryFake';
 import { AdoptionInterestRepositoryFake } from '../../src/application/fakes/AdoptionInterestRepositoryFake';
 import { AuthGatewayFake } from '../../src/application/fakes/AuthGatewayFake';
-import { PeriodoAvaliacaoRepositoryFake } from '../../src/application/fakes/PeriodoAvaliacaoRepositoryFake';
 import { CameraGatewayFake } from '../../src/application/fakes/CameraGatewayFake';
 import { LocationGatewayFake } from '../../src/application/fakes/LocationGatewayFake';
 
@@ -15,34 +15,22 @@ import { DeleteAnimalUseCase } from '../../src/application/use-cases/DeleteAnima
 import { MarkAnimalAdoptedUseCase } from '../../src/application/use-cases/MarkAnimalAdoptedUseCase';
 import { ProcessSyncQueueUseCase } from '../../src/application/use-cases/ProcessSyncQueueUseCase';
 import { AuthenticateUserUseCase } from '../../src/application/use-cases/AuthenticateUserUseCase';
-import { AcessarViaTokenUseCase } from '../../src/application/use-cases/AcessarViaTokenUseCase';
 import { GerarPdfUseCase } from '../../src/application/use-cases/GerarPdfUseCase';
-import { AvaliarDesempenhoUseCase } from '../../src/application/use-cases/AvaliarDesempenhoUseCase';
-import { RealizarAutoAvaliacaoUseCase } from '../../src/application/use-cases/RealizarAutoAvaliacaoUseCase';
-import { DevolverRelatorioUseCase } from '../../src/application/use-cases/DevolverRelatorioUseCase';
-import { RegistrarAtividadesUseCase } from '../../src/application/use-cases/RegistrarAtividadesUseCase';
-import { AssinarRelatorioUseCase } from '../../src/application/use-cases/AssinarRelatorioUseCase';
-import { AprovarRelatorioUseCase } from '../../src/application/use-cases/AprovarRelatorioUseCase';
 
 import { Animal } from '../../src/domain/entities/Animal';
 import { AnimalPhoto } from '../../src/domain/entities/AnimalPhoto';
 import { SyncAction } from '../../src/domain/entities/SyncAction';
-import { PeriodoAvaliacao } from '../../src/domain/entities/PeriodoAvaliacao';
-import { Estagio } from '../../src/domain/entities/Estagio';
 import { UserRepositoryFake } from '../../src/application/fakes/UserRepositoryFake';
 import { RegisterAdoptionInterestUseCase } from '../../src/application/use-cases/RegisterAdoptionInterestUseCase';
 import { User } from '../../src/domain/entities/User';
 import { AdoptionInterest } from '../../src/domain/entities/AdoptionInterest';
-import { TokenSupervisor } from '../../src/domain/entities/TokenSupervisor';
 import { SessionStorageFake } from '../../src/application/fakes/SessionStorageFake';
 import { ToggleFavoriteUseCase } from '../../src/application/use-cases/ToggleFavoriteUseCase';
 import { Favorite } from '../../src/domain/entities/Favorite';
 import { ConflictResolutionService } from '../../src/domain/services/ConflictResolutionService';
 import { AnimalCharacteristics } from '../../src/domain/value-objects/AnimalCharacteristics';
 import { ApproximateLocation } from '../../src/domain/value-objects/ApproximateLocation';
-import { Assinatura } from '../../src/domain/value-objects/Assinatura';
 import { ContactInfo } from '../../src/domain/value-objects/ContactInfo';
-import { Criterio } from '../../src/domain/value-objects/Criterio';
 import { SincronizacaoService } from '../../src/domain/services/SincronizacaoService';
 
 describe('Additional Branch Coverage Suite', () => {
@@ -60,7 +48,7 @@ describe('Additional Branch Coverage Suite', () => {
     sex: 'Fêmea',
   });
 
-  it('AnimalRepositoryFake & PeriodoAvaliacaoRepositoryFake: exercitar todos os métodos', async () => {
+  it('AnimalRepositoryFake: exercitar todos os métodos', async () => {
     const a1 = new Animal({ id: 'a1', ownerId: 'u1', name: 'Rex', characteristics: dummyChar, location: dummyLoc });
     const repo = new AnimalRepositoryFake([a1]);
 
@@ -76,28 +64,6 @@ describe('Additional Branch Coverage Suite', () => {
     await expect(repo.createRemote(a1)).rejects.toThrow();
     await expect(repo.updateRemote(a1)).rejects.toThrow();
     await expect(repo.deleteRemote(a1.id)).rejects.toThrow();
-
-    const periodoRepo = new PeriodoAvaliacaoRepositoryFake();
-    const p1 = new PeriodoAvaliacao({ id: 'p1', estagioId: 'e1', alunoId: 'al1' });
-    await periodoRepo.save(p1);
-    expect(await periodoRepo.findById('p1')).toBeTruthy();
-    expect((await periodoRepo.listByEstagio('e1')).length).toBe(1);
-  });
-
-  it('Exercitar Use Cases de AvaliarDesempenho, RealizarAutoAvaliacao e DevolverRelatorio', async () => {
-    const periodoRepo = new PeriodoAvaliacaoRepositoryFake();
-    const p1 = new PeriodoAvaliacao({ id: 'p1', estagioId: 'e1', alunoId: 'al1' });
-    await periodoRepo.save(p1);
-
-    const avalSup = new AvaliarDesempenhoUseCase(periodoRepo);
-    await avalSup.execute('p1', [new Criterio('C1', 9)]);
-
-    const autoAval = new RealizarAutoAvaliacaoUseCase(periodoRepo);
-    await autoAval.execute('p1', [new Criterio('C2', 8)]);
-
-    const dev = new DevolverRelatorioUseCase(periodoRepo);
-    const devuelt = await dev.execute('p1', 'Motivo ajuste');
-    expect(devuelt.status.isDevolvido()).toBe(true);
   });
 
   it('GetAnimalDetailsUseCase: deve retornar null quando animal não for encontrado', async () => {
@@ -148,19 +114,10 @@ describe('Additional Branch Coverage Suite', () => {
     expect(resOther.successCount).toBe(1);
   });
 
-  it('AnimalPhoto, Estagio e TokenSupervisor: exercitar métodos e construtores com defaults', () => {
+  it('AnimalPhoto e ContactInfo: exercitar métodos e construtores com defaults', () => {
     const p1 = new AnimalPhoto({ id: 'p1', animalId: 'a1', remoteUrl: 'https://ex.com/p1.jpg' });
     expect(p1.syncState.isCompleted()).toBe(true);
     expect(() => p1.markUploaded('')).toThrow('URL remota inválida para upload.');
-
-    const est = new Estagio('e1', 'al1', 'sup1', '');
-    expect(est.empresa).toBe('Empresa Parceira');
-
-    const tok = new TokenSupervisor('t1', 'sup1', new Date(Date.now() + 1000));
-    expect(tok.isValid()).toBe(true);
-
-    const tokExpired = new TokenSupervisor('t2', 'sup1', new Date(Date.now() - 1000));
-    expect(tokExpired.isValid()).toBe(false);
 
     const contact = new ContactInfo('user@example.com');
     expect(contact.phone).toBeUndefined();
@@ -209,11 +166,6 @@ describe('Additional Branch Coverage Suite', () => {
     expect(await auth.getCurrentSession()).not.toBeNull();
     await auth.logout();
     expect(await auth.getCurrentSession()).toBeNull();
-
-    const tokenSupVal = await auth.validarTokenSupervisor('valid_supervisor_token');
-    expect(tokenSupVal).not.toBeNull();
-    const tokenSupInvalid = await auth.validarTokenSupervisor('invalid');
-    expect(tokenSupInvalid).toBeNull();
 
     const camera = new CameraGatewayFake();
     const photoRes = await camera.pickImageFromGallery();
@@ -264,27 +216,6 @@ describe('Additional Branch Coverage Suite', () => {
     await updateUseCase.execute('u1', 'a1', { name: 'Rex Atualizado' }, true);
   });
 
-  it('GerarPdfUseCase & PeriodoAvaliacao: exercitar relatórios e restrições quando aprovado', () => {
-    const pdfUseCase = new GerarPdfUseCase();
-    const periodoRepo = new PeriodoAvaliacaoRepositoryFake();
-    const p1 = new PeriodoAvaliacao({ id: 'p1', estagioId: 'e1', alunoId: 'al1' });
-
-    expect(() => pdfUseCase.executeForPeriodo(p1)).toThrow('Não é possível gerar PDF: período sem atividades ou sem assinaturas válidas.');
-
-    p1.adicionarAtividade({ id: 'at1', descricao: 'Ativ', horas: 4 });
-    p1.adicionarAssinatura(new Assinatura('data:image/png;base64,hashval123456', 'al1'));
-    p1.adicionarAssinatura(new Assinatura('data:image/png;base64,hashval789012', 'sup1'));
-
-    const pdfRes = pdfUseCase.executeForPeriodo(p1);
-    expect(pdfRes.pdfBase64).toContain('mock_pdf_periodo_p1');
-
-    expect(p1.criteriosAvaliacao).toEqual([]);
-    expect(p1.autoAvaliacao).toEqual([]);
-
-    p1.aprovar();
-    expect(() => p1.registrarAvaliacaoSupervisor([])).toThrow('Não é possível registrar 2ª avaliação em um período já APROVADO.');
-  });
-
   it('Animal & AnimalPhoto: cobrir fotos, exibições e exceções de remoção', () => {
     expect(() => new AnimalPhoto({ id: 'p1', animalId: 'a1' })).toThrow('A foto deve possuir um caminho local ou uma URL remota.');
 
@@ -332,26 +263,22 @@ describe('Additional Branch Coverage Suite', () => {
     await queueRepo.clearCompleted();
     expect(await queueRepo.findById('s_done')).toBeNull();
 
-    // AcessarViaTokenUseCase, AuthenticateUserUseCase, AprovarRelatorioUseCase, etc
+    // AcessarViaTokenUseCase & AuthenticateUserUseCase
     const authGateway = new AuthGatewayFake();
     const sessionStorage = new SessionStorageFake();
     const tokenUseCase = new AcessarViaTokenUseCase(authGateway, sessionStorage);
     await expect(tokenUseCase.execute('')).rejects.toThrow('Token de acesso é obrigatório.');
 
+
     const authUseCase = new AuthenticateUserUseCase(authGateway, sessionStorage);
     await expect(authUseCase.execute('', '')).rejects.toThrow('E-mail e senha são obrigatórios.');
 
-    const periodoRepo = new PeriodoAvaliacaoRepositoryFake();
-    const aprUseCase = new AprovarRelatorioUseCase(periodoRepo);
     await expect(aprUseCase.execute('p_invalido')).rejects.toThrow('Período de avaliação não encontrado.');
 
-    const avalUseCase = new AvaliarDesempenhoUseCase(periodoRepo);
     await expect(avalUseCase.execute('p_invalido', [])).rejects.toThrow('Período de avaliação não encontrado.');
 
-    const devUseCase = new DevolverRelatorioUseCase(periodoRepo);
     await expect(devUseCase.execute('p_invalido', 'motivo')).rejects.toThrow('Período de avaliação não encontrado.');
 
-    const autoUseCase = new RealizarAutoAvaliacaoUseCase(periodoRepo);
     await expect(autoUseCase.execute('p_invalido', [])).rejects.toThrow('Período de avaliação não encontrado.');
 
     // CreateAnimalUseCase fallback quando createRemote falhar online
@@ -380,13 +307,9 @@ describe('Additional Branch Coverage Suite', () => {
     const evalRes = ConflictResolutionService.evaluateAnimalConflict(a1, aRemote);
     expect(evalRes.needsReview).toBe(false);
 
-    // SyncAction resetForRetry & TokenSupervisor revogar & User isAdmin & ApproximateLocation sem region
+    // SyncAction resetForRetry & User isAdmin & ApproximateLocation sem region
     actionFail.resetForRetry();
     expect(actionFail.status.isPending()).toBe(true);
-
-    const tokSup = new TokenSupervisor('token1', 'sup1', new Date(Date.now() + 10000));
-    tokSup.revogar();
-    expect(tokSup.isValid()).toBe(false);
 
     const userAdmin = new User({ id: 'u_admin', name: 'Admin', contactInfo: new ContactInfo('adm@ex.com'), role: 'ADMIN' });
     expect(userAdmin.isAdmin()).toBe(true);

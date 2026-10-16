@@ -1,3 +1,4 @@
+import { AcessarViaTokenUseCase } from '../../src/application/use-cases/AcessarViaTokenUseCase';
 import { SearchAnimalsUseCase } from '../../src/application/use-cases/SearchAnimalsUseCase';
 import { GetAnimalDetailsUseCase } from '../../src/application/use-cases/GetAnimalDetailsUseCase';
 import { CreateAnimalUseCase } from '../../src/application/use-cases/CreateAnimalUseCase';
@@ -9,11 +10,7 @@ import { RegisterAdoptionInterestUseCase } from '../../src/application/use-cases
 import { ProcessSyncQueueUseCase } from '../../src/application/use-cases/ProcessSyncQueueUseCase';
 import { ResolveSyncConflictUseCase } from '../../src/application/use-cases/ResolveSyncConflictUseCase';
 import { AuthenticateUserUseCase } from '../../src/application/use-cases/AuthenticateUserUseCase';
-import { AcessarViaTokenUseCase } from '../../src/application/use-cases/AcessarViaTokenUseCase';
 import { GerarPdfUseCase } from '../../src/application/use-cases/GerarPdfUseCase';
-import { RegistrarAtividadesUseCase } from '../../src/application/use-cases/RegistrarAtividadesUseCase';
-import { AssinarRelatorioUseCase } from '../../src/application/use-cases/AssinarRelatorioUseCase';
-import { AprovarRelatorioUseCase } from '../../src/application/use-cases/AprovarRelatorioUseCase';
 
 import { AnimalRepositoryFake } from '../../src/application/fakes/AnimalRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../src/application/fakes/SyncQueueRepositoryFake';
@@ -21,14 +18,11 @@ import { FavoriteRepositoryFake } from '../../src/application/fakes/FavoriteRepo
 import { AdoptionInterestRepositoryFake } from '../../src/application/fakes/AdoptionInterestRepositoryFake';
 import { AuthGatewayFake } from '../../src/application/fakes/AuthGatewayFake';
 import { SessionStorageFake } from '../../src/application/fakes/SessionStorageFake';
-import { PeriodoAvaliacaoRepositoryFake } from '../../src/application/fakes/PeriodoAvaliacaoRepositoryFake';
 
 import { Animal } from '../../src/domain/entities/Animal';
 import { AnimalPhoto } from '../../src/domain/entities/AnimalPhoto';
-import { PeriodoAvaliacao } from '../../src/domain/entities/PeriodoAvaliacao';
 import { AnimalCharacteristics } from '../../src/domain/value-objects/AnimalCharacteristics';
 import { ApproximateLocation } from '../../src/domain/value-objects/ApproximateLocation';
-import { Assinatura } from '../../src/domain/value-objects/Assinatura';
 
 describe('Application Use Cases with In-Memory Fakes', () => {
   let animalRepo: AnimalRepositoryFake;
@@ -37,7 +31,6 @@ describe('Application Use Cases with In-Memory Fakes', () => {
   let interestRepo: AdoptionInterestRepositoryFake;
   let authGateway: AuthGatewayFake;
   let sessionStorage: SessionStorageFake;
-  let periodoRepo: PeriodoAvaliacaoRepositoryFake;
 
   const dummyLoc = new ApproximateLocation({
     latitude: -21.55,
@@ -60,7 +53,6 @@ describe('Application Use Cases with In-Memory Fakes', () => {
     interestRepo = new AdoptionInterestRepositoryFake();
     authGateway = new AuthGatewayFake();
     sessionStorage = new SessionStorageFake();
-    periodoRepo = new PeriodoAvaliacaoRepositoryFake();
   });
 
   it('SearchAnimalsUseCase: deve retornar anúncios filtrados ou em cache quando offline', async () => {
@@ -190,18 +182,4 @@ describe('Application Use Cases with In-Memory Fakes', () => {
     expect(res.pdfBase64).toContain('mock_pdf_animal_a1');
   });
 
-  it('ReportUseCases: deve permitir registrar atividades, assinar e aprovar relatório', async () => {
-    const p = new PeriodoAvaliacao({ id: 'p1', estagioId: 'e1', alunoId: 'al1' });
-    await periodoRepo.save(p);
-
-    const regAtv = new RegistrarAtividadesUseCase(periodoRepo);
-    await regAtv.execute('p1', [{ id: 'at1', descricao: 'Coding', horas: 5 }]);
-
-    const ass = new AssinarRelatorioUseCase(periodoRepo);
-    await ass.execute('p1', new Assinatura('data:image/png;base64,123456789012', 'resp1'));
-
-    const apr = new AprovarRelatorioUseCase(periodoRepo);
-    const approved = await apr.execute('p1');
-    expect(approved.status.isAprovado()).toBe(true);
-  });
 });

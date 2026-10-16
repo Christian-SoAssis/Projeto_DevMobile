@@ -3,17 +3,13 @@ import { renderHook, act } from '@testing-library/react-native';
 import { AuthProvider, useAuth } from '../../src/adapters/context/AuthContext';
 import { useAnimals } from '../../src/adapters/hooks/useAnimals';
 import { useSync } from '../../src/adapters/hooks/useSync';
-import { useAtividades } from '../../src/adapters/hooks/useAtividades';
 import { AuthGatewayFake } from '../../src/application/fakes/AuthGatewayFake';
 import { SessionStorageFake } from '../../src/application/fakes/SessionStorageFake';
 import { AnimalRepositoryFake } from '../../src/application/fakes/AnimalRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../src/application/fakes/SyncQueueRepositoryFake';
-import { PeriodoAvaliacaoRepositoryFake } from '../../src/application/fakes/PeriodoAvaliacaoRepositoryFake';
 import { Animal } from '../../src/domain/entities/Animal';
 import { AnimalCharacteristics } from '../../src/domain/value-objects/AnimalCharacteristics';
 import { ApproximateLocation } from '../../src/domain/value-objects/ApproximateLocation';
-import { PeriodoAvaliacao } from '../../src/domain/entities/PeriodoAvaliacao';
-import { Assinatura } from '../../src/domain/value-objects/Assinatura';
 
 describe('Context API & Custom Bridge Hooks', () => {
   describe('AuthContext & AuthProvider', () => {
@@ -243,66 +239,10 @@ describe('Context API & Custom Bridge Hooks', () => {
     });
   });
 
-  describe('useAtividades Custom Hook', () => {
-    it('deve carregar período, registrar atividades e assinar relatório', async () => {
-      const repo = new PeriodoAvaliacaoRepositoryFake();
-      const p = new PeriodoAvaliacao({ id: 'p1', estagioId: 'e1', alunoId: 'al1' });
-      await repo.save(p);
-
-      const { result } = renderHook(() => useAtividades(repo));
-
-      await act(async () => {
-        await result.current.carregarPeriodo('p1');
-      });
-
-      expect(result.current.periodo?.id).toBe('p1');
-
-      await act(async () => {
-        await result.current.registrarAtividades('p1', [{ id: 'at1', descricao: 'Refatoração', horas: 8 }]);
-      });
-
-      expect(result.current.periodo?.atividades.length).toBe(1);
-
-      await act(async () => {
-        await result.current.assinarRelatorio('p1', new Assinatura('data:image/png;base64,123456789012', 'resp_1'));
-      });
-
-      expect(result.current.periodo?.assinaturas.length).toBe(1);
-    });
-
-    it('deve tratar erros em useAtividades ao carregar, registrar e assinar', async () => {
-      const repo = new PeriodoAvaliacaoRepositoryFake();
-      const { result } = renderHook(() => useAtividades(repo));
-
-      await act(async () => {
-        await result.current.carregarPeriodo('p_inexistente');
-      });
-      expect(result.current.periodo).toBeNull();
-
-      await act(async () => {
-        try {
-          await result.current.registrarAtividades('p_inexistente', []);
-        } catch {}
-      });
-      expect(result.current.error).toBe('Período de avaliação não encontrado.');
-
-      await act(async () => {
-        try {
-          await result.current.assinarRelatorio('p_inexistente', new Assinatura('data:image/png;base64,123456789012', 'resp1'));
-        } catch {}
-      });
-      expect(result.current.error).toBe('Período de avaliação não encontrado.');
-
-      const repoFake = new PeriodoAvaliacaoRepositoryFake();
-      repoFake.findById = jest.fn().mockRejectedValue('Erro string');
-      const { result: defaultHook } = renderHook(() => useAtividades(repoFake));
-      await act(async () => {
-        await defaultHook.current.carregarPeriodo('p1');
-      });
-      expect(defaultHook.current.error).toBe('Erro ao carregar período.');
-
-      const { result: useSyncDefault } = renderHook(() => useSync());
-      expect(useSyncDefault.current.isSyncing).toBe(false);
+  describe('useSync defaults', () => {
+    it('deve iniciar sem sincronização em andamento', () => {
+      const { result } = renderHook(() => useSync());
+      expect(result.current.isSyncing).toBe(false);
     });
   });
 });

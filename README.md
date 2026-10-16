@@ -50,7 +50,7 @@ Busca → Filtros → Detalhes → Favoritar / Demonstrar interesse → Contato 
 | Framework | Expo SDK **~57** + React Native **0.86** + React **19.2** |
 | Linguagem | TypeScript ~6.0 |
 | Navegação | Expo Router ~57 (rotas por arquivo na pasta `app/`) |
-| Estado | Context API (`AuthProvider`) + hooks (`useAuth`, `useAnimals`, `useSync`, `useAtividades`) |
+| Estado | Context API (`AuthProvider`) + hooks (`useAuth`, `useAnimals`, `useSync`) |
 | Persistência local | SQLite (`expo-sqlite`), prevista para a Fase 2 |
 | Sessão segura | `SessionStorageSecureStore` (mockado; `expo-secure-store` real na Fase 4) |
 | Backend (futuro) | Supabase: Auth, PostgreSQL, Storage e RLS (Fase 3) |
@@ -169,7 +169,7 @@ Projeto_DevMobile/
 │   └── adapters/
 │       ├── context/          # AuthContext (AuthProvider)
 │       ├── auth/             # SessionStorageSecureStore
-│       ├── hooks/            # useAuth, useAnimals, useSync, useAtividades
+│       ├── hooks/            # useAuth, useAnimals, useSync
 │       ├── gateways/         # Gateways de hardware (câmera)
 │       ├── demo/             # Fakes compartilhados para rodar o app em modo demo
 │       └── screens/          # Telas React Native

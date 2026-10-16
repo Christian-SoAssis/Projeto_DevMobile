@@ -1,14 +1,11 @@
 import { ConflictResolutionService } from '../../src/domain/services/ConflictResolutionService';
 import { SincronizacaoService } from '../../src/domain/services/SincronizacaoService';
 import { RegraGeracaoPdfService } from '../../src/domain/services/RegraGeracaoPdfService';
-import { RegraDevolucaoService } from '../../src/domain/services/RegraDevolucaoService';
 import { Animal } from '../../src/domain/entities/Animal';
 import { AnimalPhoto } from '../../src/domain/entities/AnimalPhoto';
-import { PeriodoAvaliacao } from '../../src/domain/entities/PeriodoAvaliacao';
 import { AnimalCharacteristics } from '../../src/domain/value-objects/AnimalCharacteristics';
 import { ApproximateLocation } from '../../src/domain/value-objects/ApproximateLocation';
 import { SyncAction } from '../../src/domain/entities/SyncAction';
-import { Assinatura } from '../../src/domain/value-objects/Assinatura';
 
 describe('Domain Services', () => {
   const dummyLoc = new ApproximateLocation({
@@ -95,8 +92,8 @@ describe('Domain Services', () => {
     });
   });
 
-  describe('RegraGeracaoPdfService & RegraDevolucaoService', () => {
-    it('deve validar regras de PDF e devolução', () => {
+  describe('RegraGeracaoPdfService', () => {
+    it('deve validar regras de PDF', () => {
       const animal = new Animal({
         id: 'a1',
         ownerId: 'u1',
@@ -108,16 +105,6 @@ describe('Domain Services', () => {
 
       animal.addPhoto(new AnimalPhoto({ id: 'p1', animalId: 'a1', localPath: 'file://p1.jpg' }));
       expect(RegraGeracaoPdfService.podeGerarPdfAnimal(animal)).toBe(true);
-
-      const p = new PeriodoAvaliacao({ id: 'p1', estagioId: 'e1', alunoId: 'al1' });
-      p.adicionarAtividade({ id: 'at1', descricao: 'Code', horas: 5 });
-      p.adicionarAssinatura(new Assinatura('data:image/png;base64,123456789012', 'resp1'));
-      expect(RegraGeracaoPdfService.podeGerarPdfPeriodo(p)).toBe(true);
-
-      expect(() => RegraDevolucaoService.devolverPeriodo(p, '')).toThrow('Motivo da devolução é obrigatório.');
-
-      RegraDevolucaoService.devolverPeriodo(p, 'Faltou documento');
-      expect(p.status.isDevolvido()).toBe(true);
     });
   });
 });

@@ -1,7 +1,6 @@
 import { AuthGateway, AuthSession } from '../../domain/ports/AuthGateway';
 import { User } from '../../domain/entities/User';
 import { ContactInfo } from '../../domain/value-objects/ContactInfo';
-import { TokenSupervisor } from '../../domain/entities/TokenSupervisor';
 
 export class AuthGatewayFake implements AuthGateway {
   public currentSession: AuthSession | null = null;
@@ -56,12 +55,5 @@ export class AuthGatewayFake implements AuthGateway {
     const user = this.mockUsers[0];
     this.currentSession = { user, token };
     return this.currentSession;
-  }
-
-  async validarTokenSupervisor(token: string): Promise<TokenSupervisor | null> {
-    if (token === 'valid_supervisor_token') {
-      return new TokenSupervisor(token, 'sup_1', new Date(Date.now() + 86400000));
-    }
-    return null;
   }
 }

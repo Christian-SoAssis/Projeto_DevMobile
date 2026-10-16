@@ -2,10 +2,6 @@ import { ApproximateLocation } from '../../src/domain/value-objects/ApproximateL
 import { AdoptionStatus } from '../../src/domain/value-objects/AdoptionStatus';
 import { SyncState } from '../../src/domain/value-objects/SyncState';
 import { AnimalCharacteristics } from '../../src/domain/value-objects/AnimalCharacteristics';
-import { Criterio } from '../../src/domain/value-objects/Criterio';
-import { Assinatura } from '../../src/domain/value-objects/Assinatura';
-import { CargaHoraria } from '../../src/domain/value-objects/CargaHoraria';
-import { StatusPeriodo } from '../../src/domain/value-objects/StatusPeriodo';
 import { ContactInfo } from '../../src/domain/value-objects/ContactInfo';
 import { SearchPreferences } from '../../src/domain/value-objects/SearchPreferences';
 
@@ -131,60 +127,6 @@ describe('Domain Value Objects', () => {
       expect(() => new AnimalCharacteristics({ species: 'Cão', size: '', approximateAge: '1', sex: 'M' })).toThrow();
       expect(() => new AnimalCharacteristics({ species: 'Cão', size: 'M', approximateAge: '', sex: 'M' })).toThrow();
       expect(() => new AnimalCharacteristics({ species: 'Cão', size: 'M', approximateAge: '1', sex: '' })).toThrow();
-    });
-  });
-
-  describe('Criterio', () => {
-    it('deve calcular a faixa de notas corretamente (MB, B, R, F)', () => {
-      expect(new Criterio('Assiduidade', 9.5).getFaixa()).toBe('MB');
-      expect(new Criterio('Assiduidade', 8.0).getFaixa()).toBe('B');
-      expect(new Criterio('Assiduidade', 6.0).getFaixa()).toBe('R');
-      expect(new Criterio('Assiduidade', 4.0).getFaixa()).toBe('F');
-    });
-
-    it('deve validar nome e limites de nota (0-10)', () => {
-      expect(() => new Criterio('', 8)).toThrow();
-      expect(() => new Criterio('Pontualidade', -1)).toThrow();
-      expect(() => new Criterio('Pontualidade', 11)).toThrow();
-    });
-  });
-
-  describe('Assinatura', () => {
-    it('deve validar dados base64 e ID do responsável', () => {
-      const ass = new Assinatura('data:image/png;base64,123456789012', 'resp_1');
-      expect(ass.isValid()).toBe(true);
-      expect(ass.responsavelId).toBe('resp_1');
-
-      expect(() => new Assinatura('', 'resp_1')).toThrow();
-      expect(() => new Assinatura('data', '')).toThrow();
-    });
-  });
-
-  describe('CargaHoraria', () => {
-    it('deve calcular atendimento às horas mínimas', () => {
-      const ch = new CargaHoraria(100, 40, 50);
-      expect(ch.isAtendida()).toBe(true);
-
-      const ch2 = new CargaHoraria(100, 40, 30);
-      expect(ch2.isAtendida()).toBe(false);
-    });
-
-    it('deve validar limites de horas', () => {
-      expect(() => new CargaHoraria(-1, 10, 5)).toThrow();
-      expect(() => new CargaHoraria(50, 20, 60)).toThrow();
-    });
-  });
-
-  describe('StatusPeriodo', () => {
-    it('deve criar status válidos', () => {
-      const st = new StatusPeriodo('APROVADO');
-      expect(st.isAprovado()).toBe(true);
-      expect(new StatusPeriodo('RASCUNHO').isRascunho()).toBe(true);
-      expect(new StatusPeriodo('DEVOLVIDO').isDevolvido()).toBe(true);
-    });
-
-    it('deve rejeitar status inválidos', () => {
-      expect(() => new StatusPeriodo('INVALID' as any)).toThrow();
     });
   });
 

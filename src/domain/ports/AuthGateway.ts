@@ -1,5 +1,4 @@
 import { User } from '../entities/User';
-import { TokenSupervisor } from '../entities/TokenSupervisor';
 
 export interface AuthSession {
   user: User;
@@ -11,5 +10,4 @@ export interface AuthGateway {
   logout(): Promise<void>;
   getCurrentSession(): Promise<AuthSession | null>;
   acessarViaToken(token: string): Promise<AuthSession>;
-  validarTokenSupervisor(token: string): Promise<TokenSupervisor | null>;
 }

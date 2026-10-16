@@ -3,10 +3,7 @@ import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { SearchScreen } from '../../src/adapters/screens/SearchScreen';
 import { AnimalDetailsScreen } from '../../src/adapters/screens/AnimalDetailsScreen';
 import { AnimalFormScreen } from '../../src/adapters/screens/AnimalFormScreen';
-import { AssinaturaScreen } from '../../src/adapters/screens/AssinaturaScreen';
 import { SyncStatusScreen } from '../../src/adapters/screens/SyncStatusScreen';
-import { AtividadesFormScreen } from '../../src/adapters/screens/AtividadesFormScreen';
-import { HistoricoRelatoriosScreen } from '../../src/adapters/screens/HistoricoRelatoriosScreen';
 
 import { AnimalRepositoryFake } from '../../src/application/fakes/AnimalRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../src/application/fakes/SyncQueueRepositoryFake';
@@ -14,14 +11,12 @@ import { FavoriteRepositoryFake } from '../../src/application/fakes/FavoriteRepo
 import { AdoptionInterestRepositoryFake } from '../../src/application/fakes/AdoptionInterestRepositoryFake';
 import { CameraGatewayFake } from '../../src/application/fakes/CameraGatewayFake';
 import { LocationGatewayFake } from '../../src/application/fakes/LocationGatewayFake';
-import { PeriodoAvaliacaoRepositoryFake } from '../../src/application/fakes/PeriodoAvaliacaoRepositoryFake';
 
 import { Animal } from '../../src/domain/entities/Animal';
 import { AnimalPhoto } from '../../src/domain/entities/AnimalPhoto';
 import { SyncAction } from '../../src/domain/entities/SyncAction';
 import { AnimalCharacteristics } from '../../src/domain/value-objects/AnimalCharacteristics';
 import { ApproximateLocation } from '../../src/domain/value-objects/ApproximateLocation';
-import { PeriodoAvaliacao } from '../../src/domain/entities/PeriodoAvaliacao';
 
 describe('React Native Screens UI Tests (RNTL)', () => {
   const dummyLoc = new ApproximateLocation({
@@ -275,93 +270,6 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       await waitFor(() => {
         expect(getByText('Nome do animal é obrigatório.')).toBeTruthy();
       });
-    });
-  });
-
-  describe('AssinaturaScreen Component', () => {
-    it('deve permitir assinar digitalmente e tratar erros de assinatura inválida', async () => {
-      const repo = new PeriodoAvaliacaoRepositoryFake();
-      await repo.save(new PeriodoAvaliacao({ id: 'per_1', estagioId: 'est_1', alunoId: 'al_1' }));
-      const onSuccessMock = jest.fn();
-
-      const { getByTestId, getByText } = render(
-        <AssinaturaScreen periodoId="per_1" periodoRepository={repo} onSignedSuccess={onSuccessMock} />
-      );
-
-      fireEvent.press(getByTestId('btn-submit-signature'));
-      await waitFor(() => {
-        expect(getByText('Assinatura registrada e sincronizada com sucesso!')).toBeTruthy();
-      });
-      expect(onSuccessMock).toHaveBeenCalled();
-
-      fireEvent.changeText(getByTestId('signature-input'), 'short');
-      fireEvent.press(getByTestId('btn-submit-signature'));
-      await waitFor(() => {
-        expect(getByText('Assinatura digital inválida.')).toBeTruthy();
-      });
-    });
-
-    it('deve usar props padrão no AssinaturaScreen e tratar fallback de erro', async () => {
-      const { getByTestId, getByText } = render(<AssinaturaScreen />);
-      fireEvent.press(getByTestId('btn-submit-signature'));
-      await waitFor(() => {
-        expect(getByText('Período de avaliação não encontrado.')).toBeTruthy();
-      });
-    });
-  });
-
-  describe('AtividadesFormScreen & HistoricoRelatoriosScreen Components', () => {
-    it('deve validar horas inválidas e descrição vazia no AtividadesFormScreen', async () => {
-      const { getByTestId, getByText } = render(<AtividadesFormScreen />);
-
-      fireEvent.changeText(getByTestId('input-horas'), '-2');
-      fireEvent.press(getByTestId('btn-salvar-atividade'));
-      await waitFor(() => {
-        expect(getByText('Horas informadas devem ser um valor positivo.')).toBeTruthy();
-      });
-
-      fireEvent.changeText(getByTestId('input-horas'), '5');
-      fireEvent.changeText(getByTestId('input-descricao'), '');
-      fireEvent.press(getByTestId('btn-salvar-atividade'));
-      await waitFor(() => {
-        expect(getByText('Descrição da atividade é obrigatória.')).toBeTruthy();
-      });
-    });
-
-    it('deve renderizar HistoricoRelatoriosScreen com props padrão', async () => {
-      const { getByTestId } = render(<HistoricoRelatoriosScreen />);
-      expect(getByTestId('historico-relatorios-screen')).toBeTruthy();
-    });
-
-    it('deve registrar atividades e exibir histórico de relatórios', async () => {
-      const repo = new PeriodoAvaliacaoRepositoryFake();
-      await repo.save(new PeriodoAvaliacao({ id: 'per_1', estagioId: 'est_1', alunoId: 'al_1' }));
-      const onSuccessMock = jest.fn();
-
-      const { getByTestId, getByText } = render(
-        <AtividadesFormScreen periodoId="per_1" periodoRepository={repo} onSuccess={onSuccessMock} />
-      );
-
-      fireEvent.changeText(getByTestId('input-descricao'), 'Desenvolvimento TDD');
-      fireEvent.changeText(getByTestId('input-horas'), '6');
-      fireEvent.press(getByTestId('btn-salvar-atividade'));
-
-      await waitFor(() => {
-        expect(getByText('Atividade registrada com sucesso!')).toBeTruthy();
-      });
-      expect(onSuccessMock).toHaveBeenCalled();
-
-      const onSelectMock = jest.fn();
-      const { getByTestId: getByTestIdHist, getByText: getByTextHist } = render(
-        <HistoricoRelatoriosScreen estagioId="est_1" periodoRepository={repo} onSelectPeriodo={onSelectMock} />
-      );
-
-      await waitFor(() => {
-        expect(getByTextHist('Período ID: per_1')).toBeTruthy();
-      });
-
-      fireEvent.press(getByTestIdHist('periodo-card-per_1'));
-      expect(onSelectMock).toHaveBeenCalled();
     });
   });
 

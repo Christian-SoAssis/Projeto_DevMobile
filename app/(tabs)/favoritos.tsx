@@ -3,17 +3,16 @@ import { StyleSheet } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FavoritesScreen } from '../../src/adapters/screens/FavoritesScreen';
-import {
-  DEMO_USER_ID,
-  animalRepository,
-  favoriteRepository,
-} from '../../src/adapters/demo/sharedFakes';
+import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
+import { DEMO_USER_ID } from '../../src/adapters/demo/sharedFakes';
 
 export default function FavoritesTab() {
   const router = useRouter();
-  // Tabs mantêm a tela montada; remontar no foco garante que a lista
-  // reflita favoritos adicionados/removidos nos detalhes (100% mock,
-  // só expo-router — sem SQLite/Supabase/sensores).
+  // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider
+  // (identidade de usuário continua mock até a Fase 3).
+  const { animalRepository, favoriteRepository } = useRepositories();
+  // Remontar no foco garante que a lista reflita favoritos adicionados/
+  // removidos nos detalhes.
   const [focusKey, setFocusKey] = React.useState(0);
   useFocusEffect(
     React.useCallback(() => {

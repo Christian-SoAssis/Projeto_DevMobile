@@ -51,8 +51,9 @@ Busca → Filtros → Detalhes → Favoritar / Demonstrar interesse → Contato 
 | Linguagem | TypeScript ~6.0 |
 | Navegação | Expo Router ~57 (rotas por arquivo na pasta `app/`) |
 | Estado | Context API (`AuthProvider`) + hooks (`useAuth`, `useAnimals`, `useSync`) |
-| Persistência local | SQLite (`expo-sqlite`), prevista para a Fase 2 |
+| Persistência local | SQLite (`expo-sqlite`) — integrada ao app na Fase 2 (cache, fila e imagens locais) |
 | Sessão segura | `SessionStorageSecureStore` (mockado; `expo-secure-store` real na Fase 4) |
+| Conectividade | `@react-native-community/netinfo` via port `ConnectivityGateway` (Fase 2) |
 | Backend (futuro) | Supabase: Auth, PostgreSQL, Storage e RLS (Fase 3) |
 | Testes | Jest 29 + `jest-expo` + React Native Testing Library |
 
@@ -162,17 +163,21 @@ Projeto_DevMobile/
 │   │   ├── entities/         # Animal, AnimalPhoto, Favorite, AdoptionInterest, SyncAction, User...
 │   │   ├── value-objects/    # ApproximateLocation, AdoptionStatus, SyncState, AnimalCharacteristics...
 │   │   ├── services/         # ConflictResolutionService, SincronizacaoService...
-│   │   └── ports/            # Interfaces: AnimalRepository, SyncQueueRepository, AuthGateway, PhotoStorage...
+│   │   └── ports/            # Interfaces: AnimalRepository, SyncQueueRepository, PhotoStorage, ConnectivityGateway...
 │   ├── application/
 │   │   ├── use-cases/        # SearchAnimals, CreateAnimal, UpdateAnimal, MarkAnimalAdopted, ProcessSyncQueue...
 │   │   └── fakes/            # Repositórios e gateways in-memory para TDD
-│   └── adapters/
-│       ├── context/          # AuthContext (AuthProvider)
-│       ├── auth/             # SessionStorageSecureStore
-│       ├── hooks/            # useAuth, useAnimals, useSync
-│       ├── gateways/         # Gateways de hardware (câmera)
-│       ├── demo/             # Fakes compartilhados para rodar o app em modo demo
-│       └── screens/          # Telas React Native
+│   ├── adapters/
+│   │   ├── context/          # AuthContext (AuthProvider) + RepositoriesContext (SQLite/Fase 2)
+│   │   ├── auth/             # SessionStorageSecureStore
+│   │   ├── hooks/            # useAuth, useAnimals, useSync, useConnectivity
+│   │   ├── gateways/         # Gateways de hardware (câmera)
+│   │   ├── demo/             # Fakes compartilhados + seed para rodar o app em modo demo
+│   │   └── screens/          # Telas React Native
+│   └── infrastructure/
+│       ├── database/sqlite/  # Driver (expo-sqlite + fallback memória), migrations e repositórios (Fase 2)
+│       ├── device/           # Adaptadores de hardware: conectividade (NetInfo) — câmera/localização na Fase 4
+│       └── composition/      # loadAppContainer: monta SQLite, seed inicial e entrega via provider
 ├── __tests__/                # domain/, application/, adapters/, screens/, e2e/
 ├── docs/                     # Especificação, critérios e próximos passos
 ├── app.json                  # Configuração Expo (scheme: "enlace")
@@ -187,7 +192,7 @@ Projeto_DevMobile/
 | # | Fase | Status |
 |---|---|:---:|
 | 1 | Domínio e interface primeiro (100% fakes, cobertura ≥ 80%) | 🟢 Concluído |
-| 2 | Persistência local real (SQLite) | ⏳ Pendente |
+| 2 | Persistência local real (SQLite) | 🟡 Em andamento — schema, repositórios, container, cache seed e conectividade integrados |
 | 3 | Backend Supabase (Auth, PostgreSQL, Storage, RLS) | ⏳ Pendente |
 | 4 | Dispositivo real (câmera, localização, conectividade, secure store) | ⏳ Pendente |
 | 5 | Rotas Expo Router completas | 🟡 Parcial |

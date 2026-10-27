@@ -3,15 +3,14 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalFormScreen } from '../../src/adapters/screens/AnimalFormScreen';
-import {
-  DEMO_OWNER_ID,
-  animalRepository,
-  syncQueueRepository,
-} from '../../src/adapters/demo/sharedFakes';
+import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
+import { DEMO_OWNER_ID } from '../../src/adapters/demo/sharedFakes';
 
 export default function EditarAnuncioRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
+  const { animalRepository, syncQueueRepository } = useRepositories();
   const [animal, setAnimal] = React.useState<Awaited<
     ReturnType<typeof animalRepository.findById>
   > | null>(null);
@@ -25,7 +24,7 @@ export default function EditarAnuncioRoute() {
       setLoading(false);
     }
     load();
-  }, [id]);
+  }, [id, animalRepository]);
 
   let content = null;
 

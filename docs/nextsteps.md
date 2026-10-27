@@ -48,6 +48,8 @@ Ordem de construção exigida por `criteriosapresentacao1.md` §7, com o status 
 
 ## §2 — O que FICA EM MOCK nesta fase (proibido trocar por real)
 
+> **Atualização:** com a abertura formal da Fase 2, `expo-sqlite` e a conectividade real (`@react-native-community/netinfo`) foram integrados conforme §3 (Fase 2). Câmera, localização e `expo-secure-store` reais continuam mockados até a Fase 4, e `@supabase/supabase-js` continua ausente até a Fase 3.
+
 Cópia estrita de `criteriosapresentacao1.md` §5:
 
 - [ ] **Sem armazenamento permanente real:** nenhuma conexão ativa com `expo-sqlite` ou `@supabase/supabase-js`. Ambos **ausentes** de `package.json:14-25` — e devem continuar ausentes até a abertura formal das Fases 2–3.
@@ -62,6 +64,14 @@ Cópia estrita de `criteriosapresentacao1.md` §5:
 
 ### Fase 2 — Persistência local real (SQLite)
 - **Origem:** RNF01, RNF02, RNF09 (cache/fila sobrevivem ao reinício); RF17–RF19; UC15/UC16; documentação §§5.1, 13, 16.3.
+- **Status (atualização): 🟡 Em andamento.** Entregues:
+  - `src/infrastructure/database/sqlite/` — migrations (tabelas `animals` com geolocalização, `animal_photos`, `local_images`, `favorites`, `adoption_interests`, `users`, `sync_queue`, `sync_state`, `search_preferences`) + 6 repositórios SQLite + novo `SqlitePhotoStorage` (endereço local das imagens em `local_images`, Fase 2 §13).
+  - `src/infrastructure/composition/loadAppContainer.ts` — monta o container SQLite e popula o cache seed na primeira execução (seed nunca sobrescreve dados do usuário).
+  - `src/adapters/context/RepositoriesContext.tsx` — provider `RepositoriesProvider`/`useRepositories()` ligando TODAS as rotas `app/` ao SQLite real (fallback demo preservado).
+  - `src/domain/ports/ConnectivityGateway.ts` + `src/infrastructure/device/connectivity/NetInfoAdapter.ts` + `useConnectivity()` — conectividade real alimentando Início e Novo anúncio.
+  - Testes: `__tests__/integration/sqlite/SqlitePhotoStorage.test.ts`, `__tests__/integration/sqlite/AppContainer.test.ts`, `__tests__/adapters/RepositoriesContext.test.tsx`, `__tests__/adapters/Connectivity.test.ts`.
+  - Instalar após pull: `npm install` (adiciona `@react-native-community/netinfo`); a cópia física de arquivos usa `expo-file-system` com require dinâmico — rodar `npx expo install expo-file-system` para habilitar no device.
+  - Pendência para fechar a fase: rodar `npm test`/`npm run typecheck`/`expo-doctor` com as novas suítes no ambiente do aluno e validar no Expo Go (cache sobrevivendo ao reinício).
 - **Criar:**
   - `src/infrastructure/database/sqlite/migrations/` — tabelas `sync_queue`, `local_images`, `sync_state`, `search_preferences` (colunas exatas da doc §5.1) + cache de `animals`, `animal_photos`, `favorites`, `adoption_interests` (doc §4.2).
   - `src/infrastructure/database/sqlite/repositories/` — implementações SQLite dos ports existentes (`AnimalRepository`, `FavoriteRepository`, `AdoptionInterestRepository`, `SyncQueueRepository`, `UserRepository`) + criar `SearchPreferences` persistido (doc §§4.1/5.1).

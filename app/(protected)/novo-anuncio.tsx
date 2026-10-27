@@ -3,14 +3,16 @@ import { StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalFormScreen } from '../../src/adapters/screens/AnimalFormScreen';
-import {
-  DEMO_OWNER_ID,
-  animalRepository,
-  syncQueueRepository,
-} from '../../src/adapters/demo/sharedFakes';
+import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
+import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
+import { DEMO_OWNER_ID } from '../../src/adapters/demo/sharedFakes';
 
 export default function NovoAnuncioRoute() {
   const router = useRouter();
+  // Fase 2: repositórios SQLite + conectividade real (cria online/offline
+  // com fila de sincronização quando sem internet — RF17–RF19).
+  const { animalRepository, syncQueueRepository } = useRepositories();
+  const isOnline = useConnectivity();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
@@ -18,6 +20,7 @@ export default function NovoAnuncioRoute() {
         ownerId={DEMO_OWNER_ID}
         animalRepository={animalRepository}
         syncQueueRepository={syncQueueRepository}
+        isOnline={isOnline}
         onSuccess={() => router.back()}
       />
     </SafeAreaView>
@@ -30,4 +33,3 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
 });
-

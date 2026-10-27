@@ -33,7 +33,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
   const [loading, setLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(!isOnlineInitial);
 
-  const performSearch = async () => {
+  const performSearch = async (onlineOverride?: boolean) => {
     setLoading(true);
     try {
       const filters: AnimalFilterOptions = {
@@ -44,7 +44,10 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
         approximateAge: ageQuery || undefined,
       };
       const useCase = new SearchAnimalsUseCase(animalRepository);
-      const res = await useCase.execute(filters, !isOffline);
+      const res = await useCase.execute(
+        filters,
+        onlineOverride !== undefined ? onlineOverride : !isOffline
+      );
       setAnimals(res.animals);
       setIsOffline(res.isOffline);
     } catch {
@@ -55,8 +58,9 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
   };
 
   useEffect(() => {
-    performSearch();
-  }, [selectedSpecies, selectedSize, selectedSex]);
+    performSearch(isOnlineInitial);
+    // Refaz a busca também quando a conectividade muda (Fase 2: NetInfo real).
+  }, [selectedSpecies, selectedSize, selectedSex, isOnlineInitial]);
 
   return (
     <View style={styles.container} testID="search-screen">
@@ -79,7 +83,11 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
           onChangeText={setQuery}
           testID="search-input"
         />
-        <TouchableOpacity style={styles.searchButton} onPress={performSearch} testID="search-button">
+        <TouchableOpacity
+          style={styles.searchButton}
+          onPress={() => performSearch()}
+          testID="search-button"
+        >
           <Text style={styles.buttonText}>Buscar</Text>
         </TouchableOpacity>
       </View>
@@ -144,7 +152,11 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
           onChangeText={setAgeQuery}
           testID="search-age-input"
         />
-        <TouchableOpacity style={styles.searchButton} onPress={performSearch} testID="search-age-button">
+        <TouchableOpacity
+          style={styles.searchButton}
+          onPress={() => performSearch()}
+          testID="search-age-button"
+        >
           <Text style={styles.buttonText}>Filtrar</Text>
         </TouchableOpacity>
       </View>

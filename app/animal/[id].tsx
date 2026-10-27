@@ -3,18 +3,18 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalDetailsScreen } from '../../src/adapters/screens/AnimalDetailsScreen';
+import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import {
   DEMO_OWNER_ID,
   DEMO_USER_ID,
-  animalRepository,
-  favoriteRepository,
-  interestRepository,
-  syncQueueRepository,
 } from '../../src/adapters/demo/sharedFakes';
 
 export default function AnimalDetailsRoute() {
   const router = useRouter();
   const { id, asOwner } = useLocalSearchParams<{ id: string; asOwner?: string }>();
+  // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
+  const { animalRepository, favoriteRepository, interestRepository, syncQueueRepository } =
+    useRepositories();
   const [animal, setAnimal] = React.useState<Awaited<
     ReturnType<typeof animalRepository.findById>
   > | null>(null);
@@ -28,7 +28,7 @@ export default function AnimalDetailsRoute() {
       setLoading(false);
     }
     load();
-  }, [id]);
+  }, [id, animalRepository]);
 
   let content = null;
 

@@ -98,7 +98,6 @@ npx expo start --tunnel
 ```bash
 npm run android         # abre direto no emulador/dispositivo Android
 npm run ios             # abre no simulador iOS (somente macOS)
-npm run web             # abre no navegador
 ```
 
 ### Atalhos no terminal do Expo (com o servidor rodando)
@@ -107,7 +106,6 @@ npm run web             # abre no navegador
 |:---:|---|
 | `a` | Abrir no Android |
 | `i` | Abrir no iOS |
-| `w` | Abrir no navegador |
 | `r` | Recarregar o app |
 | `m` | Abrir o menu de desenvolvedor |
 | `j` | Abrir o debugger |

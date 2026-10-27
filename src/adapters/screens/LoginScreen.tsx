@@ -11,12 +11,15 @@ export interface LoginScreenProps {
   authGateway?: AuthGateway;
   sessionStorage?: SessionStorage;
   onSuccess?: (user: User) => void;
+  /** Quando informado (ex.: `useAuth().login`), substitui o caso de uso local para que a sessão vá para o AuthContext. */
+  onLogin?: (email: string, pass: string) => Promise<User>;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   authGateway = new AuthGatewayFake(),
   sessionStorage = new SessionStorageFake(),
   onSuccess,
+  onLogin,
 }) => {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -25,10 +28,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const handleLogin = async () => {
     setFeedback(null);
     try {
-      const useCase = new AuthenticateUserUseCase(authGateway, sessionStorage);
-      const session = await useCase.execute(email, pass);
+      let user: User;
+      if (onLogin) {
+        user = await onLogin(email, pass);
+      } else {
+        const useCase = new AuthenticateUserUseCase(authGateway, sessionStorage);
+        user = (await useCase.execute(email, pass)).user;
+      }
       setFeedback('Login realizado com sucesso!');
-      if (onSuccess) onSuccess(session.user);
+      if (onSuccess) onSuccess(user);
     } catch (err: any) {
       setFeedback(err.message || 'Erro ao autenticar.');
     }

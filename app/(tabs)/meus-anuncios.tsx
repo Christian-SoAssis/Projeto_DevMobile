@@ -3,25 +3,39 @@ import { StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MyAnimalsScreen } from '../../src/adapters/screens/MyAnimalsScreen';
-import { DEMO_OWNER_ID, animalRepository, syncQueueRepository } from '../../src/adapters/demo/sharedFakes';
+import { LoginRequired } from '../../src/adapters/components/LoginRequired';
+import { useAuth } from '../../src/adapters/context/AuthContext';
+import { useFocusKey } from '../../src/adapters/hooks/useFocusKey';
+import { animalRepository, syncQueueRepository } from '../../src/adapters/demo/sharedFakes';
 
 export default function MeusAnunciosTab() {
   const router = useRouter();
+  const { user } = useAuth();
+  const focusKey = useFocusKey();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <MyAnimalsScreen
-        animalRepository={animalRepository}
-        syncQueueRepository={syncQueueRepository}
-        ownerId={DEMO_OWNER_ID}
-        onSelectAnimal={(animal) =>
-          router.push({ pathname: '/animal/[id]', params: { id: animal.id, asOwner: '1' } })
-        }
-        onEditAnimal={(animal) =>
-          router.push({ pathname: '/(protected)/editar-anuncio', params: { id: animal.id } })
-        }
-        onNewAnimal={() => router.push('/(protected)/novo-anuncio')}
-      />
+      {user ? (
+        <MyAnimalsScreen
+          key={focusKey}
+          animalRepository={animalRepository}
+          syncQueueRepository={syncQueueRepository}
+          ownerId={user.id}
+          onSelectAnimal={(animal) =>
+            router.push({ pathname: '/animal/[id]', params: { id: animal.id } })
+          }
+          onEditAnimal={(animal) =>
+            router.push({ pathname: '/(protected)/editar-anuncio', params: { id: animal.id } })
+          }
+          onNewAnimal={() => router.push('/(protected)/novo-anuncio')}
+        />
+      ) : (
+        <LoginRequired
+          message="Entre na sua conta para publicar e gerenciar seus anúncios."
+          onLogin={() => router.push('/login')}
+          onRegister={() => router.push('/cadastro')}
+        />
+      )}
     </SafeAreaView>
   );
 }

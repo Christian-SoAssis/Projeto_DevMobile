@@ -174,9 +174,13 @@ export class SqliteAnimalRepository implements AnimalRepository {
     return animal;
   }
 
-  async deleteRemote(id: string): Promise<void> {
+  async deleteLocal(id: string): Promise<void> {
     await this.db.runAsync('DELETE FROM animals WHERE id = ?', [id]);
     await this.db.runAsync('DELETE FROM animal_photos WHERE animal_id = ?', [id]);
+  }
+
+  async deleteRemote(id: string): Promise<void> {
+    await this.deleteLocal(id);
   }
 
   async listByOwner(ownerId: string): Promise<Animal[]> {

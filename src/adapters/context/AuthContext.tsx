@@ -12,8 +12,8 @@ export interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, pass: string) => Promise<void>;
-  acessarViaToken: (token: string) => Promise<void>;
+  login: (email: string, pass: string) => Promise<User>;
+  acessarViaToken: (token: string) => Promise<User>;
   logout: () => Promise<void>;
 }
 
@@ -27,9 +27,13 @@ export interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({
   children,
-  authGateway = new AuthGatewayFake(),
-  sessionStorage = new SessionStorageFake(),
+  authGateway: authGatewayProp,
+  sessionStorage: sessionStorageProp,
 }) => {
+  // Instâncias estáveis entre renders: um default `new ...Fake()` na assinatura
+  // criaria um gateway novo a cada render (login e logout em instâncias distintas).
+  const [authGateway] = useState<AuthGateway>(() => authGatewayProp ?? new AuthGatewayFake());
+  const [sessionStorage] = useState<SessionStorage>(() => sessionStorageProp ?? new SessionStorageFake());
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -61,6 +65,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       const session = await authenticateUseCase.execute(email, pass);
       setUser(session.user);
       setToken(session.token);
+      return session.user;
     } finally {
       setIsLoading(false);
     }
@@ -72,6 +77,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       const session = await tokenUseCase.execute(tok);
       setUser(session.user);
       setToken(session.token);
+      return session.user;
     } finally {
       setIsLoading(false);
     }

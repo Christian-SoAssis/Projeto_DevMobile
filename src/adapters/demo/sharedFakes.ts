@@ -7,18 +7,14 @@ import { AnimalRepositoryFake } from '../../application/fakes/AnimalRepositoryFa
 import { FavoriteRepositoryFake } from '../../application/fakes/FavoriteRepositoryFake';
 import { AdoptionInterestRepositoryFake } from '../../application/fakes/AdoptionInterestRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
+import { AuthGatewayFake } from '../../application/fakes/AuthGatewayFake';
+import { SessionStorageFake } from '../../application/fakes/SessionStorageFake';
 
-/**
- * Usuário demo das rotas (não proprietário dos anúncios de terceiros,
- * portanto pode favoritar e demonstrar interesse).
+/*
+ * Contas seed do AuthGatewayFake (qualquer senha):
+ * - ana@exemplo.com (usr_1): responsável pelos anúncios anim_1, anim_2 e anim_7;
+ * - carlos@exemplo.com (usr_2): interessado, pode favoritar e demonstrar interesse.
  */
-export const DEMO_USER_ID = 'usr_2';
-
-/**
- * Persona responsável demo (proprietária dos anúncios seed anim_1, anim_2 e anim_7).
- * Usada nas telas de gestão para que criar → listar funcione no fluxo demo.
- */
-export const DEMO_OWNER_ID = 'usr_1';
 
 function buildSeedAnimals(): Animal[] {
   return [
@@ -221,4 +217,5 @@ export const animalRepository = new AnimalRepositoryFake(buildSeedAnimals());
 export const favoriteRepository = new FavoriteRepositoryFake();
 export const interestRepository = new AdoptionInterestRepositoryFake();
 export const syncQueueRepository = new SyncQueueRepositoryFake();
-
+export const authGateway = new AuthGatewayFake();
+export const sessionStorage = new SessionStorageFake();

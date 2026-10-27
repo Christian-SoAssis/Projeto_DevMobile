@@ -4,18 +4,19 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalFormScreen } from '../../src/adapters/screens/AnimalFormScreen';
 import {
-  DEMO_OWNER_ID,
   animalRepository,
   syncQueueRepository,
 } from '../../src/adapters/demo/sharedFakes';
+import { useAuth } from '../../src/adapters/context/AuthContext';
 
 export default function NovoAnuncioRoute() {
   const router = useRouter();
+  const { user } = useAuth();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
       <AnimalFormScreen
-        ownerId={DEMO_OWNER_ID}
+        ownerId={user?.id ?? ''}
         animalRepository={animalRepository}
         syncQueueRepository={syncQueueRepository}
         onSuccess={() => router.back()}

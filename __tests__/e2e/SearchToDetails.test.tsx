@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { AuthProvider } from '../../src/adapters/context/AuthContext';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -19,7 +20,7 @@ describe('E2E — Visitante pesquisa e abre um animal (doc §16.4 item 1)', () =
   });
 
   it('deve pesquisar na busca e navegar para os detalhes do animal', async () => {
-    const { getByTestId, getByText } = render(<HomeTab />);
+    const { getByTestId, getByText } = render(<AuthProvider><HomeTab /></AuthProvider>);
 
     await waitFor(() => {
       expect(getByText('Luna')).toBeTruthy();
@@ -34,7 +35,7 @@ describe('E2E — Visitante pesquisa e abre um animal (doc §16.4 item 1)', () =
   });
 
   it('deve abrir os detalhes do animal pelo id da rota', async () => {
-    const { getByTestId } = render(<AnimalDetailsRoute />);
+    const { getByTestId } = render(<AuthProvider><AnimalDetailsRoute /></AuthProvider>);
 
     await waitFor(() => {
       expect(getByTestId('animal-details-screen')).toBeTruthy();

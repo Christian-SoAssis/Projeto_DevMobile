@@ -17,6 +17,10 @@ export class DeleteAnimalUseCase {
       throw new Error('Somente o responsável pelo anúncio pode excluí-lo.');
     }
 
+    // Remove do cache local já: offline o anúncio não pode continuar aparecendo
+    // em "Meus anúncios"; a exclusão remota segue pela fila.
+    await this.animalRepository.deleteLocal(animalId);
+
     if (isOnline) {
       try {
         await this.animalRepository.deleteRemote(animalId);

@@ -11,6 +11,7 @@ import {
 import { Animal } from '../../domain/entities/Animal';
 import { AnimalFilterOptions, AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { SearchAnimalsUseCase } from '../../application/use-cases/SearchAnimalsUseCase';
+import { AnimalCover } from '../components/AnimalCover';
 
 export interface SearchScreenProps {
   animalRepository: AnimalRepository;
@@ -194,6 +195,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
               onPress={() => onSelectAnimal && onSelectAnimal(item)}
               testID={`animal-card-${item.id}`}
             >
+              <AnimalCover animal={item} height={140} style={styles.cover} />
               <View style={styles.cardHeader}>
                 <Text style={styles.animalName}>{item.name}</Text>
                 <View
@@ -313,6 +315,9 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 32,
+  },
+  cover: {
+    marginBottom: 10,
   },
   card: {
     backgroundColor: '#fff',

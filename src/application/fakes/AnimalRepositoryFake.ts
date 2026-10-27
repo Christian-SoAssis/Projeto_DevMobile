@@ -56,6 +56,10 @@ export class AnimalRepositoryFake implements AnimalRepository {
     this.items.set(animal.id, animal);
   }
 
+  async deleteLocal(id: string): Promise<void> {
+    this.items.delete(id);
+  }
+
   async createRemote(animal: Animal): Promise<Animal> {
     if (!this.isOnline) {
       throw new Error('Sem conexão com a internet para criar remotamente.');

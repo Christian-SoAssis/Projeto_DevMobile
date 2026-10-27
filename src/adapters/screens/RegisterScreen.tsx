@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { User } from '../../domain/entities/User';
-import { ContactInfo } from '../../domain/value-objects/ContactInfo';
 import { AuthGateway } from '../../domain/ports/AuthGateway';
 import { AuthGatewayFake } from '../../application/fakes/AuthGatewayFake';
 
@@ -26,22 +25,12 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
       if (!name.trim()) throw new Error('Nome é obrigatório.');
       if (!email.trim()) throw new Error('E-mail é obrigatório.');
       if (!pass) throw new Error('Senha é obrigatória.');
-      const fake = authGateway as AuthGatewayFake;
-      const exists = Array.isArray((fake as any).mockUsers)
-        ? (fake as any).mockUsers.find(
-            (u: User) => u.contactInfo.email.toLowerCase() === email.trim().toLowerCase()
-          )
-        : null;
-      if (exists) throw new Error('E-mail já cadastrado (mock).');
-      const user = new User({
-        id: `usr_${Date.now()}`,
+      const user = await authGateway.register({
         name: name.trim(),
-        contactInfo: new ContactInfo(email.trim(), phone.trim() || '11900000000'),
-        role: 'USER',
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        password: pass,
       });
-      if (Array.isArray((fake as any).mockUsers)) {
-        (fake as any).mockUsers.push(user);
-      }
       setFeedback('Cadastro realizado com sucesso! Faça login.');
       if (onSuccess) onSuccess(user);
     } catch (err: any) {

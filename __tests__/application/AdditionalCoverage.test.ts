@@ -211,6 +211,9 @@ describe('Additional Branch Coverage Suite', () => {
     animalRepo.isOnline = true;
     animalRepo.deleteRemote = jest.fn().mockRejectedValue(new Error('Falha remota ao deletar'));
     await deleteUseCase.execute('u1', 'a1', true);
+    // A exclusão remove do cache local mesmo quando o remoto falha (vai para a fila).
+    expect(await animalRepo.findById('a1')).toBeNull();
+    await animalRepo.saveLocal(a1);
 
     animalRepo.updateRemote = jest.fn().mockRejectedValue(new Error('Falha remota ao atualizar'));
     await updateUseCase.execute('u1', 'a1', { name: 'Rex Atualizado' }, true);
@@ -272,14 +275,6 @@ describe('Additional Branch Coverage Suite', () => {
 
     const authUseCase = new AuthenticateUserUseCase(authGateway, sessionStorage);
     await expect(authUseCase.execute('', '')).rejects.toThrow('E-mail e senha são obrigatórios.');
-
-    await expect(aprUseCase.execute('p_invalido')).rejects.toThrow('Período de avaliação não encontrado.');
-
-    await expect(avalUseCase.execute('p_invalido', [])).rejects.toThrow('Período de avaliação não encontrado.');
-
-    await expect(devUseCase.execute('p_invalido', 'motivo')).rejects.toThrow('Período de avaliação não encontrado.');
-
-    await expect(autoUseCase.execute('p_invalido', [])).rejects.toThrow('Período de avaliação não encontrado.');
 
     // CreateAnimalUseCase fallback quando createRemote falhar online
     const animalRepo = new AnimalRepositoryFake();

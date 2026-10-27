@@ -10,6 +10,7 @@ import {
 import { Animal } from '../../domain/entities/Animal';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { FavoriteRepository } from '../../domain/ports/FavoriteRepository';
+import { AnimalCover } from '../components/AnimalCover';
 
 export interface FavoritesScreenProps {
   animalRepository: AnimalRepository;
@@ -76,6 +77,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
               onPress={() => onSelectAnimal && onSelectAnimal(item)}
               testID={`favorite-card-${item.id}`}
             >
+              <AnimalCover animal={item} height={120} style={styles.cover} />
               <Text style={styles.animalName}>{item.name}</Text>
               <Text style={styles.animalDetails}>{item.characteristics.summary()}</Text>
               <Text style={styles.locationText}>📍 {item.location.formatDisplayLocation()}</Text>
@@ -106,6 +108,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1c1c1e',
     marginBottom: 12,
+  },
+  cover: {
+    marginBottom: 10,
   },
   card: {
     backgroundColor: '#fff',

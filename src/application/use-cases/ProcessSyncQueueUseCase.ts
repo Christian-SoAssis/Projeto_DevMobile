@@ -27,7 +27,13 @@ export class ProcessSyncQueueUseCase {
         if (action.entityType === 'animal') {
           if (action.operation === 'CREATE' || action.operation === 'UPDATE' || action.operation === 'MARK_ADOPTED') {
             const animal = await this.animalRepository.findById(action.entityId);
-            if (animal) {
+            if (!animal) {
+              // Sem perda silenciosa (RNF02): o item fica na fila como falha visível.
+              throw new Error('Registro local do anúncio não encontrado para sincronizar.');
+            }
+            if (action.operation === 'CREATE') {
+              await this.animalRepository.createRemote(animal);
+            } else {
               await this.animalRepository.updateRemote(animal);
             }
           } else if (action.operation === 'DELETE') {

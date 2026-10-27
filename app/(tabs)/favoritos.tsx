@@ -1,37 +1,37 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FavoritesScreen } from '../../src/adapters/screens/FavoritesScreen';
-import {
-  DEMO_USER_ID,
-  animalRepository,
-  favoriteRepository,
-} from '../../src/adapters/demo/sharedFakes';
+import { LoginRequired } from '../../src/adapters/components/LoginRequired';
+import { useAuth } from '../../src/adapters/context/AuthContext';
+import { useFocusKey } from '../../src/adapters/hooks/useFocusKey';
+import { animalRepository, favoriteRepository } from '../../src/adapters/demo/sharedFakes';
 
 export default function FavoritesTab() {
   const router = useRouter();
-  // Tabs mantêm a tela montada; remontar no foco garante que a lista
-  // reflita favoritos adicionados/removidos nos detalhes (100% mock,
-  // só expo-router — sem SQLite/Supabase/sensores).
-  const [focusKey, setFocusKey] = React.useState(0);
-  useFocusEffect(
-    React.useCallback(() => {
-      setFocusKey((k) => k + 1);
-    }, [])
-  );
+  const { user } = useAuth();
+  const focusKey = useFocusKey();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <FavoritesScreen
-        key={focusKey}
-        animalRepository={animalRepository}
-        favoriteRepository={favoriteRepository}
-        currentUserId={DEMO_USER_ID}
-        onSelectAnimal={(animal) =>
-          router.push({ pathname: '/animal/[id]', params: { id: animal.id } })
-        }
-      />
+      {user ? (
+        <FavoritesScreen
+          key={focusKey}
+          animalRepository={animalRepository}
+          favoriteRepository={favoriteRepository}
+          currentUserId={user.id}
+          onSelectAnimal={(animal) =>
+            router.push({ pathname: '/animal/[id]', params: { id: animal.id } })
+          }
+        />
+      ) : (
+        <LoginRequired
+          message="Entre na sua conta para ver seus favoritos."
+          onLogin={() => router.push('/login')}
+          onRegister={() => router.push('/cadastro')}
+        />
+      )}
     </SafeAreaView>
   );
 }

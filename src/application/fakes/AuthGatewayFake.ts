@@ -1,4 +1,4 @@
-import { AuthGateway, AuthSession } from '../../domain/ports/AuthGateway';
+import { AuthGateway, AuthSession, RegisterUserInput } from '../../domain/ports/AuthGateway';
 import { User } from '../../domain/entities/User';
 import { ContactInfo } from '../../domain/value-objects/ContactInfo';
 
@@ -24,14 +24,36 @@ export class AuthGatewayFake implements AuthGateway {
       role: 'ADMIN',
     }),
   ];
+  /** Senhas dos usuários cadastrados via `register`; usuários seed aceitam qualquer senha (demo). */
+  private passwords: Map<string, string> = new Map();
+
+  async register(input: RegisterUserInput): Promise<User> {
+    const email = input.email.trim();
+    if (this.findByEmail(email)) {
+      throw new Error('E-mail já cadastrado (mock).');
+    }
+    const user = new User({
+      id: `usr_${Date.now()}`,
+      name: input.name,
+      contactInfo: new ContactInfo(email, input.phone),
+      role: 'USER',
+    });
+    this.mockUsers.push(user);
+    this.passwords.set(user.id, input.password);
+    return user;
+  }
 
   async login(email: string, pass: string): Promise<AuthSession> {
     if (pass === 'wrong_password') {
       throw new Error('Credenciais inválidas.');
     }
-    const user = this.mockUsers.find((u) => u.contactInfo.email.toLowerCase() === email.toLowerCase());
+    const user = this.findByEmail(email);
     if (!user) {
       throw new Error('Usuário não encontrado.');
+    }
+    const expected = this.passwords.get(user.id);
+    if (expected !== undefined && expected !== pass) {
+      throw new Error('Credenciais inválidas.');
     }
     this.currentSession = {
       user,
@@ -52,8 +74,14 @@ export class AuthGatewayFake implements AuthGateway {
     if (token === 'expired_token' || token === 'invalid_token') {
       throw new Error('Token de acesso inválido ou expirado.');
     }
-    const user = this.mockUsers[0];
+    // Tokens emitidos por `login` têm o formato `fake_token_<userId>`.
+    const userId = token.startsWith('fake_token_') ? token.slice('fake_token_'.length) : null;
+    const user = (userId && this.mockUsers.find((u) => u.id === userId)) || this.mockUsers[0];
     this.currentSession = { user, token };
     return this.currentSession;
+  }
+
+  private findByEmail(email: string): User | undefined {
+    return this.mockUsers.find((u) => u.contactInfo.email.toLowerCase() === email.toLowerCase());
   }
 }

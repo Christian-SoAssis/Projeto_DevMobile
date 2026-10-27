@@ -12,6 +12,7 @@ import { GerarPdfUseCase } from '../../application/use-cases/GerarPdfUseCase';
 import { FavoriteRepositoryFake } from '../../application/fakes/FavoriteRepositoryFake';
 import { AdoptionInterestRepositoryFake } from '../../application/fakes/AdoptionInterestRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
+import { AnimalCover } from '../components/AnimalCover';
 
 export interface AnimalDetailsScreenProps {
   animal: Animal;
@@ -123,6 +124,8 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
         </View>
       )}
 
+      <AnimalCover animal={animal} height={240} style={styles.cover} />
+
       <View style={styles.header}>
         <Text style={styles.title} testID="animal-title">{animal.name}</Text>
         <View style={[styles.badge, animal.status.isAdopted() ? styles.badgeAdopted : styles.badgeAvailable]}>
@@ -218,6 +221,9 @@ const styles = StyleSheet.create({
     color: '#0c5460',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  cover: {
+    marginBottom: 12,
   },
   header: {
     flexDirection: 'row',

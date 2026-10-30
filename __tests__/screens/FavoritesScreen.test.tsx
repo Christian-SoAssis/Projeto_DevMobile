@@ -27,7 +27,7 @@ describe('FavoritesScreen Component', () => {
     new Animal({ id, ownerId: 'u1', name, characteristics: dummyChar, location: dummyLoc });
 
   it('deve exibir mensagem de vazio quando não há favoritos', async () => {
-    const { getByTestId, getByText } = render(
+    const { getByTestId, getByText } = await render(
       <FavoritesScreen
         animalRepository={new AnimalRepositoryFake()}
         favoriteRepository={new FavoriteRepositoryFake()}
@@ -48,7 +48,7 @@ describe('FavoritesScreen Component', () => {
     await favRepo.addFavorite(new Favorite('u1', 'a1'));
     const onSelectMock = jest.fn();
 
-    const { getByTestId, getByText } = render(
+    const { getByTestId, getByText } = await render(
       <FavoritesScreen
         animalRepository={animalRepo}
         favoriteRepository={favRepo}
@@ -62,7 +62,7 @@ describe('FavoritesScreen Component', () => {
     });
     expect(getByText('Meus Favoritos (1)')).toBeTruthy();
 
-    fireEvent.press(getByTestId('favorite-card-a1'));
+    await fireEvent.press(getByTestId('favorite-card-a1'));
     expect(onSelectMock).toHaveBeenCalledWith(animal);
   });
 });

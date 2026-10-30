@@ -22,7 +22,7 @@ describe('MyAnimalsScreen Component', () => {
   });
 
   it('deve exibir mensagem de vazio quando o responsável não tem anúncios', async () => {
-    const { getByTestId, getByText } = render(
+    const { getByTestId, getByText } = await render(
       <MyAnimalsScreen animalRepository={new AnimalRepositoryFake()} ownerId="u9" />
     );
 
@@ -39,7 +39,7 @@ describe('MyAnimalsScreen Component', () => {
     const onSelectMock = jest.fn();
     const onNewMock = jest.fn();
 
-    const { getByTestId, getByText, queryByText } = render(
+    const { getByTestId, getByText, queryByText } = await render(
       <MyAnimalsScreen
         animalRepository={repo}
         ownerId="u1"
@@ -54,10 +54,10 @@ describe('MyAnimalsScreen Component', () => {
     expect(queryByText('Rex')).toBeNull();
     expect(getByText('Meus Anúncios (1)')).toBeTruthy();
 
-    fireEvent.press(getByTestId('my-animal-card-a1'));
+    await fireEvent.press(getByTestId('my-animal-card-a1'));
     expect(onSelectMock).toHaveBeenCalledWith(mine);
 
-    fireEvent.press(getByTestId('new-animal-button'));
+    await fireEvent.press(getByTestId('new-animal-button'));
     expect(onNewMock).toHaveBeenCalled();
   });
 });

@@ -12,20 +12,20 @@ import CadastroRoute from '../../app/cadastro';
 
 describe('Rotas mock — edição e auth stub', () => {
   it('deve abrir edição pré-preenchida do anúncio da rota', async () => {
-    const { getByTestId } = render(<EditarAnuncioRoute />);
+    const { getByTestId } = await render(<EditarAnuncioRoute />);
     await waitFor(() => {
       expect(getByTestId('animal-form-screen')).toBeTruthy();
     });
     expect(getByTestId('form-title').props.children).toBe('Editar Anúncio');
   });
 
-  it('deve renderizar rota de login (mock)', () => {
-    const { getByTestId } = render(<LoginRoute />);
+  it('deve renderizar rota de login (mock)', async () => {
+    const { getByTestId } = await render(<LoginRoute />);
     expect(getByTestId('login-screen')).toBeTruthy();
   });
 
-  it('deve renderizar rota de cadastro (mock)', () => {
-    const { getByTestId } = render(<CadastroRoute />);
+  it('deve renderizar rota de cadastro (mock)', async () => {
+    const { getByTestId } = await render(<CadastroRoute />);
     expect(getByTestId('register-screen')).toBeTruthy();
   });
 });

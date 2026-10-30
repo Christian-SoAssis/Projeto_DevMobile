@@ -112,7 +112,7 @@ describe('useConnectivity (hook reativo)', () => {
     const netinfo = makeFakeNetInfo(false);
     const adapter: ConnectivityGateway = new NetInfoConnectivityAdapter({ netinfo });
 
-    const { result } = renderHook(() => useConnectivity(adapter));
+    const { result } = await renderHook(() => useConnectivity(adapter));
 
     await waitFor(() => expect(result.current).toBe(false));
   });
@@ -121,13 +121,13 @@ describe('useConnectivity (hook reativo)', () => {
     const netinfo = makeFakeNetInfo(true);
     const adapter: ConnectivityGateway = new NetInfoConnectivityAdapter({ netinfo });
 
-    const { result } = renderHook(() => useConnectivity(adapter));
+    const { result } = await renderHook(() => useConnectivity(adapter));
     await waitFor(() => expect(result.current).toBe(true));
 
-    act(() => netinfo.emit(false));
+    await act(() => netinfo.emit(false));
     expect(result.current).toBe(false);
 
-    act(() => netinfo.emit(true));
+    await act(() => netinfo.emit(true));
     expect(result.current).toBe(true);
   });
 
@@ -137,7 +137,7 @@ describe('useConnectivity (hook reativo)', () => {
       subscribe: () => () => undefined,
     };
 
-    const { result } = renderHook(() => useConnectivity(broken));
+    const { result } = await renderHook(() => useConnectivity(broken));
     await act(async () => {
       await Promise.resolve();
     });

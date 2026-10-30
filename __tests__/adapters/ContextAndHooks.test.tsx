@@ -23,7 +23,7 @@ describe('Context API & Custom Bridge Hooks', () => {
         </AuthProvider>
       );
 
-      const { result } = renderHook(() => useAuth(), { wrapper });
+      const { result } = await renderHook(() => useAuth(), { wrapper });
 
       await act(async () => {
         await new Promise((r) => setTimeout(r, 50));
@@ -56,7 +56,7 @@ describe('Context API & Custom Bridge Hooks', () => {
         </AuthProvider>
       );
 
-      const { result } = renderHook(() => useAuth(), { wrapper });
+      const { result } = await renderHook(() => useAuth(), { wrapper });
 
       await act(async () => {
         await new Promise((r) => setTimeout(r, 50));
@@ -77,7 +77,7 @@ describe('Context API & Custom Bridge Hooks', () => {
         </AuthProvider>
       );
 
-      const { result } = renderHook(() => useAuth(), { wrapper });
+      const { result } = await renderHook(() => useAuth(), { wrapper });
 
       await act(async () => {
         await new Promise((r) => setTimeout(r, 50));
@@ -87,9 +87,9 @@ describe('Context API & Custom Bridge Hooks', () => {
       expect(await sessionStorage.getSessionToken()).toBeNull();
     });
 
-    it('deve lançar erro se useAuth for usado fora de AuthProvider', () => {
+    it('deve lançar erro se useAuth for usado fora de AuthProvider', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      expect(() => renderHook(() => useAuth())).toThrow('useAuth deve ser utilizado dentro de um AuthProvider');
+      await expect(renderHook(() => useAuth())).rejects.toThrow('useAuth deve ser utilizado dentro de um AuthProvider');
       consoleErrorSpy.mockRestore();
     });
 
@@ -103,7 +103,7 @@ describe('Context API & Custom Bridge Hooks', () => {
         </AuthProvider>
       );
 
-      const { result } = renderHook(() => useAuth(), { wrapper });
+      const { result } = await renderHook(() => useAuth(), { wrapper });
 
       await act(async () => {
         await result.current.acessarViaToken('fake_token_usr_1');
@@ -115,7 +115,7 @@ describe('Context API & Custom Bridge Hooks', () => {
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <AuthProvider>{children}</AuthProvider>
       );
-      const { result } = renderHook(() => useAuth(), { wrapper });
+      const { result } = await renderHook(() => useAuth(), { wrapper });
       await act(async () => {
         await new Promise((r) => setTimeout(r, 20));
       });
@@ -125,11 +125,11 @@ describe('Context API & Custom Bridge Hooks', () => {
 
   describe('useAnimals Custom Hook', () => {
     it('deve permitir instanciar com repositórios padrão e tratar exceções sem mensagem', async () => {
-      const { result } = renderHook(() => useAnimals());
+      const { result } = await renderHook(() => useAnimals());
       const animalRepoFake = new AnimalRepositoryFake();
       animalRepoFake.search = jest.fn().mockRejectedValue('Erro string sem message');
 
-      const { result: customResult } = renderHook(() => useAnimals(animalRepoFake));
+      const { result: customResult } = await renderHook(() => useAnimals(animalRepoFake));
       await act(async () => {
         await customResult.current.searchAnimals();
       });
@@ -159,7 +159,7 @@ describe('Context API & Custom Bridge Hooks', () => {
       const animalRepo = new AnimalRepositoryFake();
       const syncQueueRepo = new SyncQueueRepositoryFake();
 
-      const { result } = renderHook(() => useAnimals(animalRepo, syncQueueRepo));
+      const { result } = await renderHook(() => useAnimals(animalRepo, syncQueueRepo));
 
       const animal = new Animal({
         id: 'a1',
@@ -186,7 +186,7 @@ describe('Context API & Custom Bridge Hooks', () => {
       const animalRepo = new AnimalRepositoryFake();
       animalRepo.search = jest.fn().mockRejectedValue(new Error('Falha no repositório ao buscar'));
 
-      const { result } = renderHook(() => useAnimals(animalRepo));
+      const { result } = await renderHook(() => useAnimals(animalRepo));
 
       await act(async () => {
         await result.current.searchAnimals();
@@ -225,7 +225,7 @@ describe('Context API & Custom Bridge Hooks', () => {
       const animalRepo = new AnimalRepositoryFake();
       const syncQueueRepo = new SyncQueueRepositoryFake();
 
-      const { result } = renderHook(() => useSync(syncQueueRepo, animalRepo));
+      const { result } = await renderHook(() => useSync(syncQueueRepo, animalRepo));
 
       await act(async () => {
         await result.current.loadPending();
@@ -240,8 +240,8 @@ describe('Context API & Custom Bridge Hooks', () => {
   });
 
   describe('useSync defaults', () => {
-    it('deve iniciar sem sincronização em andamento', () => {
-      const { result } = renderHook(() => useSync());
+    it('deve iniciar sem sincronização em andamento', async () => {
+      const { result } = await renderHook(() => useSync());
       expect(result.current.isSyncing).toBe(false);
     });
   });

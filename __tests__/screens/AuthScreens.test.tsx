@@ -8,22 +8,22 @@ import { SessionStorageFake } from '../../src/application/fakes/SessionStorageFa
 describe('Auth stub screens (100% mock)', () => {
   describe('LoginScreen', () => {
     it('deve exigir e-mail e senha', async () => {
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <LoginScreen authGateway={new AuthGatewayFake()} sessionStorage={new SessionStorageFake()} />
       );
-      fireEvent.press(getByTestId('btn-login'));
+      await fireEvent.press(getByTestId('btn-login'));
       await waitFor(() => {
         expect(getByText('E-mail e senha são obrigatórios.')).toBeTruthy();
       });
     });
 
     it('deve rejeitar usuário inexistente', async () => {
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <LoginScreen authGateway={new AuthGatewayFake()} sessionStorage={new SessionStorageFake()} />
       );
-      fireEvent.changeText(getByTestId('input-email'), 'ninguem@exemplo.com');
-      fireEvent.changeText(getByTestId('input-pass'), 'qualquer');
-      fireEvent.press(getByTestId('btn-login'));
+      await fireEvent.changeText(getByTestId('input-email'), 'ninguem@exemplo.com');
+      await fireEvent.changeText(getByTestId('input-pass'), 'qualquer');
+      await fireEvent.press(getByTestId('btn-login'));
       await waitFor(() => {
         expect(getByText('Usuário não encontrado.')).toBeTruthy();
       });
@@ -33,12 +33,12 @@ describe('Auth stub screens (100% mock)', () => {
       const gateway = new AuthGatewayFake();
       const storage = new SessionStorageFake();
       const onSuccess = jest.fn();
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <LoginScreen authGateway={gateway} sessionStorage={storage} onSuccess={onSuccess} />
       );
-      fireEvent.changeText(getByTestId('input-email'), 'ana@exemplo.com');
-      fireEvent.changeText(getByTestId('input-pass'), 'password123');
-      fireEvent.press(getByTestId('btn-login'));
+      await fireEvent.changeText(getByTestId('input-email'), 'ana@exemplo.com');
+      await fireEvent.changeText(getByTestId('input-pass'), 'password123');
+      await fireEvent.press(getByTestId('btn-login'));
       await waitFor(() => {
         expect(getByText('Login realizado com sucesso!')).toBeTruthy();
       });
@@ -49,25 +49,25 @@ describe('Auth stub screens (100% mock)', () => {
 
   describe('RegisterScreen', () => {
     it('deve exigir nome', async () => {
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <RegisterScreen authGateway={new AuthGatewayFake()} />
       );
-      fireEvent.changeText(getByTestId('input-email'), 'novo@exemplo.com');
-      fireEvent.changeText(getByTestId('input-pass'), '123456');
-      fireEvent.press(getByTestId('btn-register'));
+      await fireEvent.changeText(getByTestId('input-email'), 'novo@exemplo.com');
+      await fireEvent.changeText(getByTestId('input-pass'), '123456');
+      await fireEvent.press(getByTestId('btn-register'));
       await waitFor(() => {
         expect(getByText('Nome é obrigatório.')).toBeTruthy();
       });
     });
 
     it('deve rejeitar e-mail duplicado do fake', async () => {
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <RegisterScreen authGateway={new AuthGatewayFake()} />
       );
-      fireEvent.changeText(getByTestId('input-name'), 'Ana Silva');
-      fireEvent.changeText(getByTestId('input-email'), 'ana@exemplo.com');
-      fireEvent.changeText(getByTestId('input-pass'), '123456');
-      fireEvent.press(getByTestId('btn-register'));
+      await fireEvent.changeText(getByTestId('input-name'), 'Ana Silva');
+      await fireEvent.changeText(getByTestId('input-email'), 'ana@exemplo.com');
+      await fireEvent.changeText(getByTestId('input-pass'), '123456');
+      await fireEvent.press(getByTestId('btn-register'));
       await waitFor(() => {
         expect(getByText('E-mail já cadastrado (mock).')).toBeTruthy();
       });
@@ -76,13 +76,13 @@ describe('Auth stub screens (100% mock)', () => {
     it('deve cadastrar novo usuário no fake', async () => {
       const gateway = new AuthGatewayFake();
       const onSuccess = jest.fn();
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <RegisterScreen authGateway={gateway} onSuccess={onSuccess} />
       );
-      fireEvent.changeText(getByTestId('input-name'), 'Maria Souza');
-      fireEvent.changeText(getByTestId('input-email'), 'maria@exemplo.com');
-      fireEvent.changeText(getByTestId('input-pass'), '123456');
-      fireEvent.press(getByTestId('btn-register'));
+      await fireEvent.changeText(getByTestId('input-name'), 'Maria Souza');
+      await fireEvent.changeText(getByTestId('input-email'), 'maria@exemplo.com');
+      await fireEvent.changeText(getByTestId('input-pass'), '123456');
+      await fireEvent.press(getByTestId('btn-register'));
       await waitFor(() => {
         expect(getByText('Cadastro realizado com sucesso! Faça login.')).toBeTruthy();
       });

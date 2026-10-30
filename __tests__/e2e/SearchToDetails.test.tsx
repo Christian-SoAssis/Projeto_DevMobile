@@ -19,13 +19,13 @@ describe('E2E — Visitante pesquisa e abre um animal (doc §16.4 item 1)', () =
   });
 
   it('deve pesquisar na busca e navegar para os detalhes do animal', async () => {
-    const { getByTestId, getByText } = render(<HomeTab />);
+    const { getByTestId, getByText } = await render(<HomeTab />);
 
     await waitFor(() => {
       expect(getByText('Luna')).toBeTruthy();
     });
 
-    fireEvent.press(getByTestId('animal-card-anim_1'));
+    await fireEvent.press(getByTestId('animal-card-anim_1'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/animal/[id]',
@@ -34,7 +34,7 @@ describe('E2E — Visitante pesquisa e abre um animal (doc §16.4 item 1)', () =
   });
 
   it('deve abrir os detalhes do animal pelo id da rota', async () => {
-    const { getByTestId } = render(<AnimalDetailsRoute />);
+    const { getByTestId } = await render(<AnimalDetailsRoute />);
 
     await waitFor(() => {
       expect(getByTestId('animal-details-screen')).toBeTruthy();

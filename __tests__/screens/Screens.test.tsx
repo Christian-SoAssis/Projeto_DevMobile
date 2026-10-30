@@ -39,7 +39,7 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       const repo = new AnimalRepositoryFake([animal1]);
       const onSelectMock = jest.fn();
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <SearchScreen animalRepository={repo} isOnlineInitial={true} onSelectAnimal={onSelectMock} />
       );
 
@@ -50,20 +50,20 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       expect(getByTestId('connection-banner')).toBeTruthy();
 
       const input = getByTestId('search-input');
-      fireEvent.changeText(input, 'Luna');
-      fireEvent.press(getByTestId('filter-chip-Cão'));
-      fireEvent.press(getByTestId('filter-chip-Todos'));
-      fireEvent.press(getByTestId('toggle-map'));
+      await fireEvent.changeText(input, 'Luna');
+      await fireEvent.press(getByTestId('filter-chip-Cão'));
+      await fireEvent.press(getByTestId('filter-chip-Todos'));
+      await fireEvent.press(getByTestId('toggle-map'));
       await waitFor(() => {
         expect(getByTestId('map-view')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('toggle-list'));
+      await fireEvent.press(getByTestId('toggle-list'));
       await waitFor(() => {
         expect(getByTestId('animals-list')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('animal-card-a1'));
+      await fireEvent.press(getByTestId('animal-card-a1'));
       expect(onSelectMock).toHaveBeenCalledWith(animal1);
     });
 
@@ -71,7 +71,7 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       const repo = new AnimalRepositoryFake();
       repo.search = jest.fn().mockRejectedValue(new Error('Erro de conexão'));
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <SearchScreen animalRepository={repo} isOnlineInitial={true} />
       );
 
@@ -89,7 +89,7 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       const intrRepo = new AdoptionInterestRepositoryFake();
       const onBackMock = jest.fn();
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <AnimalDetailsScreen
           animal={animal}
           currentUserId=""
@@ -101,15 +101,15 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       );
 
       expect(getByText('Rex')).toBeTruthy();
-      fireEvent.press(getByTestId('back-button'));
+      await fireEvent.press(getByTestId('back-button'));
       expect(onBackMock).toHaveBeenCalled();
 
-      fireEvent.press(getByTestId('favorite-button'));
+      await fireEvent.press(getByTestId('favorite-button'));
       await waitFor(() => {
         expect(getByText('Faça login para favoritar.')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('interest-button'));
+      await fireEvent.press(getByTestId('interest-button'));
       await waitFor(() => {
         expect(getByText('Faça login para demonstrar interesse.')).toBeTruthy();
       });
@@ -121,7 +121,7 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       const favRepo = new FavoriteRepositoryFake();
       const intrRepo = new AdoptionInterestRepositoryFake();
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <AnimalDetailsScreen
           animal={animal}
           currentUserId="usr_interessado"
@@ -131,12 +131,12 @@ describe('React Native Screens UI Tests (RNTL)', () => {
         />
       );
 
-      fireEvent.press(getByTestId('favorite-button'));
+      await fireEvent.press(getByTestId('favorite-button'));
       await waitFor(() => {
         expect(getByText('Adicionado aos favoritos!')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('interest-button'));
+      await fireEvent.press(getByTestId('interest-button'));
       await waitFor(() => {
         expect(getByText('Manifestação de interesse enviada ao responsável!')).toBeTruthy();
       });
@@ -147,7 +147,7 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       animal.addPhoto(new AnimalPhoto({ id: 'p1', animalId: 'a1', localPath: 'file://p1.jpg' }));
       const animalRepo = new AnimalRepositoryFake([animal]);
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <AnimalDetailsScreen
           animal={animal}
           currentUserId="usr_owner"
@@ -158,12 +158,12 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       const btn = getByTestId('mark-adopted-button');
       expect(btn).toBeTruthy();
 
-      fireEvent.press(btn);
+      await fireEvent.press(btn);
       await waitFor(() => {
         expect(getByText('Animal marcado como adotado com sucesso!')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('export-pdf-button'));
+      await fireEvent.press(getByTestId('export-pdf-button'));
       await waitFor(() => {
         expect(getByText(/PDF gerado com sucesso/)).toBeTruthy();
       });
@@ -174,7 +174,7 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       const animalRepo = new AnimalRepositoryFake([animal]);
       animalRepo.saveLocal = jest.fn().mockRejectedValue(new Error('Erro no SQLite local'));
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <AnimalDetailsScreen
           animal={animal}
           currentUserId="usr_owner"
@@ -182,12 +182,12 @@ describe('React Native Screens UI Tests (RNTL)', () => {
         />
       );
 
-      fireEvent.press(getByTestId('mark-adopted-button'));
+      await fireEvent.press(getByTestId('mark-adopted-button'));
       await waitFor(() => {
         expect(getByText('Erro no SQLite local')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('export-pdf-button'));
+      await fireEvent.press(getByTestId('export-pdf-button'));
       await waitFor(() => {
         expect(getByText('Não é possível gerar PDF para este animal: informações incompletas.')).toBeTruthy();
       });
@@ -202,7 +202,7 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       const locationGateway = new LocationGatewayFake();
       const onSuccessMock = jest.fn();
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <AnimalFormScreen
           animalRepository={animalRepo}
           syncQueueRepository={queueRepo}
@@ -213,22 +213,22 @@ describe('React Native Screens UI Tests (RNTL)', () => {
         />
       );
 
-      fireEvent.changeText(getByTestId('input-name'), 'Thor');
-      fireEvent.press(getByTestId('radio-species-Cão'));
-      fireEvent.changeText(getByTestId('input-size'), 'Grande');
-      fireEvent.changeText(getByTestId('input-age'), '3 anos');
+      await fireEvent.changeText(getByTestId('input-name'), 'Thor');
+      await fireEvent.press(getByTestId('radio-species-Cão'));
+      await fireEvent.changeText(getByTestId('input-size'), 'Grande');
+      await fireEvent.changeText(getByTestId('input-age'), '3 anos');
 
-      fireEvent.press(getByTestId('btn-capture-photo'));
+      await fireEvent.press(getByTestId('btn-capture-photo'));
       await waitFor(() => {
         expect(getByTestId('photo-status')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('btn-capture-location'));
+      await fireEvent.press(getByTestId('btn-capture-location'));
       await waitFor(() => {
         expect(getByTestId('location-status')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('btn-submit-animal'));
+      await fireEvent.press(getByTestId('btn-submit-animal'));
       await waitFor(() => {
         expect(getByText(/Anúncio cadastrado e sincronizado remotamente!/)).toBeTruthy();
       });
@@ -239,7 +239,7 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       const animalRepo = new AnimalRepositoryFake();
       const queueRepo = new SyncQueueRepositoryFake();
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <AnimalFormScreen
           animalRepository={animalRepo}
           syncQueueRepository={queueRepo}
@@ -247,8 +247,8 @@ describe('React Native Screens UI Tests (RNTL)', () => {
         />
       );
 
-      fireEvent.changeText(getByTestId('input-name'), 'Thor Offline');
-      fireEvent.press(getByTestId('btn-submit-animal'));
+      await fireEvent.changeText(getByTestId('input-name'), 'Thor Offline');
+      await fireEvent.press(getByTestId('btn-submit-animal'));
       await waitFor(() => {
         expect(getByText(/Anúncio salvo localmente/)).toBeTruthy();
       });
@@ -258,15 +258,15 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       const animalRepo = new AnimalRepositoryFake();
       const queueRepo = new SyncQueueRepositoryFake();
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <AnimalFormScreen
           animalRepository={animalRepo}
           syncQueueRepository={queueRepo}
         />
       );
 
-      fireEvent.changeText(getByTestId('input-name'), '');
-      fireEvent.press(getByTestId('btn-submit-animal'));
+      await fireEvent.changeText(getByTestId('input-name'), '');
+      await fireEvent.press(getByTestId('btn-submit-animal'));
       await waitFor(() => {
         expect(getByText('Nome do animal é obrigatório.')).toBeTruthy();
       });
@@ -275,7 +275,7 @@ describe('React Native Screens UI Tests (RNTL)', () => {
 
   describe('SyncStatusScreen Component', () => {
     it('deve renderizar SyncStatusScreen com props padrão', async () => {
-      const { getByTestId } = render(<SyncStatusScreen />);
+      const { getByTestId } = await render(<SyncStatusScreen />);
       expect(getByTestId('sync-status-screen')).toBeTruthy();
     });
 
@@ -293,7 +293,7 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       });
       await queueRepo.enqueue(action);
 
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <SyncStatusScreen animalRepository={animalRepo} syncQueueRepository={queueRepo} />
       );
 
@@ -302,7 +302,7 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       });
 
       await act(async () => {
-        fireEvent.press(getByTestId('btn-trigger-sync'));
+        await fireEvent.press(getByTestId('btn-trigger-sync'));
       });
       await waitFor(() => {
         expect(getByTestId('sync-result-banner')).toBeTruthy();

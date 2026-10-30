@@ -30,9 +30,9 @@ describe('Mock completion — filtros, edição e gestão', () => {
         new Animal({ id: 'a1', ownerId: 'u1', name: 'Luna', characteristics: makeChar('Cão', 'Médio', '2 anos', 'Fêmea'), location: makeLoc() }),
         new Animal({ id: 'a2', ownerId: 'u1', name: 'Rex', characteristics: makeChar('Cão', 'Grande', '3 anos', 'Macho'), location: makeLoc() }),
       ]);
-      const { getByTestId, getByText, queryByText } = render(<SearchScreen animalRepository={repo} />);
+      const { getByTestId, getByText, queryByText } = await render(<SearchScreen animalRepository={repo} />);
       await waitFor(() => expect(getByText('Luna')).toBeTruthy());
-      fireEvent.press(getByTestId('filter-size-Grande'));
+      await fireEvent.press(getByTestId('filter-size-Grande'));
       await waitFor(() => expect(getByText('Rex')).toBeTruthy());
       expect(queryByText('Luna')).toBeNull();
     });
@@ -42,9 +42,9 @@ describe('Mock completion — filtros, edição e gestão', () => {
         new Animal({ id: 'a1', ownerId: 'u1', name: 'Luna', characteristics: makeChar('Gato', 'Pequeno', '1 ano', 'Fêmea'), location: makeLoc() }),
         new Animal({ id: 'a2', ownerId: 'u1', name: 'Rex', characteristics: makeChar('Gato', 'Pequeno', '1 ano', 'Macho'), location: makeLoc() }),
       ]);
-      const { getByTestId, getByText, queryByText } = render(<SearchScreen animalRepository={repo} />);
+      const { getByTestId, getByText, queryByText } = await render(<SearchScreen animalRepository={repo} />);
       await waitFor(() => expect(getByText('Luna')).toBeTruthy());
-      fireEvent.press(getByTestId('filter-sex-Macho'));
+      await fireEvent.press(getByTestId('filter-sex-Macho'));
       await waitFor(() => expect(getByText('Rex')).toBeTruthy());
       expect(queryByText('Luna')).toBeNull();
     });
@@ -54,10 +54,10 @@ describe('Mock completion — filtros, edição e gestão', () => {
         new Animal({ id: 'a1', ownerId: 'u1', name: 'Luna', characteristics: makeChar('Cão', 'Médio', '2 anos', 'Fêmea'), location: makeLoc() }),
         new Animal({ id: 'a2', ownerId: 'u1', name: 'Totó', characteristics: makeChar('Cão', 'Médio', '5 anos', 'Macho'), location: makeLoc() }),
       ]);
-      const { getByTestId, getByText, queryByText } = render(<SearchScreen animalRepository={repo} />);
+      const { getByTestId, getByText, queryByText } = await render(<SearchScreen animalRepository={repo} />);
       await waitFor(() => expect(getByText('Luna')).toBeTruthy());
-      fireEvent.changeText(getByTestId('search-age-input'), '5 anos');
-      fireEvent.press(getByTestId('search-age-button'));
+      await fireEvent.changeText(getByTestId('search-age-input'), '5 anos');
+      await fireEvent.press(getByTestId('search-age-button'));
       await waitFor(() => expect(getByText('Totó')).toBeTruthy());
       expect(queryByText('Luna')).toBeNull();
     });
@@ -75,7 +75,7 @@ describe('Mock completion — filtros, edição e gestão', () => {
       const repo = new AnimalRepositoryFake([animal]);
       const queue = new SyncQueueRepositoryFake();
       const onSuccess = jest.fn();
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <AnimalFormScreen
           ownerId="usr_1"
           initialAnimal={animal}
@@ -85,8 +85,8 @@ describe('Mock completion — filtros, edição e gestão', () => {
         />
       );
       expect(getByTestId('form-title').props.children).toBe('Editar Anúncio');
-      fireEvent.changeText(getByTestId('input-name'), 'Luna Nova');
-      fireEvent.press(getByTestId('btn-submit-animal'));
+      await fireEvent.changeText(getByTestId('input-name'), 'Luna Nova');
+      await fireEvent.press(getByTestId('btn-submit-animal'));
       await waitFor(() => {
         expect(getByText('Anúncio atualizado com sucesso!')).toBeTruthy();
       });
@@ -103,7 +103,7 @@ describe('Mock completion — filtros, edição e gestão', () => {
         location: makeLoc(),
       });
       const repo = new AnimalRepositoryFake([animal]);
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <AnimalFormScreen
           ownerId="usr_2"
           initialAnimal={animal}
@@ -111,8 +111,8 @@ describe('Mock completion — filtros, edição e gestão', () => {
           syncQueueRepository={new SyncQueueRepositoryFake()}
         />
       );
-      fireEvent.changeText(getByTestId('input-name'), 'Invasão');
-      fireEvent.press(getByTestId('btn-submit-animal'));
+      await fireEvent.changeText(getByTestId('input-name'), 'Invasão');
+      await fireEvent.press(getByTestId('btn-submit-animal'));
       await waitFor(() => {
         expect(getByText('Somente o responsável pelo anúncio pode alterar seus dados.')).toBeTruthy();
       });
@@ -124,18 +124,18 @@ describe('Mock completion — filtros, edição e gestão', () => {
       const mine = new Animal({ id: 'a1', ownerId: 'u1', name: 'Luna', characteristics: makeChar('Cão', 'Médio', '2 anos', 'Fêmea'), location: makeLoc() });
       const repo = new AnimalRepositoryFake([mine]);
       const onEdit = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId } = await render(
         <MyAnimalsScreen animalRepository={repo} ownerId="u1" onEditAnimal={onEdit} />
       );
       await waitFor(() => expect(getByTestId('my-animal-item-a1')).toBeTruthy());
-      fireEvent.press(getByTestId('my-animal-edit-a1'));
+      await fireEvent.press(getByTestId('my-animal-edit-a1'));
       expect(onEdit).toHaveBeenCalledWith(mine);
     });
 
     it('deve marcar como adotado e exibir feedback', async () => {
       const mine = new Animal({ id: 'a1', ownerId: 'u1', name: 'Luna', characteristics: makeChar('Cão', 'Médio', '2 anos', 'Fêmea'), location: makeLoc() });
       const repo = new AnimalRepositoryFake([mine]);
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <MyAnimalsScreen
           animalRepository={repo}
           syncQueueRepository={new SyncQueueRepositoryFake()}
@@ -143,7 +143,7 @@ describe('Mock completion — filtros, edição e gestão', () => {
         />
       );
       await waitFor(() => expect(getByTestId('my-animal-adopted-a1')).toBeTruthy());
-      fireEvent.press(getByTestId('my-animal-adopted-a1'));
+      await fireEvent.press(getByTestId('my-animal-adopted-a1'));
       await waitFor(() => {
         expect(getByText('Animal marcado como adotado com sucesso!')).toBeTruthy();
       });
@@ -153,7 +153,7 @@ describe('Mock completion — filtros, edição e gestão', () => {
     it('deve excluir anúncio e exibir feedback', async () => {
       const mine = new Animal({ id: 'a1', ownerId: 'u1', name: 'Luna', characteristics: makeChar('Cão', 'Médio', '2 anos', 'Fêmea'), location: makeLoc() });
       const repo = new AnimalRepositoryFake([mine]);
-      const { getByTestId, getByText } = render(
+      const { getByTestId, getByText } = await render(
         <MyAnimalsScreen
           animalRepository={repo}
           syncQueueRepository={new SyncQueueRepositoryFake()}
@@ -161,7 +161,7 @@ describe('Mock completion — filtros, edição e gestão', () => {
         />
       );
       await waitFor(() => expect(getByTestId('my-animal-delete-a1')).toBeTruthy());
-      fireEvent.press(getByTestId('my-animal-delete-a1'));
+      await fireEvent.press(getByTestId('my-animal-delete-a1'));
       await waitFor(() => {
         expect(getByText('Anúncio excluído com sucesso!')).toBeTruthy();
       });

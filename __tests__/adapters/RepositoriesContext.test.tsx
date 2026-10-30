@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, View } from 'react-native';
-import { render, waitFor } from '@testing-library/react-native';
+import { render, waitFor, act } from '@testing-library/react-native';
 import {
   InMemorySqliteDriver,
   setTestDatabaseDriver,
@@ -8,6 +8,7 @@ import {
 import { INITIAL_SCHEMA_SQL } from '../../src/infrastructure/database/sqlite/migrations/schema.sql';
 import { RepositoriesProvider, useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { animalRepository as demoAnimalRepository, demoContainer } from '../../src/adapters/demo/sharedFakes';
+import { loadAppContainer, AppContainer } from '../../src/infrastructure/composition/loadAppContainer';
 
 function Probe() {
   const container = useRepositories();
@@ -25,14 +26,24 @@ describe('RepositoriesContext — composição da persistência (Fase 2)', () =>
     await db.execAsync(INITIAL_SCHEMA_SQL);
     setTestDatabaseDriver(db);
 
-    const { getByTestId, queryByTestId } = render(
-      <RepositoriesProvider>
+    let resolveContainer!: (c: AppContainer) => void;
+    const pendingLoad = new Promise<AppContainer>((resolve) => {
+      resolveContainer = resolve;
+    });
+
+    const { getByTestId, queryByTestId } = await render(
+      <RepositoriesProvider loadContainer={() => pendingLoad}>
         <Probe />
       </RepositoriesProvider>
     );
 
     // Estado inicial de boot mostra o placeholder (testID repos-loading).
     expect(getByTestId('repos-loading')).toBeTruthy();
+
+    const realContainer = await loadAppContainer();
+    await act(async () => {
+      resolveContainer(realContainer);
+    });
 
     await waitFor(() => {
       expect(getByTestId('probe-mode').props.children).toBe('memory');
@@ -47,7 +58,7 @@ describe('RepositoriesContext — composição da persistência (Fase 2)', () =>
       throw new Error('banco indisponível');
     };
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <RepositoriesProvider loadContainer={falhou}>
         <Probe />
       </RepositoriesProvider>
@@ -60,7 +71,7 @@ describe('RepositoriesContext — composição da persistência (Fase 2)', () =>
   });
 
   it('sem provider (rotas avulsas/testes de rota): fallback demo em memória', async () => {
-    const { getByTestId } = render(<Probe />);
+    const { getByTestId } = await render(<Probe />);
 
     await waitFor(() => {
       expect(getByTestId('probe-mode').props.children).toBe('demo');
@@ -74,7 +85,7 @@ describe('RepositoriesContext — composição da persistência (Fase 2)', () =>
     const demorado = (): Promise<ReturnType<typeof useRepositories>> =>
       new Promise((resolve) => setTimeout(() => resolve(demoContainer), 20));
 
-    const { getByTestId, unmount } = render(
+    const { getByTestId, unmount } = await render(
       <RepositoriesProvider loadContainer={demorado}>
         <Probe />
       </RepositoriesProvider>
@@ -83,7 +94,7 @@ describe('RepositoriesContext — composição da persistência (Fase 2)', () =>
     // Ainda montado: a indisponibilidade do load é o placeholder visível.
     expect(getByTestId('repos-loading')).toBeTruthy();
 
-    unmount();
+    await unmount();
 
     // A promise depois disso deve resolver sem crash nem update de estado
     // no componente desmontado (defesa `if (active)` no boot).

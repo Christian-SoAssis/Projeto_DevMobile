@@ -4,11 +4,14 @@ import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
 import { AnimalCharacteristics } from '../../domain/value-objects/AnimalCharacteristics';
 import { ApproximateLocation } from '../../domain/value-objects/ApproximateLocation';
+import { UnitOfWork } from '../ports/UnitOfWork';
+import { NoopUnitOfWork } from '../fakes/NoopUnitOfWork';
 
 export class UpdateAnimalUseCase {
   constructor(
     private animalRepository: AnimalRepository,
-    private syncQueueRepository: SyncQueueRepository
+    private syncQueueRepository: SyncQueueRepository,
+    private unitOfWork: UnitOfWork = new NoopUnitOfWork()
   ) {}
 
   async execute(
@@ -27,23 +30,27 @@ export class UpdateAnimalUseCase {
     }
 
     animal.updateData(requestorId, updates);
-    await this.animalRepository.saveLocal(animal);
+    const action = this.buildUpdateAction(animal);
+
+    await this.unitOfWork.run(async () => {
+      await this.animalRepository.saveLocal(animal);
+      await this.syncQueueRepository.enqueue(action);
+    });
 
     if (isOnline) {
       try {
         await this.animalRepository.updateRemote(animal);
+        await this.syncQueueRepository.delete(action.id);
       } catch {
-        await this.enqueueUpdate(animal);
+        // Mantém a ação na fila para retry.
       }
-    } else {
-      await this.enqueueUpdate(animal);
     }
 
     return animal;
   }
 
-  private async enqueueUpdate(animal: Animal): Promise<void> {
-    const action = new SyncAction({
+  private buildUpdateAction(animal: Animal): SyncAction {
+    return new SyncAction({
       id: `sync_update_${animal.id}_v${animal.version}`,
       operation: 'UPDATE',
       entityType: 'animal',
@@ -54,6 +61,5 @@ export class UpdateAnimalUseCase {
         updatedAt: animal.updatedAt,
       },
     });
-    await this.syncQueueRepository.enqueue(action);
   }
 }

@@ -35,7 +35,12 @@ export class SqliteUserRepository implements UserRepository {
 
   async save(user: User): Promise<void> {
     await this.db.runAsync(
-      `INSERT INTO users (id, name, email, phone, user_type, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, name, email, phone, user_type, created_at) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         email = excluded.email,
+         phone = excluded.phone,
+         user_type = excluded.user_type`,
       [
         user.id,
         user.name,

@@ -111,7 +111,12 @@ describe('Additional Branch Coverage Suite', () => {
     });
     await queueRepo.enqueue(actionOther);
     const resOther = await processUseCase.execute();
-    expect(resOther.successCount).toBe(1);
+    // Fase 2: upload/sincronização remota de foto ainda não existe; a ação
+    // deve falhar de forma visível em vez de ser marcada como concluída.
+    expect(resOther.successCount).toBe(0);
+    expect(resOther.failedCount).toBe(1);
+    const failedOther = await queueRepo.findById('s_other');
+    expect(failedOther?.status.isFailed()).toBe(true);
   });
 
   it('AnimalPhoto e ContactInfo: exercitar métodos e construtores com defaults', () => {
@@ -212,6 +217,9 @@ describe('Additional Branch Coverage Suite', () => {
     animalRepo.deleteRemote = jest.fn().mockRejectedValue(new Error('Falha remota ao deletar'));
     await deleteUseCase.execute('u1', 'a1', true);
 
+    // deleteLocal removeu o anúncio; recriamos para exercitar o fallback de
+    // update quando o remoto falha.
+    await animalRepo.saveLocal(a1);
     animalRepo.updateRemote = jest.fn().mockRejectedValue(new Error('Falha remota ao atualizar'));
     await updateUseCase.execute('u1', 'a1', { name: 'Rex Atualizado' }, true);
   });

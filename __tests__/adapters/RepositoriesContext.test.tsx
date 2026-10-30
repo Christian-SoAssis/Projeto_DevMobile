@@ -35,9 +35,10 @@ describe('RepositoriesContext — composição da persistência (Fase 2)', () =>
     expect(getByTestId('repos-loading')).toBeTruthy();
 
     await waitFor(() => {
-      expect(getByTestId('probe-mode').props.children).toBe('sqlite');
+      expect(getByTestId('probe-mode').props.children).toBe('memory');
     });
     expect(queryByTestId('repos-loading')).toBeNull();
+    expect(queryByTestId('repos-fallback-banner')).toBeNull();
     expect(getByTestId('probe-repo').props.children).toBe('SqliteAnimalRepository');
   });
 
@@ -55,6 +56,7 @@ describe('RepositoriesContext — composição da persistência (Fase 2)', () =>
     await waitFor(() => {
       expect(getByTestId('probe-mode').props.children).toBe('demo');
     });
+    expect(getByTestId('repos-fallback-banner')).toBeTruthy();
   });
 
   it('sem provider (rotas avulsas/testes de rota): fallback demo em memória', async () => {

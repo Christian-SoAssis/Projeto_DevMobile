@@ -2,11 +2,14 @@ import { Animal } from '../../domain/entities/Animal';
 import { SyncAction } from '../../domain/entities/SyncAction';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
+import { UnitOfWork } from '../ports/UnitOfWork';
+import { NoopUnitOfWork } from '../fakes/NoopUnitOfWork';
 
 export class MarkAnimalAdoptedUseCase {
   constructor(
     private animalRepository: AnimalRepository,
-    private syncQueueRepository: SyncQueueRepository
+    private syncQueueRepository: SyncQueueRepository,
+    private unitOfWork: UnitOfWork = new NoopUnitOfWork()
   ) {}
 
   async execute(requestorId: string, animalId: string, isOnline: boolean): Promise<Animal> {
@@ -16,29 +19,32 @@ export class MarkAnimalAdoptedUseCase {
     }
 
     animal.markAdopted(requestorId);
-    await this.animalRepository.saveLocal(animal);
+    const action = this.buildMarkAdoptedAction(animal);
+
+    await this.unitOfWork.run(async () => {
+      await this.animalRepository.saveLocal(animal);
+      await this.syncQueueRepository.enqueue(action);
+    });
 
     if (isOnline) {
       try {
         await this.animalRepository.updateRemote(animal);
+        await this.syncQueueRepository.delete(action.id);
       } catch {
-        await this.enqueueMarkAdopted(animal);
+        // Mantém a ação na fila para retry.
       }
-    } else {
-      await this.enqueueMarkAdopted(animal);
     }
 
     return animal;
   }
 
-  private async enqueueMarkAdopted(animal: Animal): Promise<void> {
-    const action = new SyncAction({
+  private buildMarkAdoptedAction(animal: Animal): SyncAction {
+    return new SyncAction({
       id: `sync_mark_adopted_${animal.id}`,
       operation: 'MARK_ADOPTED',
       entityType: 'animal',
       entityId: animal.id,
       payload: { animalId: animal.id, status: animal.status.value, version: animal.version },
     });
-    await this.syncQueueRepository.enqueue(action);
   }
 }

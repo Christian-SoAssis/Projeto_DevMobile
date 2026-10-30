@@ -175,7 +175,7 @@ Projeto_DevMobile/
 │   │   ├── demo/             # Fakes compartilhados + seed para rodar o app em modo demo
 │   │   └── screens/          # Telas React Native
 │   └── infrastructure/
-│       ├── database/sqlite/  # Driver (expo-sqlite + fallback memória), migrations e repositórios (Fase 2)
+│       ├── database/sqlite/  # Driver expo-sqlite (modo honesto), migrations versionadas e repositórios (Fase 2)
 │       ├── device/           # Adaptadores de hardware: conectividade (NetInfo) — câmera/localização na Fase 4
 │       └── composition/      # loadAppContainer: monta SQLite, seed inicial e entrega via provider
 ├── __tests__/                # domain/, application/, adapters/, screens/, e2e/

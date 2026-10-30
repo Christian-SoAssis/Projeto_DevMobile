@@ -2,6 +2,8 @@ import { Animal } from '../../domain/entities/Animal';
 import { SyncAction } from '../../domain/entities/SyncAction';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
+import { UnitOfWork } from '../ports/UnitOfWork';
+import { NoopUnitOfWork } from '../fakes/NoopUnitOfWork';
 
 export interface CreateAnimalOutput {
   animal: Animal;
@@ -11,29 +13,36 @@ export interface CreateAnimalOutput {
 export class CreateAnimalUseCase {
   constructor(
     private animalRepository: AnimalRepository,
-    private syncQueueRepository: SyncQueueRepository
+    private syncQueueRepository: SyncQueueRepository,
+    private unitOfWork: UnitOfWork = new NoopUnitOfWork()
   ) {}
 
   async execute(animal: Animal, isOnline: boolean): Promise<CreateAnimalOutput> {
-    await this.animalRepository.saveLocal(animal);
+    const action = this.buildCreateAction(animal);
+
+    // Outbox local: anúncio + ação entram juntos. Se o processo cair depois
+    // do save, a intenção de sincronizar não é perdida.
+    await this.unitOfWork.run(async () => {
+      await this.animalRepository.saveLocal(animal);
+      await this.syncQueueRepository.enqueue(action);
+    });
 
     if (isOnline) {
       try {
         const remote = await this.animalRepository.createRemote(animal);
+        await this.syncQueueRepository.delete(action.id);
         return { animal: remote, synced: true };
       } catch {
-        // Fallback to queue if remote call fails
-        await this.enqueueCreate(animal);
+        // A ação permanece na fila para retry (Fase 6).
         return { animal, synced: false };
       }
-    } else {
-      await this.enqueueCreate(animal);
-      return { animal, synced: false };
     }
+
+    return { animal, synced: false };
   }
 
-  private async enqueueCreate(animal: Animal): Promise<void> {
-    const action = new SyncAction({
+  private buildCreateAction(animal: Animal): SyncAction {
+    return new SyncAction({
       id: `sync_create_${animal.id}`,
       operation: 'CREATE',
       entityType: 'animal',
@@ -57,6 +66,5 @@ export class CreateAnimalUseCase {
         version: animal.version,
       },
     });
-    await this.syncQueueRepository.enqueue(action);
   }
 }

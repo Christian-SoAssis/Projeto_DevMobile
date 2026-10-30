@@ -14,7 +14,8 @@ export class SqliteAdoptionInterestRepository implements AdoptionInterestReposit
 
   async registerInterest(interest: AdoptionInterest): Promise<void> {
     await this.db.runAsync(
-      `INSERT INTO adoption_interests (id, user_id, animal_id, created_at) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO adoption_interests (id, user_id, animal_id, created_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT DO NOTHING`,
       [interest.id, interest.userId, interest.animalId, interest.createdAt]
     );
   }

@@ -1,4 +1,6 @@
-import { INITIAL_SCHEMA_SQL } from './migrations/schema.sql';
+import { applyMigrations } from './migrations';
+
+export type DatabaseMode = 'sqlite' | 'memory';
 
 export interface SqliteRunResult {
   lastInsertRowId?: number;
@@ -6,6 +8,8 @@ export interface SqliteRunResult {
 }
 
 export interface SqliteDatabaseDriver {
+  /** `memory` identifica dublês de teste; `sqlite` é persistência real. */
+  readonly mode: DatabaseMode;
   execAsync(sql: string): Promise<void>;
   runAsync(sql: string, params?: unknown[]): Promise<SqliteRunResult>;
   getFirstAsync<T>(sql: string, params?: unknown[]): Promise<T | null>;
@@ -17,6 +21,7 @@ export interface SqliteDatabaseDriver {
  * In-memory SQLite driver for Jest tests and mock environments.
  */
 export class InMemorySqliteDriver implements SqliteDatabaseDriver {
+  readonly mode: DatabaseMode = 'memory';
   private tables: Map<string, Map<string, Record<string, unknown>>> = new Map();
 
   constructor() {
@@ -241,25 +246,89 @@ export class InMemorySqliteDriver implements SqliteDatabaseDriver {
   }
 }
 
+interface ExpoSQLiteDatabase {
+  execAsync(sql: string): Promise<void>;
+  runAsync(sql: string, params?: unknown[]): Promise<{ lastInsertRowId?: number; changes: number }>;
+  getFirstAsync<T>(sql: string, params?: unknown[]): Promise<T | null>;
+  getAllAsync<T>(sql: string, params?: unknown[]): Promise<T[]>;
+}
+
+/**
+ * Adapta a API do `expo-sqlite` ao contrato do projeto e implementa
+ * transações aninhadas por profundidade. O SQLite não permite `BEGIN` dentro
+ * de `BEGIN`; quando já existe uma transação externa, a operação apenas
+ * participa dela (o commit/rollback fica com o nível mais externo).
+ */
+export class ExpoSqliteDriver implements SqliteDatabaseDriver {
+  readonly mode: DatabaseMode = 'sqlite';
+  private transactionDepth = 0;
+
+  constructor(private db: ExpoSQLiteDatabase) {}
+
+  async execAsync(sql: string): Promise<void> {
+    await this.db.execAsync(sql);
+  }
+
+  async runAsync(sql: string, params: unknown[] = []): Promise<SqliteRunResult> {
+    const result = await this.db.runAsync(sql, params);
+    return { changes: result.changes, lastInsertRowId: result.lastInsertRowId };
+  }
+
+  async getFirstAsync<T>(sql: string, params: unknown[] = []): Promise<T | null> {
+    return this.db.getFirstAsync<T>(sql, params);
+  }
+
+  async getAllAsync<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+    return this.db.getAllAsync<T>(sql, params);
+  }
+
+  async withTransactionAsync<T>(action: () => Promise<T>): Promise<T> {
+    if (this.transactionDepth > 0) {
+      return action();
+    }
+
+    this.transactionDepth += 1;
+    let transactionStarted = false;
+    try {
+      await this.db.execAsync('BEGIN');
+      transactionStarted = true;
+      const result = await action();
+      await this.db.execAsync('COMMIT');
+      return result;
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          await this.db.execAsync('ROLLBACK');
+        } catch {
+          // Mantém o erro original; a transação já pode ter sido encerrada.
+        }
+      }
+      throw error;
+    } finally {
+      this.transactionDepth -= 1;
+    }
+  }
+}
+
 let driverInstance: SqliteDatabaseDriver | null = null;
 
 export async function getDatabaseDriver(): Promise<SqliteDatabaseDriver> {
   if (!driverInstance) {
     if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
       const driver = new InMemorySqliteDriver();
-      await driver.execAsync(INITIAL_SCHEMA_SQL);
+      await applyMigrations(driver);
       driverInstance = driver;
     } else {
-      try {
-        const SQLite = require('expo-sqlite');
-        const db = await SQLite.openDatabaseAsync('enlace.db');
-        await db.execAsync(INITIAL_SCHEMA_SQL);
-        driverInstance = db;
-      } catch {
-        const driver = new InMemorySqliteDriver();
-        await driver.execAsync(INITIAL_SCHEMA_SQL);
-        driverInstance = driver;
-      }
+      // Sem fallback silencioso: uma falha ao abrir o SQLite real deve
+      // chegar ao provider, que exibe o erro em vez de fingir persistência.
+      const SQLite = require('expo-sqlite');
+      const raw = await SQLite.openDatabaseAsync('enlace.db');
+      const driver = new ExpoSqliteDriver(raw);
+      await driver.execAsync('PRAGMA foreign_keys = ON');
+      await driver.execAsync('PRAGMA journal_mode = WAL');
+      await driver.execAsync('PRAGMA busy_timeout = 5000');
+      await applyMigrations(driver);
+      driverInstance = driver;
     }
   }
   return driverInstance!;

@@ -97,4 +97,12 @@ CREATE TABLE IF NOT EXISTS search_preferences (
   radius_km REAL,
   updated_at TEXT NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_animals_owner_id ON animals (owner_id);
+CREATE INDEX IF NOT EXISTS idx_animals_status ON animals (status);
+CREATE INDEX IF NOT EXISTS idx_animal_photos_animal_id ON animal_photos (animal_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites (user_id);
+CREATE INDEX IF NOT EXISTS idx_interests_user_id ON adoption_interests (user_id);
+CREATE INDEX IF NOT EXISTS idx_interests_animal_id ON adoption_interests (animal_id);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_status_changed_at ON sync_queue (status, changed_at);
 `;

@@ -4,6 +4,7 @@ import { AnimalRepository, AnimalFilterOptions } from '../../../../domain/ports/
 import { AdoptionStatus } from '../../../../domain/value-objects/AdoptionStatus';
 import { AnimalCharacteristics } from '../../../../domain/value-objects/AnimalCharacteristics';
 import { ApproximateLocation } from '../../../../domain/value-objects/ApproximateLocation';
+import { SyncState, SyncStateType } from '../../../../domain/value-objects/SyncState';
 import { SqliteDatabaseDriver } from '../DatabaseDriver';
 
 interface AnimalRow {
@@ -100,7 +101,25 @@ export class SqliteAnimalRepository implements AnimalRepository {
           id, owner_id, name, species, size, approximate_age, sex, description,
           health_notes, special_care, status, neighborhood, city, region,
           latitude, longitude, created_at, updated_at, version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          owner_id = excluded.owner_id,
+          name = excluded.name,
+          species = excluded.species,
+          size = excluded.size,
+          approximate_age = excluded.approximate_age,
+          sex = excluded.sex,
+          description = excluded.description,
+          health_notes = excluded.health_notes,
+          special_care = excluded.special_care,
+          status = excluded.status,
+          neighborhood = excluded.neighborhood,
+          city = excluded.city,
+          region = excluded.region,
+          latitude = excluded.latitude,
+          longitude = excluded.longitude,
+          updated_at = excluded.updated_at,
+          version = excluded.version`,
         [
           animal.id,
           animal.ownerId,
@@ -124,6 +143,9 @@ export class SqliteAnimalRepository implements AnimalRepository {
         ]
       );
 
+      // A lista de fotos é a fonte da verdade: removemos órfãs e regravamos
+      // as atuais na mesma transação para evitar duplicidade em upserts.
+      await this.db.runAsync('DELETE FROM animal_photos WHERE animal_id = ?', [animal.id]);
       for (const photo of animal.photos) {
         await this.db.runAsync(
           `INSERT INTO animal_photos (
@@ -142,8 +164,17 @@ export class SqliteAnimalRepository implements AnimalRepository {
     });
   }
 
+  async deleteLocal(id: string): Promise<void> {
+    await this.db.withTransactionAsync(async () => {
+      await this.db.runAsync('DELETE FROM animal_photos WHERE animal_id = ?', [id]);
+      await this.db.runAsync('DELETE FROM local_images WHERE animal_local_or_remote_id = ?', [id]);
+      await this.db.runAsync('DELETE FROM animals WHERE id = ?', [id]);
+    });
+  }
+
   async createRemote(animal: Animal): Promise<Animal> {
-    await this.saveLocal(animal);
+    // Stub remoto da Fase 2: a gravação local é responsabilidade do caso de
+    // uso (saveLocal). A Fase 3 substitui este método pelo adapter Supabase.
     return animal;
   }
 
@@ -151,6 +182,7 @@ export class SqliteAnimalRepository implements AnimalRepository {
     await this.db.runAsync(
       `UPDATE animals SET
         name = ?, species = ?, size = ?, approximate_age = ?, sex = ?,
+        description = ?, health_notes = ?, special_care = ?,
         status = ?, neighborhood = ?, city = ?, region = ?,
         latitude = ?, longitude = ?, updated_at = ?, version = ?
        WHERE id = ?`,
@@ -160,6 +192,9 @@ export class SqliteAnimalRepository implements AnimalRepository {
         animal.characteristics.size,
         animal.characteristics.approximateAge,
         animal.characteristics.sex,
+        animal.characteristics.characteristics || '',
+        animal.characteristics.behavior || '',
+        animal.characteristics.specialCare || 'Nenhum',
         animal.status.value,
         animal.location.neighborhood,
         animal.location.city,
@@ -175,8 +210,8 @@ export class SqliteAnimalRepository implements AnimalRepository {
   }
 
   async deleteRemote(id: string): Promise<void> {
-    await this.db.runAsync('DELETE FROM animals WHERE id = ?', [id]);
     await this.db.runAsync('DELETE FROM animal_photos WHERE animal_id = ?', [id]);
+    await this.db.runAsync('DELETE FROM animals WHERE id = ?', [id]);
   }
 
   async listByOwner(ownerId: string): Promise<Animal[]> {
@@ -185,12 +220,7 @@ export class SqliteAnimalRepository implements AnimalRepository {
 
   async upsertCache(animals: Animal[]): Promise<void> {
     for (const animal of animals) {
-      const existing = await this.findById(animal.id);
-      if (existing) {
-        await this.updateRemote(animal);
-      } else {
-        await this.saveLocal(animal);
-      }
+      await this.saveLocal(animal);
     }
   }
 
@@ -200,16 +230,21 @@ export class SqliteAnimalRepository implements AnimalRepository {
       [animalId]
     );
 
-    return rows.map(
-      (r) =>
-        new AnimalPhoto({
-          id: r.id,
-          animalId: r.animal_id,
-          localPath: r.local_path || undefined,
-          remoteUrl: r.remote_url || undefined,
-          createdAt: r.created_at,
-        })
-    );
+    return rows.map((r) => {
+      const syncState =
+        r.upload_status === 'SYNCED'
+          ? SyncState.completed()
+          : new SyncState(r.upload_status as SyncStateType);
+
+      return new AnimalPhoto({
+        id: r.id,
+        animalId: r.animal_id,
+        localPath: r.local_path || undefined,
+        remoteUrl: r.remote_url || undefined,
+        syncState,
+        createdAt: r.created_at,
+      });
+    });
   }
 
   private mapToEntity(row: AnimalRow, photos: AnimalPhoto[]): Animal {

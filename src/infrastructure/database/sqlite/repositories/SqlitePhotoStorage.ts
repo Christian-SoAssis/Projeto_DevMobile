@@ -31,7 +31,13 @@ export class SqlitePhotoStorage implements PhotoStorage {
   async persistLocal(photo: AnimalPhoto): Promise<void> {
     const localPath = this.enableFileCopy
       ? await this.copyToAppStorage(photo)
-      : photo.localPath || '';
+      : photo.localPath;
+    if (!localPath) {
+      // Foto já remota não tem o que registrar em `local_images`; a foto
+      // puramente local continua obrigatória para o cache offline.
+      if (photo.remoteUrl) return;
+      throw new Error('A foto precisa de um caminho local para ser persistida.');
+    }
     const existing = await this.findRow(photo.id);
 
     if (existing) {
@@ -109,11 +115,13 @@ export class SqlitePhotoStorage implements PhotoStorage {
     if (!source) return source;
 
     try {
-      const FileSystem = require('expo-file-system');
-      const directory = `${FileSystem.documentDirectory}/animal_photos/`;
+      // SDK 57 mantém a API antiga em `expo-file-system/legacy`. A API nova
+      // (File/Directory/Paths) não expõe `documentDirectory`/`copyAsync`.
+      const FileSystem = require('expo-file-system/legacy');
+      const directory = `${FileSystem.documentDirectory}animal_photos/`;
       const target = `${directory}${photo.id}.jpg`;
 
-      const dirInfo = await FileSystem.getFileInfoAsync(directory);
+      const dirInfo = await FileSystem.getInfoAsync(directory);
       if (!dirInfo.exists) {
         await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
       }
@@ -127,12 +135,17 @@ export class SqlitePhotoStorage implements PhotoStorage {
   }
 
   private mapToEntity(row: LocalImageRow): AnimalPhoto {
+    const syncState =
+      row.upload_status === 'SYNCED'
+        ? SyncState.completed()
+        : new SyncState(row.upload_status as SyncStateType);
+
     return new AnimalPhoto({
       id: row.id,
       animalId: row.animal_local_or_remote_id,
       localPath: row.local_path || undefined,
       remoteUrl: row.remote_url || undefined,
-      syncState: new SyncState(row.upload_status as SyncStateType),
+      syncState,
       createdAt: row.created_at,
     });
   }

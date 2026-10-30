@@ -36,7 +36,7 @@ describe('loadAppContainer — composição da Fase 2 (cache online/offline no S
 
     const container = await loadAppContainer(db);
 
-    expect(container.mode).toBe('sqlite');
+    expect(container.mode).toBe('memory');
 
     const seeded = await container.animalRepository.search({});
     expect(seeded.length).toBe(7);

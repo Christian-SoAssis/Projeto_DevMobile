@@ -15,7 +15,8 @@ export class SqliteFavoriteRepository implements FavoriteRepository {
   async addFavorite(favorite: Favorite): Promise<void> {
     const id = `${favorite.userId}_${favorite.animalId}`;
     await this.db.runAsync(
-      `INSERT INTO favorites (id, user_id, animal_id, created_at) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO favorites (id, user_id, animal_id, created_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT DO NOTHING`,
       [id, favorite.userId, favorite.animalId, favorite.createdAt]
     );
   }

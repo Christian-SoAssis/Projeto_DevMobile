@@ -38,11 +38,11 @@ Ordem de construção exigida por `criteriosapresentacao1.md` §7, com o status 
 | 7 | Telas com RNTL + fakes injetados | ✅ Feito | 11 screens em `src/adapters/screens/` (`LoginScreen.tsx` e `RegisterScreen.tsx` novas, stubs mock com testes RNTL dedicados; `AnimalFormScreen.tsx` com modo edição via `UpdateAnimalUseCase`; `MyAnimalsScreen.tsx` com Editar/Excluir/Marcar adotado; `SearchScreen.tsx` com filtros RF04 espécie/porte/sexo/idade). Rotas em `app/`: `/(tabs)` (Início, Favoritos, Meus anúncios, Sync), `/animal/[id]` (detalhes, com fluxo dono via `DEMO_OWNER_ID`), `/(protected)/novo-anuncio` (criação), `/(protected)/editar-anuncio` (edição), `/login`, `/cadastro` (stubs), `/` → `/(tabs)`; fakes compartilhados em `src/adapters/demo/sharedFakes.ts`. Pendentes por desenho (não são Fase 1): revisão de conflito (Fase 6), moderação (bloqueada UC20) |
 | 8 | Sessão segura (`SessionStorageSecureStore` + `expo-secure-store` mockado) | ✅ Feito (mock) | `src/adapters/auth/SessionStorageSecureStore.ts` existe com teste dedicado (`__tests__/adapters/SessionStorageSecureStore.test.ts`, 4 casos); `expo-secure-store` **não** está em `package.json` — opera apenas mockada, como manda o critério §5 |
 
-**Base técnica validada:** Expo SDK 57 (`package.json:15`), `expo-doctor` 21/21, `tsc --noEmit` limpo, 128/128 testes verdes (`npm test` = `jest --runInBand`; cobertura 99,5% linhas / 93,5% branches, meta ≥ 80%), bundle Android + manifest `exposdk:57.0.0` confirmados.
+**Base técnica validada:** Expo SDK 57 (`package.json:15`), `expo-doctor` 21/21, `tsc --noEmit` limpo, **179/179 testes verdes** (`npm test` = `jest --runInBand`; cobertura 94,16% statements / 85,41% branches / 95,71% lines, meta ≥ 80%), bundle Android + manifest `exposdk:57.0.0` confirmados.
 
 **Gaps nominais a registrar (sem renomear nada por conta própria):**
 - Critério §7 pede `Coordenada` / `StatusSincronizacao` / `SincronizarFilaUseCase`; o código tem `ApproximateLocation` / `SyncState` / `ProcessSyncQueueUseCase`. Manter os nomes do código; eventual unificação é decisão futura, não próximo passo.
-- Ausente vs. documentação §8/§16: `ModerateAnimalUseCase`. As formas puras `SearchPreferences` (VO, doc §4.1, sem regras) e `SyncMetadata` (entidade, doc §§4.1/5.1) já existem; a persistência de `SearchPreferences` continua tarefa da Fase 2.
+- Ausente vs. documentação §8/§16: `ModerateAnimalUseCase`. As formas puras `SearchPreferences` (VO, doc §4.1, sem regras) e `SyncMetadata` (entidade, doc §§4.1/5.1) já existem; a persistência de ambas foi implementada na Fase 2 (`SqliteSearchPreferencesRepository`, `SqliteSyncMetadataRepository`).
 
 ---
 
@@ -64,19 +64,20 @@ Cópia estrita de `criteriosapresentacao1.md` §5:
 
 ### Fase 2 — Persistência local real (SQLite)
 - **Origem:** RNF01, RNF02, RNF09 (cache/fila sobrevivem ao reinício); RF17–RF19; UC15/UC16; documentação §§5.1, 13, 16.3.
-- **Status (atualização): 🟡 Em andamento.** Entregues:
-  - `src/infrastructure/database/sqlite/` — migrations (tabelas `animals` com geolocalização, `animal_photos`, `local_images`, `favorites`, `adoption_interests`, `users`, `sync_queue`, `sync_state`, `search_preferences`) + 6 repositórios SQLite + novo `SqlitePhotoStorage` (endereço local das imagens em `local_images`, Fase 2 §13).
-  - `src/infrastructure/composition/loadAppContainer.ts` — monta o container SQLite e popula o cache seed na primeira execução (seed nunca sobrescreve dados do usuário).
-  - `src/adapters/context/RepositoriesContext.tsx` — provider `RepositoriesProvider`/`useRepositories()` ligando TODAS as rotas `app/` ao SQLite real (fallback demo preservado).
-  - `src/domain/ports/ConnectivityGateway.ts` + `src/infrastructure/device/connectivity/NetInfoAdapter.ts` + `useConnectivity()` — conectividade real alimentando Início e Novo anúncio.
-  - Testes: `__tests__/integration/sqlite/SqlitePhotoStorage.test.ts`, `__tests__/integration/sqlite/AppContainer.test.ts`, `__tests__/adapters/RepositoriesContext.test.tsx`, `__tests__/adapters/Connectivity.test.ts`.
-  - Instalar após pull: `npm install` (adiciona `@react-native-community/netinfo`); a cópia física de arquivos usa `expo-file-system` com require dinâmico — rodar `npx expo install expo-file-system` para habilitar no device.
-  - Pendência para fechar a fase: rodar `npm test`/`npm run typecheck`/`expo-doctor` com as novas suítes no ambiente do aluno e validar no Expo Go (cache sobrevivendo ao reinício).
-- **Criar:**
-  - `src/infrastructure/database/sqlite/migrations/` — tabelas `sync_queue`, `local_images`, `sync_state`, `search_preferences` (colunas exatas da doc §5.1) + cache de `animals`, `animal_photos`, `favorites`, `adoption_interests` (doc §4.2).
-  - `src/infrastructure/database/sqlite/repositories/` — implementações SQLite dos ports existentes (`AnimalRepository`, `FavoriteRepository`, `AdoptionInterestRepository`, `SyncQueueRepository`, `UserRepository`) + criar `SearchPreferences` persistido (doc §§4.1/5.1).
-- **Testes (doc §16.3 SQLite):** migrations criam todas as tabelas; cache persiste após reinício; fila mantém payload e tentativas; transação anúncio + ação pendente é atômica.
-- **Pronto:** testes §16.3 SQLite verdes; cobertura ≥ 80%; domínio/application sem import de `expo-sqlite` (regra §13.1).
+- **Status: ✅ Fechada no código e nos testes.** Validação manual em Expo Go/device segue recomendada antes da apresentação.
+  - **Migrations versionadas:** `src/infrastructure/database/sqlite/migrations/index.ts` aplica o schema por `PRAGMA user_version` (versão atual `1`), de forma idempotente e transacional; o container também garante o schema quando recebe um driver já aberto.
+  - **Repositórios SQLite:** `animals` (com geolocalização), `animal_photos`, `local_images`, `favorites`, `adoption_interests`, `users`, `sync_queue`, `sync_state`, `search_preferences`, com índices para busca/fila. Upserts idempotentes em anúncios, favoritos, interesses, fila, usuário, preferências e metadados.
+  - **Atomicidade:** port `UnitOfWork` em `src/application/ports/UnitOfWork.ts` + `SqliteUnitOfWork`; casos de uso de criar/editar/excluir/marcar adotado gravam anúncio + ação da fila na mesma transação (outbox local). Em modo online, a ação é removida após o sucesso remoto; em falha, permanece para retry.
+  - **Fila mínima correta:** `ProcessSyncQueueUseCase` evita execução concorrente, usa `createRemote`/`updateRemote`/`deleteRemote` conforme a operação, remove o registro local no DELETE e falha de forma visível para entidades ainda não suportadas (`photo`, `favorite`, `interest`) e para registro local ausente.
+  - **Modo honesto:** `AppContainer.mode` é `sqlite` (driver real), `memory` (dublê de teste) ou `demo` (fallback). Não há mais fallback silencioso para memória em produção; se o SQLite não abrir, o app segue em demo com banner visível e aviso no console.
+  - **Fotos:** `SqlitePhotoStorage` usa `expo-file-system/legacy` (API compatível com SDK 57), registra o endereço local em `local_images`, atualiza `animal_photos` no upload e ignora corretamente fotos apenas remotas. `expo-file-system` passou a ser dependência direta.
+  - **Testes reais:** `__tests__/integration/sqlite/real/` usa `better-sqlite3` (devDependency) para contratos de migrations, upsert, update completo, delete local, duplicidade de favoritos/interesses, payload/tentativas da fila, fotos, rollback do UnitOfWork e persistência em arquivo após reabrir o banco.
+  - **Suíte:** 179 testes verdes, typecheck limpo, cobertura global 94,16% statements / 85,41% branches, `expo-doctor` 21/21.
+- **Decisões registradas nesta fase:**
+  - Favoritos e interesses continuam **local-only** até a Fase 6; não entram na fila remota nesta fase.
+  - Conflito/merge automático e sincronização completa continuam na Fase 6; a Fase 2 entrega apenas a fila persistente e o processamento mínimo.
+  - A cópia física de imagens depende de device/Expo Go; em Jest o adapter degrada para o endereço original sem perder o vínculo.
+- **Pronto (evidência):** testes §16.3 SQLite verdes (incluindo banco real); cobertura ≥ 80%; domínio/application sem import de `expo-sqlite`; fila mantém payload/tentativas; transação anúncio + ação é atômica.
 
 ### Fase 3 — Backend Supabase (Auth, PostgreSQL, Storage, RLS)
 - **Origem:** RNF03, RNF04, RNF10; RF08–RF13, RF16; UC06/UC07/UC17/UC20; documentação §§14.2, 15, 16.3.
@@ -165,7 +166,7 @@ RNFs: RNF01/02/09 → Fase 2; RNF03/04/10 → Fase 3; RNF05/06 → Fase 4; RNF07
 
 ```bash
 npm run typecheck   # tsc --noEmit, 0 erros
-npm test            # 128 testes atuais + novos; cobertura ≥ 80% (jest.config.js:12-19)
+npm test            # 179 testes atuais + novos; cobertura ≥ 80% (jest.config.js:12-19)
 npx expo-doctor     # 21/21
 npx expo start      # bundle Android + manifest exposdk:57.0.0
 ```
@@ -174,6 +175,6 @@ npx expo start      # bundle Android + manifest exposdk:57.0.0
 
 ## §7 — Registro de discrepância entre os dois documentos-fonte
 
-`criteriosapresentacao1.md` descreve também uma trilha "estágio/relatórios" (`PeriodoAvaliacao`, `Estagio`, `TokenSupervisor`, `Criterio`, `Assinatura`, `CargaHoraria`, `StatusPeriodo`, telas `AssinaturaScreen`/`AtividadesFormScreen`/`HistoricoRelatoriosScreen`) que **não existe** na documentação do software (cujo domínio é `Animal`, `AnimalPhoto`, `Favorite`, `AdoptionInterest`, `SyncAction`, `SyncMetadata` — doc §§4–5). O código contém as duas trilhas e os 128 testes cobrem ambas.
+`criteriosapresentacao1.md` descreve também uma trilha "estágio/relatórios" (`PeriodoAvaliacao`, `Estagio`, `TokenSupervisor`, `Criterio`, `Assinatura`, `CargaHoraria`, `StatusPeriodo`, telas `AssinaturaScreen`/`AtividadesFormScreen`/`HistoricoRelatoriosScreen`) que **não existe** na documentação do software (cujo domínio é `Animal`, `AnimalPhoto`, `Favorite`, `AdoptionInterest`, `SyncAction`, `SyncMetadata` — doc §§4–5). O código contém as duas trilhas e os 179 testes cobrem ambas.
 
 **Decisão registrada:** a trilha adoção é o escopo deste planejamento. Nenhum próximo passo cria, remove ou renomeia nada da trilha estágio sem decisão explícita posterior — este arquivo apenas a documenta como legado existente.

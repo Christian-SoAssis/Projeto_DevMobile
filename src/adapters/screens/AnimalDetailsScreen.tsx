@@ -12,6 +12,8 @@ import { GerarPdfUseCase } from '../../application/use-cases/GerarPdfUseCase';
 import { FavoriteRepositoryFake } from '../../application/fakes/FavoriteRepositoryFake';
 import { AdoptionInterestRepositoryFake } from '../../application/fakes/AdoptionInterestRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
+import { UnitOfWork } from '../../application/ports/UnitOfWork';
+import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
 
 export interface AnimalDetailsScreenProps {
   animal: Animal;
@@ -20,6 +22,7 @@ export interface AnimalDetailsScreenProps {
   favoriteRepository?: FavoriteRepository;
   interestRepository?: AdoptionInterestRepository;
   syncQueueRepository?: SyncQueueRepository;
+  unitOfWork?: UnitOfWork;
   onBack?: () => void;
 }
 
@@ -30,6 +33,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   favoriteRepository = new FavoriteRepositoryFake(),
   interestRepository = new AdoptionInterestRepositoryFake(),
   syncQueueRepository = new SyncQueueRepositoryFake(),
+  unitOfWork = new NoopUnitOfWork(),
   onBack,
 }) => {
   const [animal, setAnimal] = useState<Animal>(initialAnimal);
@@ -90,7 +94,11 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
 
   const handleMarkAdopted = async () => {
     try {
-      const useCase = new MarkAnimalAdoptedUseCase(animalRepository, syncQueueRepository);
+      const useCase = new MarkAnimalAdoptedUseCase(
+        animalRepository,
+        syncQueueRepository,
+        unitOfWork
+      );
       const updated = await useCase.execute(currentUserId, animal.id, true);
       setAnimal(updated);
       setFeedback('Animal marcado como adotado com sucesso!');

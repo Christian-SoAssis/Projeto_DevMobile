@@ -12,6 +12,8 @@ import { CreateAnimalUseCase } from '../../application/use-cases/CreateAnimalUse
 import { UpdateAnimalUseCase } from '../../application/use-cases/UpdateAnimalUseCase';
 import { CameraGatewayFake } from '../../application/fakes/CameraGatewayFake';
 import { LocationGatewayFake } from '../../application/fakes/LocationGatewayFake';
+import { UnitOfWork } from '../../application/ports/UnitOfWork';
+import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
 
 export interface AnimalFormScreenProps {
   ownerId?: string;
@@ -20,6 +22,7 @@ export interface AnimalFormScreenProps {
   syncQueueRepository: SyncQueueRepository;
   cameraGateway?: CameraGateway;
   locationGateway?: LocationGateway;
+  unitOfWork?: UnitOfWork;
   onSuccess?: () => void;
   isOnline?: boolean;
 }
@@ -31,6 +34,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
   syncQueueRepository,
   cameraGateway = new CameraGatewayFake(),
   locationGateway = new LocationGatewayFake(),
+  unitOfWork = new NoopUnitOfWork(),
   onSuccess,
   isOnline = true,
 }) => {
@@ -84,7 +88,11 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           sex,
         });
 
-        const useCase = new UpdateAnimalUseCase(animalRepository, syncQueueRepository);
+        const useCase = new UpdateAnimalUseCase(
+          animalRepository,
+          syncQueueRepository,
+          unitOfWork
+        );
         await useCase.execute(ownerId, initialAnimal.id, { name, characteristics, location }, isOnline);
         setFeedback('Anúncio atualizado com sucesso!');
         if (onSuccess) onSuccess();
@@ -123,7 +131,11 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         );
       }
 
-      const useCase = new CreateAnimalUseCase(animalRepository, syncQueueRepository);
+      const useCase = new CreateAnimalUseCase(
+        animalRepository,
+        syncQueueRepository,
+        unitOfWork
+      );
       const result = await useCase.execute(animal, isOnline);
 
       if (result.synced) {

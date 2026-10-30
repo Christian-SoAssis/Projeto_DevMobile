@@ -9,13 +9,14 @@ import { DEMO_OWNER_ID } from '../../src/adapters/demo/sharedFakes';
 export default function MeusAnunciosTab() {
   const router = useRouter();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
-  const { animalRepository, syncQueueRepository } = useRepositories();
+  const { animalRepository, syncQueueRepository, unitOfWork } = useRepositories();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <MyAnimalsScreen
         animalRepository={animalRepository}
         syncQueueRepository={syncQueueRepository}
+        unitOfWork={unitOfWork}
         ownerId={DEMO_OWNER_ID}
         onSelectAnimal={(animal) =>
           router.push({ pathname: '/animal/[id]', params: { id: animal.id, asOwner: '1' } })

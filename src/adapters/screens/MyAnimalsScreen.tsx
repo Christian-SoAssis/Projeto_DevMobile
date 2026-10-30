@@ -13,6 +13,8 @@ import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
 import { DeleteAnimalUseCase } from '../../application/use-cases/DeleteAnimalUseCase';
 import { MarkAnimalAdoptedUseCase } from '../../application/use-cases/MarkAnimalAdoptedUseCase';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
+import { UnitOfWork } from '../../application/ports/UnitOfWork';
+import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
 
 export interface MyAnimalsScreenProps {
   animalRepository: AnimalRepository;
@@ -23,6 +25,7 @@ export interface MyAnimalsScreenProps {
   onNewAnimal?: () => void;
   onBack?: () => void;
   isOnline?: boolean;
+  unitOfWork?: UnitOfWork;
 }
 
 export const MyAnimalsScreen: React.FC<MyAnimalsScreenProps> = ({
@@ -34,6 +37,7 @@ export const MyAnimalsScreen: React.FC<MyAnimalsScreenProps> = ({
   onNewAnimal,
   onBack,
   isOnline = true,
+  unitOfWork = new NoopUnitOfWork(),
 }) => {
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,7 +59,11 @@ export const MyAnimalsScreen: React.FC<MyAnimalsScreenProps> = ({
   const handleDelete = async (id: string) => {
     setFeedback(null);
     try {
-      const useCase = new DeleteAnimalUseCase(animalRepository, syncQueueRepository);
+      const useCase = new DeleteAnimalUseCase(
+        animalRepository,
+        syncQueueRepository,
+        unitOfWork
+      );
       await useCase.execute(ownerId, id, isOnline);
       setFeedback('Anúncio excluído com sucesso!');
       await loadAnimals();
@@ -67,7 +75,11 @@ export const MyAnimalsScreen: React.FC<MyAnimalsScreenProps> = ({
   const handleMarkAdopted = async (id: string) => {
     setFeedback(null);
     try {
-      const useCase = new MarkAnimalAdoptedUseCase(animalRepository, syncQueueRepository);
+      const useCase = new MarkAnimalAdoptedUseCase(
+        animalRepository,
+        syncQueueRepository,
+        unitOfWork
+      );
       await useCase.execute(ownerId, id, isOnline);
       setFeedback('Animal marcado como adotado com sucesso!');
       await loadAnimals();

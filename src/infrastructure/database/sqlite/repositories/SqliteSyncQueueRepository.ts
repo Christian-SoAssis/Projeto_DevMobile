@@ -22,7 +22,16 @@ export class SqliteSyncQueueRepository implements SyncQueueRepository {
     await this.db.runAsync(
       `INSERT INTO sync_queue (
         id, operation, entity_type, entity_id, payload_json, changed_at, attempts, status, last_error
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        operation = excluded.operation,
+        entity_type = excluded.entity_type,
+        entity_id = excluded.entity_id,
+        payload_json = excluded.payload_json,
+        changed_at = excluded.changed_at,
+        attempts = excluded.attempts,
+        status = excluded.status,
+        last_error = excluded.last_error`,
       [
         action.id,
         action.operation,

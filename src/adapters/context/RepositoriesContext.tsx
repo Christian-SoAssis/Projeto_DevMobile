@@ -21,17 +21,27 @@ export interface RepositoriesProviderProps {
  */
 export function RepositoriesProvider({ children, loadContainer }: RepositoriesProviderProps) {
   const [container, setContainer] = useState<AppContainer | null>(null);
+  const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     async function boot() {
       try {
         const resolved = loadContainer ? await loadContainer() : await loadAppContainer();
-        if (active) setContainer(resolved);
-      } catch {
-        // Sem perda silenciosa: se o container real não puder ser criado,
-        // o app segue com a persistência demo em memória.
-        if (active) setContainer(demoContainer);
+        if (active) {
+          setBootError(null);
+          setContainer(resolved);
+        }
+      } catch (error) {
+        // O app continua utilizável em modo demonstração, mas a falha não é
+        // silenciosa: fica visível no banner e no console.
+        console.warn('Falha ao abrir o SQLite local; usando dados de demonstração.', error);
+        if (active) {
+          setBootError(
+            error instanceof Error ? error.message : 'Não foi possível abrir o armazenamento local.'
+          );
+          setContainer(demoContainer);
+        }
       }
     }
     boot();
@@ -49,7 +59,19 @@ export function RepositoriesProvider({ children, loadContainer }: RepositoriesPr
     );
   }
 
-  return <RepositoriesContext.Provider value={container}>{children}</RepositoriesContext.Provider>;
+  return (
+    <RepositoriesContext.Provider value={container}>
+      {bootError && (
+        <View style={styles.fallbackBanner} testID="repos-fallback-banner">
+          <Text style={styles.fallbackText}>
+            Armazenamento local indisponível. Usando dados de demonstração — alterações não serão
+            persistidas.
+          </Text>
+        </View>
+      )}
+      {children}
+    </RepositoriesContext.Provider>
+  );
 }
 
 /**
@@ -72,5 +94,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#48484a',
     marginTop: 12,
+  },
+  fallbackBanner: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+    backgroundColor: '#8a1c1c',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  fallbackText: {
+    color: '#fff',
+    fontSize: 12,
+    textAlign: 'center',
   },
 });

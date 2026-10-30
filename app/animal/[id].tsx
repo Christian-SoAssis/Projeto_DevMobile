@@ -13,8 +13,13 @@ export default function AnimalDetailsRoute() {
   const router = useRouter();
   const { id, asOwner } = useLocalSearchParams<{ id: string; asOwner?: string }>();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
-  const { animalRepository, favoriteRepository, interestRepository, syncQueueRepository } =
-    useRepositories();
+  const {
+    animalRepository,
+    favoriteRepository,
+    interestRepository,
+    syncQueueRepository,
+    unitOfWork,
+  } = useRepositories();
   const [animal, setAnimal] = React.useState<Awaited<
     ReturnType<typeof animalRepository.findById>
   > | null>(null);
@@ -64,6 +69,7 @@ export default function AnimalDetailsRoute() {
         favoriteRepository={favoriteRepository}
         interestRepository={interestRepository}
         syncQueueRepository={syncQueueRepository}
+        unitOfWork={unitOfWork}
         onBack={() => router.back()}
       />
     );

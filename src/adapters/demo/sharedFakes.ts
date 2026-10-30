@@ -3,6 +3,10 @@ import { FavoriteRepositoryFake } from '../../application/fakes/FavoriteReposito
 import { AdoptionInterestRepositoryFake } from '../../application/fakes/AdoptionInterestRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
 import { PhotoStorageFake } from '../../application/fakes/PhotoStorageFake';
+import { UserRepositoryFake } from '../../application/fakes/UserRepositoryFake';
+import { SearchPreferencesRepositoryFake } from '../../application/fakes/SearchPreferencesRepositoryFake';
+import { SyncMetadataRepositoryFake } from '../../application/fakes/SyncMetadataRepositoryFake';
+import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
 import { buildSeedAnimals } from './seedAnimals';
 
 /**
@@ -39,4 +43,8 @@ export const demoContainer = {
   interestRepository,
   syncQueueRepository,
   photoStorage: new PhotoStorageFake(),
+  userRepository: new UserRepositoryFake(),
+  searchPreferencesRepository: new SearchPreferencesRepositoryFake(),
+  syncMetadataRepository: new SyncMetadataRepositoryFake(),
+  unitOfWork: new NoopUnitOfWork(),
 };

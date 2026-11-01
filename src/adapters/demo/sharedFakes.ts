@@ -7,6 +7,8 @@ import { UserRepositoryFake } from '../../application/fakes/UserRepositoryFake';
 import { SearchPreferencesRepositoryFake } from '../../application/fakes/SearchPreferencesRepositoryFake';
 import { SyncMetadataRepositoryFake } from '../../application/fakes/SyncMetadataRepositoryFake';
 import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
+import { CameraGatewayFake } from '../../application/fakes/CameraGatewayFake';
+import { LocationGatewayFake } from '../../application/fakes/LocationGatewayFake';
 import { buildSeedAnimals } from './seedAnimals';
 
 /**
@@ -47,4 +49,6 @@ export const demoContainer = {
   searchPreferencesRepository: new SearchPreferencesRepositoryFake(),
   syncMetadataRepository: new SyncMetadataRepositoryFake(),
   unitOfWork: new NoopUnitOfWork(),
+  cameraGateway: new CameraGatewayFake(),
+  locationGateway: new LocationGatewayFake(),
 };

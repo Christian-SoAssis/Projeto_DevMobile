@@ -52,7 +52,7 @@ Busca → Filtros → Detalhes → Favoritar / Demonstrar interesse → Contato 
 | Navegação | Expo Router ~57 (rotas por arquivo na pasta `app/`) |
 | Estado | Context API (`AuthProvider`) + hooks (`useAuth`, `useAnimals`, `useSync`) |
 | Persistência local | SQLite (`expo-sqlite`) — integrada ao app na Fase 2 (cache, fila e imagens locais) |
-| Sessão segura | `SessionStorageSecureStore` (mockado; `expo-secure-store` real na Fase 4) |
+| Sessão segura | `SessionStorageSecureStore` — `expo-secure-store` real (Keychain/Keystore) com fallback em memória em Jest/demo |
 | Conectividade | `@react-native-community/netinfo` via port `ConnectivityGateway` (Fase 2) |
 | Backend (futuro) | Supabase: Auth, PostgreSQL, Storage e RLS (Fase 3) |
 | Testes | Jest 29 + `jest-expo` + React Native Testing Library |
@@ -194,7 +194,7 @@ Projeto_DevMobile/
 | 1 | Domínio e interface primeiro (100% fakes, cobertura ≥ 80%) | 🟢 Concluído |
 | 2 | Persistência local real (SQLite) | 🟡 Em andamento — schema, repositórios, container, cache seed e conectividade integrados |
 | 3 | Backend Supabase (Auth, PostgreSQL, Storage, RLS) | ⏳ Pendente |
-| 4 | Dispositivo real (câmera, localização, conectividade, secure store) | ⏳ Pendente |
+| 4 | Dispositivo real (câmera, localização, conectividade, secure store) | 🟡 Em andamento — `expo-secure-store`, `expo-location` (GPS real no formulário, coordenada anonimizada) e `expo-image-picker` (câmera/galeria) integrados; validação em dispositivo e mapa pendentes |
 | 5 | Rotas Expo Router completas | 🟡 Parcial |
 | 6 | Sincronização fim a fim, conflitos e moderação | ⏳ Pendente |
 | 7 | Requisitos de desempenho e escalabilidade | ⏳ Pendente |
@@ -221,6 +221,7 @@ Detalhes e bloqueadores de produto estão em [docs/nextsteps.md](docs/nextsteps.
 | [docs/documentacao-software-rede-adocao-animais.md](docs/documentacao-software-rede-adocao-animais.md) | Requisitos (RF/RNF), casos de uso, DER, diagramas e decisões de arquitetura |
 | [docs/criteriosapresentacao1.md](docs/criteriosapresentacao1.md) | Rubrica da fase "Domínio e Interface Primeiro" |
 | [docs/nextsteps.md](docs/nextsteps.md) | Próximos passos por fase e bloqueadores |
+| [docs/decisao-orm.md](docs/decisao-orm.md) | ADR: acesso ao SQLite com SQL cru (decisão sobre ORM) |
 
 ---
 

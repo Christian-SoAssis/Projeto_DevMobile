@@ -3,6 +3,8 @@ import { FavoriteRepository } from '../../domain/ports/FavoriteRepository';
 import { AdoptionInterestRepository } from '../../domain/ports/AdoptionInterestRepository';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
 import { PhotoStorage } from '../../domain/ports/PhotoStorage';
+import { CameraGateway } from '../../domain/ports/CameraGateway';
+import { LocationGateway } from '../../domain/ports/LocationGateway';
 import { UserRepository } from '../../domain/ports/UserRepository';
 import { SearchPreferencesRepository } from '../../domain/ports/SearchPreferencesRepository';
 import { SyncMetadataRepository } from '../../domain/ports/SyncMetadataRepository';
@@ -18,6 +20,8 @@ import { SqlitePhotoStorage } from '../database/sqlite/repositories/SqlitePhotoS
 import { SqliteUserRepository } from '../database/sqlite/repositories/SqliteUserRepository';
 import { SqliteSearchPreferencesRepository } from '../database/sqlite/repositories/SqliteSearchPreferencesRepository';
 import { SqliteSyncMetadataRepository } from '../database/sqlite/repositories/SqliteSyncMetadataRepository';
+import { ImagePickerCameraAdapter } from '../device/camera/ImagePickerCameraAdapter';
+import { ExpoLocationAdapter } from '../device/location/LocationAdapter';
 import { buildSeedAnimals } from '../../adapters/demo/seedAnimals';
 
 export type AppMode = 'sqlite' | 'memory' | 'demo';
@@ -33,6 +37,9 @@ export interface AppContainer {
   searchPreferencesRepository: SearchPreferencesRepository;
   syncMetadataRepository: SyncMetadataRepository;
   unitOfWork: UnitOfWork;
+  /** Gateways de hardware (passo da geolocalização/fotos real). */
+  cameraGateway: CameraGateway;
+  locationGateway: LocationGateway;
 }
 
 /**
@@ -58,6 +65,12 @@ export async function loadAppContainer(driver?: SqliteDatabaseDriver): Promise<A
   const searchPreferencesRepository = new SqliteSearchPreferencesRepository(db);
   const syncMetadataRepository = new SqliteSyncMetadataRepository(db);
   const unitOfWork = new SqliteUnitOfWork(db);
+  // Gateways de hardware reais: os módulos expo-image-picker/expo-location
+  // são carregados dinamicamente pelos adapters — em Jest/demo operam sem a
+  // ponte nativa, com degradação definida (câmera → null; GPS → erro
+  // tipado tratado pela UI).
+  const cameraGateway = new ImagePickerCameraAdapter();
+  const locationGateway = new ExpoLocationAdapter();
 
   await seedCacheIfEmpty(animalRepository);
 
@@ -72,6 +85,8 @@ export async function loadAppContainer(driver?: SqliteDatabaseDriver): Promise<A
     searchPreferencesRepository,
     syncMetadataRepository,
     unitOfWork,
+    cameraGateway,
+    locationGateway,
   };
 }
 

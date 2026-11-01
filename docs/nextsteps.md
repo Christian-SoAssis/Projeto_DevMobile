@@ -1,180 +1,173 @@
 # Enlace — Próximos passos (`nextsteps.md`)
 
-> **Escopo deste arquivo:** mapeamento dos próximos passos estritamente a partir de dois documentos-fonte do repositório:
-> - `criteriosapresentacao1.md` — Fase "Domínio e Interface Primeiro" (100% mock, cobertura 80%+).
-> - `documentacao-software-rede-adocao-animais.md` — especificação do app Rede de Adoção de Animais (RF01–RF27, RNF01–RNF15, UC01–UC20).
+> **Escopo deste arquivo:** roteiro de trabalho **reordenado conforme a sequência acordada** com a equipe (ver §2). A nova ordem dos próximos passos é, estritamente:
 >
-> Nada fora desses dois arquivos foi assumido. Onde a especificação marca um valor como **proposto** ou lista um ponto como **indefinido**, este arquivo repassa a indefinição em vez de inventar a resposta.
+> 1. Banco de dados local seguro e offline-first (SQLite, secure store, mapeamento offline, modelo ER)
+> 2. Imagens locais, geolocalização e cache
+> 3. Supabase: infraestrutura online, comunicação app↔servidor e segurança de acesso
+> 4. Storage: bucket, padrão S3 e armazenamento de arquivos no Supabase
+> 5. Armazenamento no SQLite sincronizando com o Supabase online
+>
+> Documentos-fonte que continuam valendo: `criteriosapresentacao1.md` (Fase "Domínio e Interface Primeiro") e `documentacao-software-rede-adocao-animais.md` (RF01–RF27, RNF01–RNF15, UC01–UC20). Onde a especificação marca um valor como **proposto** ou lista um ponto como **indefinido**, este arquivo repassa a indefinição em vez de inventar a resposta.
 
 ---
 
-## §0 — REGRA DURA: os limites dos critérios não podem ser ultrapassados em nenhuma hipótese
+## §0 — REGRA DURA: limites que não podem ser ultrapassados em nenhuma hipótese
 
-As proibições abaixo valem **sempre**, sem exceção, atalho ou "só desta vez":
-
-1. **Fase atual é 100% mock/fake.** Conforme `criteriosapresentacao1.md` §5, é proibido conectar qualquer dado a banco permanente (`expo-sqlite`, `@supabase/supabase-js`) ou a hardware real (`expo-camera`, `expo-location`) enquanto a Fase 1 ("Domínio e Interface Primeiro") não for declarada concluída e os próximos passos deste arquivo não forem formalmente abertos.
+1. **Supabase é somente infraestrutura online — ele NÃO gera APK.** Nesta etapa, o Supabase entra apenas como backend (Auth, PostgreSQL, Storage, RLS). Ele não gera, hospeda, empacota nem distribui o APK; a geração do APK continua sendo responsabilidade do build Expo/EAS (`expo start`, `eas build`). A integração com o Supabase **não pode bloquear nem alterar o build do APK**: sem rede e sem Supabase configurado, o app segue funcionando em modo `honesto`/`demo` (AppContainer), com fallback visível. Nenhuma dependência do SQLite local, das fakes de demo ou do fluxo de build pode ser removida por causa do Supabase.
 2. **Domínio puro.** Conforme `criteriosapresentacao1.md` §1 e documentação §13.1 regra 1: `src/domain/` nunca importa React, Expo, Supabase, SQLite, câmera, localização ou Expo Router. Violação = reverter, não "ajustar depois".
 3. **Aplicação sem SDK externo.** Conforme documentação §13.1 regras 2 e 7 e §11 decisão 10: `src/application/` conhece somente domínio e ports. Nenhum use-case importa SDK do Supabase, SQLite, câmera ou Expo Router.
 4. **UI nunca acessa infraestrutura diretamente.** Conforme documentação §13.1 regra 6 e §15.3: nenhum componente visual acessa Supabase ou SQLite; validação de propriedade existe no caso de uso + repository remoto + RLS — a UI nunca é barreira de segurança.
 5. **Privacidade de localização.** Conforme RNF05/RNF06, RF25 e documentação §15.2: mapa e API pública expõem **somente** localização aproximada (bairro/cidade/região, coordenadas aproximadas); geolocalização apenas sob ação do usuário ou no fluxo de criação do anúncio. Nenhuma implementação pode expor endereço exato ou rastrear em segundo plano.
 6. **Sem perda silenciosa.** Conforme RNF02/RNF03 e RF23: toda mutação offline gera item de fila com operação, registro, payload, data e tentativas; conflitos com risco de perda relevante **não** podem ser resolvidos silenciosamente — exigem revisão do responsável.
-7. **Pontos indefinidos não são implementados por suposição.** Conforme documentação §19 e UC20: os 13 itens listados no §4 deste arquivo só entram em implementação após decisão explícita de produto.
-8. **Cobertura mínima de 80%.** Conforme `criteriosapresentacao1.md` §6 e `jest.config.js:12-19`: branches, functions, lines e statements ≥ 80%. Nenhuma fase é "concluída" abaixo disso.
+7. **Pontos indefinidos não são implementados por suposição.** Conforme documentação §19 e UC20: os itens do §4 só entram em implementação após decisão explícita de produto.
+8. **Cobertura mínima de 80%.** Conforme `criteriosapresentacao1.md` §6 e `jest.config.js:12-19`: branches, functions, lines e statements ≥ 80%. Nenhum passo é "concluído" abaixo disso.
 
 ---
 
-## §1 — Onde estamos: Fase 1 ("Domínio e Interface Primeiro")
+## §1 — Onde estamos (estado consolidado)
 
-Ordem de construção exigida por `criteriosapresentacao1.md` §7, com o status verificado no código:
+- **Fase 1 — Domínio e Interface Primeiro:** ✅ concluída (domínio puro, 19 use cases, 11 telas com RNTL, sessão mockada; cobertura ≈ 94% statements / 85% branches).
+- **Fase 2 — Persistência local real (SQLite):** ✅ concluída no código e nos testes; validação manual em Expo Go/device ainda recomendada.
+  - `expo-sqlite` + migrations versionadas por `PRAGMA user_version` (`src/infrastructure/database/sqlite/migrations/index.ts`, versão atual `1`).
+  - 8 repositórios + `SqlitePhotoStorage` + `SqliteUnitOfWork` (outbox atômico: anúncio + ação da fila na mesma transação).
+  - `ProcessSyncQueueUseCase` com anti-concorrência, retry (`maxAttempts` padrão 5) e fila mínima correta para a entidade `animal`.
+  - Modo honesto: `AppContainer.mode` = `sqlite` | `memory` | `demo`, sem fallback silencioso em produção.
+  - Testes de integração reais com `better-sqlite3` em `__tests__/integration/sqlite/real/`.
+- **O repositório atual está sem `node_modules`** (checkout novo): rodar `npm install` antes de qualquer verificação do §5.
 
-| # | Item do checklist (§7) | Status | Evidência no repo |
-|---|---|---|---|
-| 1 | Value Objects | ✅ Feito | `src/domain/value-objects/` — `ApproximateLocation.ts`, `AnimalCharacteristics.ts`, `AdoptionStatus.ts`, `SyncState.ts`, `ContactInfo.ts`, `SearchPreferences.ts` (trilha adoção, sem regras — limites são decisão §4) + `Criterio.ts`, `Assinatura.ts`, `CargaHoraria.ts`, `StatusPeriodo.ts` (trilha estágio, ver §7) |
-| 2 | Entities & Aggregates | ✅ Feito | `src/domain/entities/` — `Animal.ts`, `AnimalPhoto.ts`, `Favorite.ts`, `AdoptionInterest.ts`, `SyncAction.ts`, `SyncMetadata.ts`, `User.ts` + `PeriodoAvaliacao.ts`, `Estagio.ts`, `TokenSupervisor.ts` (trilha estágio) |
-| 3 | Domain Services | ✅ Feito | `src/domain/services/` — `SincronizacaoService.ts`, `ConflictResolutionService.ts`, `RegraDevolucaoService.ts`, `RegraGeracaoPdfService.ts` |
-| 4 | Interfaces Repository/Gateway | ✅ Feito | `src/domain/ports/` com 11 contratos, incluindo `PhotoStorage.ts` (doc §13) + `PhotoStorageFake` em `src/application/fakes/` com teste dedicado |
-| 5 | Use Cases com fakes in-memory (TDD Red-Green-Refactor) | ✅ Feito | `src/application/use-cases/` (19 arquivos) + `src/application/fakes/` (11 fakes em `Map`, incluindo `PhotoStorageFake`). Cobrem UC01–UC02/UC05/UC07/UC09–UC11/UC13–UC18 (adoção) e relatório/avaliação/assinatura/aprovação/devolução/PDF/token (estágio) |
-| 6 | Context API + Custom Hooks | ✅ Feito | `src/adapters/context/AuthContext.tsx`, `src/adapters/hooks/useAnimals.ts`, `useSync.ts`, `useAtividades.ts` |
-| 7 | Telas com RNTL + fakes injetados | ✅ Feito | 11 screens em `src/adapters/screens/` (`LoginScreen.tsx` e `RegisterScreen.tsx` novas, stubs mock com testes RNTL dedicados; `AnimalFormScreen.tsx` com modo edição via `UpdateAnimalUseCase`; `MyAnimalsScreen.tsx` com Editar/Excluir/Marcar adotado; `SearchScreen.tsx` com filtros RF04 espécie/porte/sexo/idade). Rotas em `app/`: `/(tabs)` (Início, Favoritos, Meus anúncios, Sync), `/animal/[id]` (detalhes, com fluxo dono via `DEMO_OWNER_ID`), `/(protected)/novo-anuncio` (criação), `/(protected)/editar-anuncio` (edição), `/login`, `/cadastro` (stubs), `/` → `/(tabs)`; fakes compartilhados em `src/adapters/demo/sharedFakes.ts`. Pendentes por desenho (não são Fase 1): revisão de conflito (Fase 6), moderação (bloqueada UC20) |
-| 8 | Sessão segura (`SessionStorageSecureStore` + `expo-secure-store` mockado) | ✅ Feito (mock) | `src/adapters/auth/SessionStorageSecureStore.ts` existe com teste dedicado (`__tests__/adapters/SessionStorageSecureStore.test.ts`, 4 casos); `expo-secure-store` **não** está em `package.json` — opera apenas mockada, como manda o critério §5 |
-
-**Base técnica validada:** Expo SDK 57 (`package.json:15`), `expo-doctor` 21/21, `tsc --noEmit` limpo, **179/179 testes verdes** (`npm test` = `jest --runInBand`; cobertura 94,16% statements / 85,41% branches / 95,71% lines, meta ≥ 80%), bundle Android + manifest `exposdk:57.0.0` confirmados.
-
-**Gaps nominais a registrar (sem renomear nada por conta própria):**
-- Critério §7 pede `Coordenada` / `StatusSincronizacao` / `SincronizarFilaUseCase`; o código tem `ApproximateLocation` / `SyncState` / `ProcessSyncQueueUseCase`. Manter os nomes do código; eventual unificação é decisão futura, não próximo passo.
-- Ausente vs. documentação §8/§16: `ModerateAnimalUseCase`. As formas puras `SearchPreferences` (VO, doc §4.1, sem regras) e `SyncMetadata` (entidade, doc §§4.1/5.1) já existem; a persistência de ambas foi implementada na Fase 2 (`SqliteSearchPreferencesRepository`, `SqliteSyncMetadataRepository`).
+**Gaps nominais registrados (sem renomear nada por conta própria):**
+- Critério §7 pede `Coordenada`/`StatusSincronizacao`/`SincronizarFilaUseCase`; o código tem `ApproximateLocation`/`SyncState`/`ProcessSyncQueueUseCase`. Manter os nomes do código.
+- Ausente vs. documentação §8/§16: `ModerateAnimalUseCase` — previsto no **Passo 3**.
+- Trilha "estágio/relatórios" (`PeriodoAvaliacao`, `Estagio`, `TokenSupervisor`, telas `AssinaturaScreen`/`AtividadesFormScreen`/`HistoricoRelatoriosScreen`) é **legado** da rubrica, fora do escopo do planejamento. Nada é criado, removido ou renomeado nela sem decisão explícita.
 
 ---
 
-## §2 — O que FICA EM MOCK nesta fase (proibido trocar por real)
+## §2 — Próximos passos, na ordem acordada (ordem estrita)
 
-> **Atualização:** com a abertura formal da Fase 2, `expo-sqlite` e a conectividade real (`@react-native-community/netinfo`) foram integrados conforme §3 (Fase 2). Câmera, localização e `expo-secure-store` reais continuam mockados até a Fase 4, e `@supabase/supabase-js` continua ausente até a Fase 3.
+> Regra de abertura: um passo só abre quando o anterior estiver fechado (tarefas ✅) e os bloqueadores de produto do §4 correspondentes estiverem decididos.
 
-Cópia estrita de `criteriosapresentacao1.md` §5:
+### Passo 1 — Banco de dados local seguro e offline-first (SQLite)
 
-- [ ] **Sem armazenamento permanente real:** nenhuma conexão ativa com `expo-sqlite` ou `@supabase/supabase-js`. Ambos **ausentes** de `package.json:14-25` — e devem continuar ausentes até a abertura formal das Fases 2–3.
-- [ ] **Sem sensores nativos reais:** câmera (`expo-camera`) e localização (`expo-location`) somente via gateways fakes/mocks em teste (`CameraGatewayFake`, `LocationGatewayFake`).
-- [ ] **Repositórios em `Map` + stubs de sessão:** telas montadas com fakes injetados e sessões stub válidas.
+**Origem:** RNF01, RNF02, RNF09, RF07, RF17–RF19; doc §§13, 15, 16.3.
+
+**Base — o que já está feito (Fase 2):**
+- ✅ SQLite real + migrations versionadas + repositórios + índices (tabelas `animals`, `animal_photos`, `favorites`, `adoption_interests`, `users`, `sync_queue`, `local_images`, `sync_state`, `search_preferences`).
+- ✅ Modelo Entidade–Relacionamento persistido no SQLite: FKs com `ON DELETE CASCADE` e der na documentação §6; testes de persistência em banco real (fechar e reabrir o arquivo).
+- ✅ App offline-first: consulta por cache quando offline (`SearchAnimalsUseCase` → `{ animals: cached, isOffline }`), banner perceptível e NetInfo via port `ConnectivityGateway`.
+- ✅ Fila `sync_queue` persistente com payload, tentativas e status; outbox atômico via `UnitOfWork`.
+
+**Fazer neste passo:**
+- [x] **`expo-secure-store` real:** instalado (`expo-secure-store ~58.0.2` + plugin no `app.json`), `SessionStorageSecureStore.ts` ligado ao store real (Keychain/Keystore) com require dinâmico e fallback in-memory para Jest/demo; wiring no `app/_layout.tsx`. Testes: `__tests__/adapters/SessionStorageSecureStore.test.ts` (9 casos, incluindo sobrevivência entre instâncias e degradação com falha do Keychain). Sessão sobrevive ao reinício do app.
+- [x] **Mapeamento formal das funcionalidades offline:** tabela no código em `src/application/offline/OfflineCapabilities.ts` — 14 funcionalidades com `behavior` (`FULL_OFFLINE` | `OFFLINE_WITH_QUEUE` | `OFFLINE_PARTIAL` | `ONLINE_ONLY`), requisitos RF e fluxo offline; `OFFLINE_STATUS_LABELS` os cinco estados visuais do RF22. Testes: `__tests__/application/OfflineCapabilities.test.ts` (7 casos). Referência na UI: seção "O que funciona offline" na tela de Sync (`testID: offline-capabilities-section`), testada em `__tests__/screens/HardwareFailure.test.tsx`.
+- [ ] **Ampliar o mapeamento para o que hoje é local-only:** favoritos e interesses já persistem localmente; repetir a decisão (ou rever) de quais mutações deles entram na fila — remete ao bloqueador §4 (offline completo). *(Estado atual registrado no mapa: `OFFLINE_PARTIAL` com nota na tela de Sync.)*
+- [x] **ORM:** decisão registrada em [decisao-orm.md](decisao-orm.md) — manter SQL cru nos repositórios (suíte de contratos reais já cobre os riscos); se um ORM entrar (gatilho: Passo 3), fica restrito a adapters/infrastructure, nunca em `src/domain/`/`src/application/`.
+- [ ] **Validação manual em Expo Go/device** da Fase 2: criar anúncio offline, fechar e reabrir, fila intacta, cache visível, banner correto, login persistindo entre reinícios via secure store.
+
+**Testes:** sessão persistida/recuperada; mapeamento offline verificado por use case; integração SQLite real continua verde.
+**Pronto (evidência):** secure store real em Keychain/Keystore, mapa offline documentado e testado, decisão de ORM registrada, cobertura ≥ 80%.
+
+### Passo 2 — Imagens locais, geolocalização e cache
+
+**Origem:** RNF05, RNF06, RF09, RF24–RF26, RF26; doc §§11, 16.3.
+
+**Base — o que já está feito:**
+- ✅ Imagens locais registradas no SQLite (`local_images` + `animal_photos` com `local_path`/`upload_status`); `SqlitePhotoStorage` copia o arquivo e mantém o vínculo; degrada com segurança em Jest.
+- ✅ Coordenadas aproximadas persistem em `animals` (latitude/longitude/bairro/cidade/região) e `radius_km` em `search_preferences`.
+- ✅ Cache local servindo online e offline (seed no container + leitura dos repositórios SQLite).
+
+**Fazer neste passo:**
+- [x] **Geolocalização real:** `expo-location ~58.0.20` instalado; `src/infrastructure/device/location/LocationAdapter.ts` (`ExpoLocationAdapter`) implementando o port `LocationGateway` — permissão de foreground sob ação do usuário, coordenada **anonimizada por arredondamento** (2 casas ~1,1 km, default proposto; precisão configurável — §4) e geocodificação inversa restrita a **bairro/cidade/região** (nunca rua/número). Erros tipados: `LocationPermissionDeniedError` (UC01-A3) e `LocationUnavailableError`. Um anúncio criado com o adapter grava a coordenada aproximada no SQLite pelo fluxo existente de `CreateAnimalUseCase`.
+- [x] **Teste de falha de permissão:** permissão negada **não quebra** o app (UC01-A3) — testes de adapter (`__tests__/infrastructure/device/location/LocationAdapter.test.ts`, 10 casos) + RNTL na tela (`__tests__/screens/HardwareFailure.test.tsx`: feedback "preencha bairro e cidade manualmente", campos preservados, cadastro segue utilizável). Busca continua funcionando sem GPS (uso do gateway só no formulário).
+- [x] **Câmera/galeria:** decisão `expo-image-picker ~58.0.10` (câmera **e** galeria num módulo só, no lugar do `expo-camera`); `src/infrastructure/device/camera/ImagePickerCameraAdapter.ts` implementando o port `CameraGateway` — câmera negada devolve `null` (sem lançar erro) e a UI orienta salvar sem foto ou usar a galeria (doc §16.3). Testes: `__tests__/infrastructure/device/camera/ImagePickerCameraAdapter.test.ts` (9 casos).
+- [ ] **Cache:** garantir que o cache local (anúncios + fotos) sobrevive a fechar/reabrir e atualiza sem bloquear a UI (gancho com RNF13, medido no passo de RNFs remanescentes §3). *(Já garantido por `__tests__/integration/sqlite/real/Persistence.real.test.ts` e o seed do container — falta medir em device.)*
+
+**Bloqueadores §4 a decidir antes:** limite de fotos por anúncio; precisão da anonimização de coordenadas.
+**Pronto (evidência):** GPS real grava coordenada aproximada no SQLite; nenhuma UI pública mostra endereço exato; fotos locais persistem após reinício.
+
+### Passo 3 — Supabase: infraestrutura online, comunicação e segurança de acesso
+
+**Origem:** RNF03, RNF04, RNF10; RF08–RF13, RF16; UC06/UC07/UC17/UC20; doc §§14.2, 15, §16.3.
+
+**Fazer neste passo:**
+- [ ] Estrutura `src/infrastructure/supabase/`: `client.ts`, `repositories/`, `auth/`, `storage/` (doc §13).
+- [ ] **Comunicação app ↔ Supabase:** implementar os ports já existentes (`createRemote`/`updateRemote`/`deleteRemote` no `AnimalRepository`, entregas remotas do `PhotoStorage`) com o adapter Supabase, no lugar dos stubs atuais. *(Atenção à regra §0.1: nada disso altera o build do APK nem depende dele para o app rodar offline.)*
+- [ ] **Autenticação:** ligar `AuthenticateUserUseCase` ao `supabase/auth/` conforme o método decidido (bloqueador §4).
+- [ ] **Segurança de acesso — RLS mínimas** (doc §15.1): leitura pública de `animals` ativos; escrita só do proprietário; `favorites`/`adoption_interests` privados; moderação só admin.
+- [ ] **Defesa em profundidade** (doc §15.3): validação no caso de uso + repository remoto + RLS. A UI nunca é barreira.
+- [ ] **`ModerateAnimalUseCase`** (tabela §8 + teste §16.2 `ModerateAnimalUseCase_rejects_non_admin`) — único use case do §8 ausente.
+
+**Testes (doc §§16.2/16.3 Supabase):** RLS leitura pública OK; edição por terceiro bloqueada; favoritos/interesses protegidos; upload associa arquivo ao anúncio correto; `UPDATE` com `version` antiga é rejeitado (doc §14.3).
+**Pronto (evidência):** integração Supabase verde; domínio/application sem import de Supabase; app sem credencial/fallback segue em modo honesto; cobertura ≥ 80%.
+**Bloqueador §4 antes de começar:** método de autenticação (e-mail/senha, magic link, OAuth…).
+
+### Passo 4 — Storage: bucket, padrão S3 e armazenamento de arquivos
+
+**Origem:** doc §13 (port `PhotoStorage`), RF09, RF26.
+
+**Fazer neste passo:**
+- [ ] Criar o bucket no Supabase (políticas de acesso por projeto; nomes/tamanhos conforme decisão de limite de fotos §4).
+- [ ] Implementar `src/infrastructure/supabase/storage/` seguindo o padrão S3 do Supabase (chaves por objeto, URLs assinadas conforme decisão de visibilidade — bloqueador §4), implementando o port `PhotoStorage` já existente.
+- [ ] Ligar o upload ao fluxo de criação/edição: foto local → upload → `remote_url` registrado em `animal_photos`/`local_images`.
+- [ ] Testes: upload associa arquivo ao anúncio correto; anúncio de terceiro não altera nem lê objeto fora da política; foto só-remota ignorada corretamente pelo SQLite (já coberta no contrato atual).
+
+**Bloqueadores §4 a decidir antes:** limite de fotos por anúncio (reuso do Passo 2); visibilidade exata dos dados de contato/URLs.
+
+### Passo 5 — Armazenamento no SQLite sincronizando com o Supabase online
+
+**Origem:** RF19–RF23, RF26; UC16–UC18/UC20; doc §§9.3/9.4/14/16.2.
+
+**Fazer neste passo:**
+- [ ] Ordem doc §14.1 (10 passos): mutações locais primeiro, upload de imagens antes da reconciliação, reconciliação, `last_sync_at` em `sync_state`.
+- [ ] Item de fila no formato doc §14.2 (já persistido — manter e estender para `photo`, `favorite`, `interest`).
+- [ ] `ProcessSyncQueueUseCase` fim-a-fim: remover entidade local no DELETE remoto com sucesso, retry automático na reconexão (disparo **uma única vez** por ciclo de reconexão) e retry manual.
+- [ ] `ConflictReviewScreen` + fluxos doc §9.4: conflito simples = versão mais recente; risco de perda = revisão do responsável. Extender `ResolveSyncConflictUseCase` (já existente).
+- [ ] Moderação admin conectada (UC20 — `ModerateAnimalUseCase` do Passo 3).
+- [ ] Indicadores de estado inequívocos (RNF07/RF22: offline, salvo no dispositivo, pendente, sincronizando, atualizado) refletidos na tela Sync e nos banners.
+
+**Testes (doc §16.2):** `ProcessSyncQueueUseCase_retries_failed_action`; `..._uploads_local_photo_before_reconcile`; `ResolveSyncConflictUseCase_requests_review_when_data_may_be_lost`; E2E §16.4 itens 4–6 (cria offline→fecha app→reabre→sincroniza; edição offline chega ao servidor; conflito gera revisão) + item 8 (não-editar anúncio de terceiro) contra o backend real.
+**Pronto (evidência):** fila idempotente (decisão doc §18 item 5); sync da fila SQLite → Supabase verificado em device; E2E 8/8.
+**Bloqueadores §4 a decidir antes:** política conflito simples vs. revisão; tipos de ação de moderação; retenção de interesses; offline completo de favoritos/interesses.
 
 ---
 
-## §3 — Próximos passos, em fases (ordem estrita)
+## §3 — Atividades remanescentes fora dos 5 passos
 
-> Regra de abertura: nenhuma fase começa sem a anterior ter seus "Critérios de pronto" cumpridos **e** sem os bloqueadores do §4 correspondentes estarem decididos.
-
-### Fase 2 — Persistência local real (SQLite)
-- **Origem:** RNF01, RNF02, RNF09 (cache/fila sobrevivem ao reinício); RF17–RF19; UC15/UC16; documentação §§5.1, 13, 16.3.
-- **Status: ✅ Fechada no código e nos testes.** Validação manual em Expo Go/device segue recomendada antes da apresentação.
-  - **Migrations versionadas:** `src/infrastructure/database/sqlite/migrations/index.ts` aplica o schema por `PRAGMA user_version` (versão atual `1`), de forma idempotente e transacional; o container também garante o schema quando recebe um driver já aberto.
-  - **Repositórios SQLite:** `animals` (com geolocalização), `animal_photos`, `local_images`, `favorites`, `adoption_interests`, `users`, `sync_queue`, `sync_state`, `search_preferences`, com índices para busca/fila. Upserts idempotentes em anúncios, favoritos, interesses, fila, usuário, preferências e metadados.
-  - **Atomicidade:** port `UnitOfWork` em `src/application/ports/UnitOfWork.ts` + `SqliteUnitOfWork`; casos de uso de criar/editar/excluir/marcar adotado gravam anúncio + ação da fila na mesma transação (outbox local). Em modo online, a ação é removida após o sucesso remoto; em falha, permanece para retry.
-  - **Fila mínima correta:** `ProcessSyncQueueUseCase` evita execução concorrente, usa `createRemote`/`updateRemote`/`deleteRemote` conforme a operação, remove o registro local no DELETE e falha de forma visível para entidades ainda não suportadas (`photo`, `favorite`, `interest`) e para registro local ausente.
-  - **Modo honesto:** `AppContainer.mode` é `sqlite` (driver real), `memory` (dublê de teste) ou `demo` (fallback). Não há mais fallback silencioso para memória em produção; se o SQLite não abrir, o app segue em demo com banner visível e aviso no console.
-  - **Fotos:** `SqlitePhotoStorage` usa `expo-file-system/legacy` (API compatível com SDK 57), registra o endereço local em `local_images`, atualiza `animal_photos` no upload e ignora corretamente fotos apenas remotas. `expo-file-system` passou a ser dependência direta.
-  - **Testes reais:** `__tests__/integration/sqlite/real/` usa `better-sqlite3` (devDependency) para contratos de migrations, upsert, update completo, delete local, duplicidade de favoritos/interesses, payload/tentativas da fila, fotos, rollback do UnitOfWork e persistência em arquivo após reabrir o banco.
-  - **Suíte:** 179 testes verdes, typecheck limpo, cobertura global 94,16% statements / 85,41% branches, `expo-doctor` 21/21.
-- **Decisões registradas nesta fase:**
-  - Favoritos e interesses continuam **local-only** até a Fase 6; não entram na fila remota nesta fase.
-  - Conflito/merge automático e sincronização completa continuam na Fase 6; a Fase 2 entrega apenas a fila persistente e o processamento mínimo.
-  - A cópia física de imagens depende de device/Expo Go; em Jest o adapter degrada para o endereço original sem perder o vínculo.
-- **Pronto (evidência):** testes §16.3 SQLite verdes (incluindo banco real); cobertura ≥ 80%; domínio/application sem import de `expo-sqlite`; fila mantém payload/tentativas; transação anúncio + ação é atômica.
-
-### Fase 3 — Backend Supabase (Auth, PostgreSQL, Storage, RLS)
-- **Origem:** RNF03, RNF04, RNF10; RF08–RF13, RF16; UC06/UC07/UC17/UC20; documentação §§14.2, 15, 16.3.
-- **Criar:**
-  - `src/infrastructure/supabase/client.ts`, `repositories/`, `auth/`, `storage/` (estrutura da doc §13).
-  - `ModerateAnimalUseCase` (tabela §8 + teste §16.2 `ModerateAnimalUseCase_rejects_non_admin`). O port `src/domain/ports/PhotoStorage.ts` + `PhotoStorageFake` já existem (Fase 1 concluída).
-  - Políticas RLS mínimas da tabela doc §15.1 (leitura pública de `animals` ativos; escrita só proprietário; `favorites`/`adoption_interests` privados; moderação só admin).
-- **Testes (doc §§16.2/16.3 Supabase):** RLS leitura pública OK; edição por terceiro bloqueada; favoritos/interesses protegidos; upload associa arquivo ao anúncio correto; `UPDATE` com `version` antiga é rejeitado (doc §14.3).
-- **Pronto:** integração Supabase verde; defesa em profundidade §15.3 (caso de uso + repository remoto + RLS); cobertura ≥ 80%.
-- **Bloqueador:** método de autenticação (e-mail/senha, magic link, OAuth…) — doc §19 item 1 — decidir **antes** de implementar `supabase/auth/`.
-
-### Fase 4 — Dispositivo real (câmera, localização, conectividade, sessão segura)
-- **Origem:** RNF05, RNF06; RF09, RF24–RF26; UC07–UC08/UC17; documentação §§11, 16.3.
-- **Criar/instalar:** `expo-secure-store`, `expo-camera` (ou image-picker conforme decisão), `expo-location`, `@react-native-community/netinfo`; `src/infrastructure/device/{camera,location,connectivity}/` + `LocationAdapter` e `PhotoAdapter` implementando os ports (doc §11); ligar `SessionStorageSecureStore.ts` ao store real (Keychain/Keystore, critério §3).
-- **Testes (doc §16.3 Dispositivo):** permissão de localização negada não quebra a busca (UC01-A3); câmera negada permite galeria quando aplicável; reconexão dispara sincronização uma única vez por ciclo.
-- **Pronto:** telas usam gateways reais com fallback fake em teste; nenhum endereço exato chega à UI pública (§0 item 5).
-- **Bloqueadores (doc §19):** limite de fotos por anúncio; precisão de anonimização de coordenadas — decidir **antes**.
-
-### Fase 5 — Rotas Expo Router completas
-- **Origem:** tabela Boundary doc §8; estrutura doc §13 (`(public)/`, `(tabs)/`, `(protected)/`); UC01–UC06.
-- **Criar em `app/`:** ✅ feito `/(tabs)` (Início, Favoritos, Meus anúncios, Sync), `/animal/[id]` (detalhes, com fluxo dono), `/(protected)/novo-anuncio` (criação), `/(protected)/editar-anuncio` (edição), `/login`, `/cadastro` (stubs mock), `/` → `/(tabs)`. Pendentes por desenho (não são Fase 1): revisão de conflito (Fase 6), moderação (bloqueada UC20).
-- **Testes:** RNTL por tela com fakes (padrão critérios §6: `render`, `fireEvent.press`, `fireEvent.changeText` dentro de `<AuthProvider>`); E2E §16.4 itens 1, 2, 3, 7, 8 ✅ feitos (`SearchToDetails.test.tsx` + `MockFlows.test.ts`); itens 4–6 seguem Fase 6.
-- **Pronto:** todas as telas da tabela §8 roteadas; deep links via `scheme: "enlace"` (`app.json:7`) funcionais.
-- **Bloqueadores (doc §19):** visibilidade exata dos dados de contato — decidir **antes** da tela de detalhes final.
-
-### Fase 6 — Sincronização fim-a-fim + conflito + moderação
-- **Origem:** RF19–RF23, RF26; UC16–UC18/UC20; documentação §§9.3/9.4/14/16.2.
-- **Implementar:** ordem doc §14.1 (10 passos, mutações locais primeiro, upload de imagens, reconciliação, `last_sync_at`); item de fila no formato doc §14.2; `ConflictReviewScreen` + fluxos doc §9.4 (conflito simples = versão mais recente; risco de perda = revisão do responsável); moderação admin (UC20).
-- **Testes (doc §16.2):** `ProcessSyncQueueUseCase_retries_failed_action`; `..._uploads_local_photo_before_reconcile`; `ResolveSyncConflictUseCase_requests_review_when_data_may_be_lost`; E2E §16.4 itens 4–6 (offline→fecha app→sincroniza; edição offline chega ao servidor; conflito gera revisão) + item 8 (não-editar anúncio de terceiro).
-- **Pronto:** fila idempotente (decisão §18 item 5); retry manual + automático (RF21); indicador de estado inequívoco (RNF07/RF22).
-- **Bloqueadores (doc §19 + UC20):** política conflito simples vs. revisão; tipos de ação de moderação; retenção de interesses; quais mutações de favoritos/interesses têm offline completo — decidir **antes**.
-
-### Fase 7 — RNFs de desempenho e escalabilidade
-- **Origem:** RNF13, RNF14, RNF15 — todos marcados como **"proposto"** na documentação §2.2.
-- **Implementar:** abertura de cache local ≤ 1 s (dispositivo intermediário); operações remotas com loading sem bloquear UI; listagem paginada/limitada no Supabase.
-- **Pronto:** metas medidas em dispositivo real e registradas aqui; nenhuma meta é apertada por suposição — se o valor "proposto" for rejeitado, volta ao §4 como bloqueador.
-
-### Fase 8 — E2E finais + apresentação
-- **Origem:** doc §16.4 (8 fluxos) + pirâmide de testes critérios §6 (E2E pouquíssimos, só críticos).
-- **Executar na ordem:** 1) ✅ visitante pesquisa e abre um animal (`__tests__/e2e/SearchToDetails.test.tsx`, rotas com `expo-router` mockado e fakes compartilhados); 2) ✅ autentica e favorita; 3) ✅ responsável cria online; 4) cria offline→fecha→reabre→sincroniza (Fase 6 — exige SQLite); 5) edita offline→chega ao servidor (Fase 6); 6) conflito (Fase 6); 7) ✅ marca adotado; 8) ✅ terceiro não edita (2, 3, 7, 8 em `__tests__/e2e/MockFlows.test.ts`, 100% mock).
-- **Pronto:** 5/8 verdes em mock; 8/8 só ao fim da Fase 6; cobertura global ≥ 80%; `expo-doctor` 21/21.
+- **Rotas Expo Router completas:** ✅ feitas as principais (`(tabs)`, `/animal/[id]`, `/(protected)/novo-anuncio`, `/(protected)/editar-anuncio`, `/login`, `/cadastro`, `/` → `/(tabs)`). Pendentes por desenho: `ConflictReviewScreen` (Passo 5) e tela de moderação (passo 3/5 — bloqueada pela UC20/§4). Deep links via `scheme: "enlace"` devem ser verificados quando as telas fecharem.
+- **RNFs de desempenho e escalabilidade (RNF13/14/15):** valores **propostos** na doc §2.2 — abertura de cache ≤ 1 s, operações remotas sem bloquear UI, listagem paginada/limitada no Supabase. Medir em device real e registrar; se o valor "proposto" for rejeitado, volta ao §4 como bloqueador.
+- **E2E finais + apresentação:** 5/8 fluxos em mock já verdes (`SearchToDetails`, `MockFlows` itens 2/3/7/8); 8/8 fecham no Passo 5. Cobertura global ≥ 80% e `expo-doctor` integram a verificação §5.
+- **Visualização no mapa (RF05/RF25):** renderização do mapa aproximado fica atrelada à geolocalização real (Passo 2) e à decisão de raio máximo do §4.
 
 ---
 
 ## §4 — Bloqueadores de produto (não implementar por suposição)
 
-Direto da documentação §19 + indefinição da UC20 (doc §3.2). Cada item precisa de decisão explícita antes da fase indicada:
+Cada item precisa de decisão explícita antes do passo indicado:
 
-- [ ] Método de autenticação Supabase (e-mail/senha, magic link, OAuth…) → antes da **Fase 3**
-- [ ] Campos obrigatórios e limites de cada formulário → antes das **Fases 3/5**
-- [ ] Regras de exclusão de anúncio já adotado → antes das **Fases 3/6**
-- [ ] Reabertura Adotado → Disponível (permitida ou não) → antes das **Fases 3/6** (o diagrama de estados §7.1 só prevê Disponível → Adotado)
-- [ ] Tipos de ação de moderação (ocultar, remover, suspender…) → antes da **Fase 6** (UC20)
-- [ ] Visibilidade exata dos dados de contato → antes da **Fase 5**
-- [ ] Política de retenção de manifestações de interesse → antes das **Fases 3/6**
-- [ ] Limite de fotos por anúncio → antes da **Fase 4**
-- [ ] Raio máximo de pesquisa → antes das **Fases 2/5**
-- [ ] Precisão de anonimização de coordenadas → antes da **Fase 4**
-- [ ] Conflito simples vs. conflito com revisão (política definitiva) → antes da **Fase 6**
-- [ ] Offline completo de favoritos/interesses (quais mutações entram na fila) → antes da **Fase 6**
-- [ ] Validação dos três valores "propostos" (RNF13/14/15) → antes da **Fase 7**
-
----
-
-## §5 — Matriz requisito → fase (resumo da rastreabilidade doc §17)
-
-| RF | Fase |
-|---|---|
-| RF01–RF05 (consulta, início, pesquisa, filtros, lista/mapa) | Fases 2 + 5 |
-| RF06 (detalhes) | Fase 5 |
-| RF07 (cadastro/login/sessão) | Fases 3 + 4 |
-| RF08–RF09 (criar anúncio + fotos) | Fases 3 + 4 |
-| RF10–RF13 (editar/excluir próprios, marcar adotado, meus anúncios) | Fases 3 + 5 + 6 |
-| RF14–RF16 (favoritos, listar favoritos, interesse) | Fases 3 + 5 (+ §4 decisão offline) |
-| RF17–RF22 (offline, fila, sync, retry, estados) | Fases 2 + 6 |
-| RF23 (conflitos) | Fase 6 |
-| RF24–RF25 (localização pontual, mapa aproximado) | Fase 4 |
-| RF26 (imagens offline até upload) | Fases 2 + 6 |
-| RF27 (moderação) | Fase 6 (bloqueada até decisão UC20) |
-
-RNFs: RNF01/02/09 → Fase 2; RNF03/04/10 → Fase 3; RNF05/06 → Fase 4; RNF07/08 → Fase 6; RNF11/12 → todas (verificação contínua); RNF13/14/15 → Fase 7.
+- [ ] Método de autenticação Supabase (e-mail/senha, magic link, OAuth…) → antes do **Passo 3**
+- [ ] Campos obrigatórios e limites de cada formulário → antes dos **Passos 3/5**
+- [ ] Regras de exclusão de anúncio já adotado → antes dos **Passos 3/5**
+- [ ] Reabertura Adotado → Disponível (permitida ou não) → antes dos **Passos 3/5** (o diagrama de estados §7.1 só prevê Disponível → Adotado)
+- [ ] Tipos de ação de moderação (ocultar, remover, suspender…) → antes do **Passo 5**
+- [ ] Visibilidade exata dos dados de contato → antes do **Passo 5**
+- [ ] Política de retenção de manifestações de interesse → antes dos **Passos 3/5**
+- [ ] Limite de fotos por anúncio → antes do **Passo 2**
+- [ ] Raio máximo de pesquisa → antes do **Passo 2**
+- [ ] Precisão de anonimização de coordenadas → antes do **Passo 2**
+- [ ] Conflito simples vs. conflito com revisão (política definitiva) → antes do **Passo 5**
+- [ ] Offline completo de favoritos/interesses (quais mutações entram na fila) → antes do **Passo 5**
+- [ ] Validação dos três valores "propostos" (RNF13/14/15) → antes das atividades do §3
 
 ---
 
-## §6 — Verificação (rodar ao fechar cada fase)
+## §5 — Verificação (rodar ao fechar cada passo)
 
 ```bash
-npm run typecheck   # tsc --noEmit, 0 erros
-npm test            # 179 testes atuais + novos; cobertura ≥ 80% (jest.config.js:12-19)
-npx expo-doctor     # 21/21
-npx expo start      # bundle Android + manifest exposdk:57.0.0
+npm install          # checkout novo: antes de tudo
+npm run typecheck    # tsc --noEmit, 0 erros
+npm test             # suíte atual + novos testes; cobertura ≥ 80% (jest.config.js:12-19)
+npx expo-doctor      # 21/21
+npx expo start       # bundle Android + manifest expo válidos
 ```
 
----
-
-## §7 — Registro de discrepância entre os dois documentos-fonte
-
-`criteriosapresentacao1.md` descreve também uma trilha "estágio/relatórios" (`PeriodoAvaliacao`, `Estagio`, `TokenSupervisor`, `Criterio`, `Assinatura`, `CargaHoraria`, `StatusPeriodo`, telas `AssinaturaScreen`/`AtividadesFormScreen`/`HistoricoRelatoriosScreen`) que **não existe** na documentação do software (cujo domínio é `Animal`, `AnimalPhoto`, `Favorite`, `AdoptionInterest`, `SyncAction`, `SyncMetadata` — doc §§4–5). O código contém as duas trilhas e os 179 testes cobrem ambas.
-
-**Decisão registrada:** a trilha adoção é o escopo deste planejamento. Nenhum próximo passo cria, remove ou renomeia nada da trilha estágio sem decisão explícita posterior — este arquivo apenas a documenta como legado existente.
+Lembrete da regra §0.1: nas verificações do Passo 3 em diante, conferir também que **o APK continua sendo gerado pelo build Expo/EAS, sem depender do Supabase**, e que o app sem credenciais segue abrindo em modo honesto/demo.

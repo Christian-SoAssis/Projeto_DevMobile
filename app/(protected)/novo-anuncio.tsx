@@ -11,7 +11,8 @@ export default function NovoAnuncioRoute() {
   const router = useRouter();
   // Fase 2: repositórios SQLite + conectividade real (cria online/offline
   // com fila de sincronização quando sem internet — RF17–RF19).
-  const { animalRepository, syncQueueRepository, unitOfWork } = useRepositories();
+  const { animalRepository, syncQueueRepository, unitOfWork, cameraGateway, locationGateway } =
+    useRepositories();
   const isOnline = useConnectivity();
 
   return (
@@ -21,6 +22,8 @@ export default function NovoAnuncioRoute() {
         animalRepository={animalRepository}
         syncQueueRepository={syncQueueRepository}
         unitOfWork={unitOfWork}
+        cameraGateway={cameraGateway}
+        locationGateway={locationGateway}
         isOnline={isOnline}
         onSuccess={() => router.back()}
       />

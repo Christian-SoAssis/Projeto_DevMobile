@@ -57,17 +57,34 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
     if (photo) {
       setCapturedPhotoUri(photo.uri);
       setFeedback('Foto capturada com sucesso!');
+    } else {
+      setFeedback('Nenhuma foto capturada. Conceda a permissão da câmera ou salve o anúncio sem foto.');
     }
   };
 
   const handleCaptureLocation = async () => {
-    const loc = await locationGateway.getCurrentLocation();
-    setLatitude(loc.latitude);
-    setLongitude(loc.longitude);
-    setCity(loc.city);
-    setNeighborhood(loc.neighborhood);
-    setLocationStatus(`Capturada: ${loc.neighborhood}, ${loc.city}`);
-    setFeedback('Localização pontual capturada!');
+    try {
+      const loc = await locationGateway.getCurrentLocation();
+      setLatitude(loc.latitude);
+      setLongitude(loc.longitude);
+      setCity(loc.city);
+      setNeighborhood(loc.neighborhood);
+      setLocationStatus(`Capturada: ${loc.neighborhood}, ${loc.city}`);
+      setFeedback('Localização pontual capturada!');
+    } catch (err: any) {
+      // UC01-A3: permissão negada / GPS indisponível não quebra o formulário —
+      // o local pode ser preenchido manualmente.
+      setLatitude(initialAnimal?.location.latitude ?? -21.554);
+      setLongitude(initialAnimal?.location.longitude ?? -45.435);
+      setCity(initialAnimal?.location.city ?? 'Varginha');
+      setNeighborhood(initialAnimal?.location.neighborhood ?? 'Centro');
+      setLocationStatus('Não capturada');
+      setFeedback(
+        err?.name === 'LocationPermissionDeniedError' || err?.name === 'LocationUnavailableError'
+          ? 'Geolocalização indisponível neste momento. Preencha bairro e cidade manualmente.'
+          : `Falha ao capturar localização. ${err?.message || 'Tente novamente ou preencha manualmente.'}`
+      );
+    }
   };
 
   const handleSubmit = async () => {

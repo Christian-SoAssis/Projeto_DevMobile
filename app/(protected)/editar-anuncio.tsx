@@ -10,7 +10,8 @@ export default function EditarAnuncioRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
-  const { animalRepository, syncQueueRepository, unitOfWork } = useRepositories();
+  const { animalRepository, syncQueueRepository, unitOfWork, cameraGateway, locationGateway } =
+    useRepositories();
   const [animal, setAnimal] = React.useState<Awaited<
     ReturnType<typeof animalRepository.findById>
   > | null>(null);
@@ -55,6 +56,8 @@ export default function EditarAnuncioRoute() {
         animalRepository={animalRepository}
         syncQueueRepository={syncQueueRepository}
         unitOfWork={unitOfWork}
+        cameraGateway={cameraGateway}
+        locationGateway={locationGateway}
         onSuccess={() => router.back()}
       />
     );

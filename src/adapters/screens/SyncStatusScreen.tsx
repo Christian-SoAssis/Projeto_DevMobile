@@ -6,6 +6,11 @@ import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { ProcessSyncQueueUseCase } from '../../application/use-cases/ProcessSyncQueueUseCase';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
 import { AnimalRepositoryFake } from '../../application/fakes/AnimalRepositoryFake';
+import {
+  listOfflineCapabilities,
+  OFFLINE_BEHAVIOR_LABELS,
+  OFFLINE_STATUS_LABELS,
+} from '../../application/offline/OfflineCapabilities';
 
 export interface SyncStatusScreenProps {
   syncQueueRepository?: SyncQueueRepository;
@@ -86,6 +91,29 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
             {item.lastError && <Text style={styles.itemError}>Erro: {item.lastError}</Text>}
           </View>
         )}
+        ListFooterComponent={
+          <View style={styles.footer} testID="offline-capabilities-section">
+            <Text style={styles.sectionTitle}>O que funciona offline (RNF01/RF17–RF22)</Text>
+            <Text style={styles.statusNote}>
+              Estados visíveis: “{OFFLINE_STATUS_LABELS.OFFLINE}”, “{OFFLINE_STATUS_LABELS.SAVED}”,
+              “{OFFLINE_STATUS_LABELS.PENDING}”, “{OFFLINE_STATUS_LABELS.SYNCING}” e “
+              {OFFLINE_STATUS_LABELS.SYNCED}”.
+            </Text>
+            {listOfflineCapabilities().map((entry) => (
+              <View style={styles.itemCard} key={entry.feature} testID={`capability-${entry.feature}`}>
+                <Text style={styles.itemOp}>{entry.label}</Text>
+                <Text style={styles.itemMeta}>
+                  {entry.rf.join(' · ')} | {entry.behaviorLabel}
+                </Text>
+                <Text style={styles.itemMeta}>{entry.offlineFlow}</Text>
+              </View>
+            ))}
+            <Text style={styles.footerNote}>
+              {OFFLINE_BEHAVIOR_LABELS.OFFLINE_PARTIAL} — favoritos e interesses aguardam decisão de
+              produto sobre a entrada na fila (§4 do nextsteps).
+            </Text>
+          </View>
+        }
       />
     </View>
   );
@@ -163,5 +191,26 @@ const styles = StyleSheet.create({
     marginTop: 20,
     color: '#28a745',
     fontWeight: 'bold',
+  },
+  footer: {
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#3a3a3c',
+    marginBottom: 8,
+  },
+  statusNote: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 10,
+  },
+  footerNote: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: '#856404',
+    marginTop: 8,
   },
 });

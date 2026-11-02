@@ -17,3 +17,5 @@ yarn-error.log*
 
 expo-env.d.ts
 # @end expo-cli
+# Estado local da CLI do Supabase
+supabase/.temp/

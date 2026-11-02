@@ -80,7 +80,10 @@ describe('AnimalFormScreen — foto capturada pode ser salva no banco local de f
     // 1) O PhotoStorage recebeu a foto (URI bruta da câmera) ANTES do anúncio.
     expect(storage.calls).toHaveLength(1);
     expect(storage.calls[0].localPath).toBe(CAPTURED_URI);
-    expect(storage.calls[0].animalId).toMatch(/^anim_/);
+    // Ids são UUID: o Supabase usa `uuid` nas chaves primárias.
+    expect(storage.calls[0].animalId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
 
     // 2) A foto no agregado salvo aponta para o arquivo COPIADO — e não
     //    para os temp-files da câmera, que morrem quando o app é encerrado.

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Animal } from '../../domain/entities/Animal';
+import { newUuid } from '../../domain/services/IdGenerator';
 import { AnimalPhoto } from '../../domain/entities/AnimalPhoto';
 import { AnimalCharacteristics } from '../../domain/value-objects/AnimalCharacteristics';
 import { ApproximateLocation } from '../../domain/value-objects/ApproximateLocation';
@@ -119,7 +120,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         if (onSuccess) onSuccess();
         return;
       }
-      const animalId = `anim_${Date.now()}`;
+      const animalId = newUuid();
       const location = new ApproximateLocation({
         latitude,
         longitude,
@@ -148,7 +149,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         // leva o destino definitivo — a URI temporária da câmera morre quando
         // o app é encerrado (RNF01/RNF02), o arquivo copiado não.
         const captured = new AnimalPhoto({
-          id: `photo_${Date.now()}`,
+          id: newUuid(),
           animalId,
           localPath: capturedPhotoUri,
         });

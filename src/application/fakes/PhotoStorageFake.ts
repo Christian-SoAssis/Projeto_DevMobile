@@ -4,8 +4,9 @@ import { PhotoStorage } from '../../domain/ports/PhotoStorage';
 export class PhotoStorageFake implements PhotoStorage {
   public photos: Map<string, AnimalPhoto> = new Map();
 
-  async persistLocal(photo: AnimalPhoto): Promise<void> {
+  async persistLocal(photo: AnimalPhoto): Promise<AnimalPhoto> {
     this.photos.set(photo.id, photo);
+    return photo;
   }
 
   async listPendingUpload(): Promise<AnimalPhoto[]> {

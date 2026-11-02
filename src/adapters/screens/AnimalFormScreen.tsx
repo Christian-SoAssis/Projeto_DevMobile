@@ -8,10 +8,12 @@ import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
 import { CameraGateway } from '../../domain/ports/CameraGateway';
 import { LocationGateway } from '../../domain/ports/LocationGateway';
+import { PhotoStorage } from '../../domain/ports/PhotoStorage';
 import { CreateAnimalUseCase } from '../../application/use-cases/CreateAnimalUseCase';
 import { UpdateAnimalUseCase } from '../../application/use-cases/UpdateAnimalUseCase';
 import { CameraGatewayFake } from '../../application/fakes/CameraGatewayFake';
 import { LocationGatewayFake } from '../../application/fakes/LocationGatewayFake';
+import { PhotoStorageFake } from '../../application/fakes/PhotoStorageFake';
 import { UnitOfWork } from '../../application/ports/UnitOfWork';
 import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
 
@@ -22,6 +24,7 @@ export interface AnimalFormScreenProps {
   syncQueueRepository: SyncQueueRepository;
   cameraGateway?: CameraGateway;
   locationGateway?: LocationGateway;
+  photoStorage?: PhotoStorage;
   unitOfWork?: UnitOfWork;
   onSuccess?: () => void;
   isOnline?: boolean;
@@ -34,6 +37,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
   syncQueueRepository,
   cameraGateway = new CameraGatewayFake(),
   locationGateway = new LocationGatewayFake(),
+  photoStorage = new PhotoStorageFake(),
   unitOfWork = new NoopUnitOfWork(),
   onSuccess,
   isOnline = true,
@@ -139,13 +143,16 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
       });
 
       if (capturedPhotoUri) {
-        animal.addPhoto(
-          new AnimalPhoto({
-            id: `photo_${Date.now()}`,
-            animalId,
-            localPath: capturedPhotoUri,
-          })
-        );
+        // Doc §5.1/§14.1: a foto vai para o armazenamento seguro (cópia física
+        // + registro em `local_images`) ANTES de anexar; a foto no agregado
+        // leva o destino definitivo — a URI temporária da câmera morre quando
+        // o app é encerrado (RNF01/RNF02), o arquivo copiado não.
+        const captured = new AnimalPhoto({
+          id: `photo_${Date.now()}`,
+          animalId,
+          localPath: capturedPhotoUri,
+        });
+        animal.addPhoto(await photoStorage.persistLocal(captured));
       }
 
       const useCase = new CreateAnimalUseCase(

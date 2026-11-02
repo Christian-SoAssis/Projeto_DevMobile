@@ -10,7 +10,14 @@ import { AnimalPhoto } from '../entities/AnimalPhoto';
  * vivem na infraestrutura e são ligadas apenas nas Fases 2–3.
  */
 export interface PhotoStorage {
-  persistLocal(photo: AnimalPhoto): Promise<void>;
+  /**
+   * Persiste a foto localmente (copia o arquivo para a área segura do app
+   * e registra o endereço no SQLite) e devolve a foto com o **destino
+   * definitivo** — o chamador deve anexar a foto retornada no agregado
+   * `Animal`, nunca a original com a URI temporária da câmera/galeria
+   * (que morre quando o app é encerrado; RNF01/RNF02).
+   */
+  persistLocal(photo: AnimalPhoto): Promise<AnimalPhoto>;
   listPendingUpload(): Promise<AnimalPhoto[]>;
   uploadPending(photo: AnimalPhoto): Promise<AnimalPhoto>;
   remove(photoId: string): Promise<void>;

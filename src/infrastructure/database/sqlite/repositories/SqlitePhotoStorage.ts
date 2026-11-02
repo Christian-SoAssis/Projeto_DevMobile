@@ -28,14 +28,14 @@ interface LocalImageRow {
 export class SqlitePhotoStorage implements PhotoStorage {
   constructor(private db: SqliteDatabaseDriver, private enableFileCopy: boolean = true) {}
 
-  async persistLocal(photo: AnimalPhoto): Promise<void> {
-    const localPath = this.enableFileCopy
+  async persistLocal(photo: AnimalPhoto): Promise<AnimalPhoto> {
+    const persistedPath = this.enableFileCopy
       ? await this.copyToAppStorage(photo)
       : photo.localPath;
-    if (!localPath) {
+    if (!persistedPath) {
       // Foto já remota não tem o que registrar em `local_images`; a foto
       // puramente local continua obrigatória para o cache offline.
-      if (photo.remoteUrl) return;
+      if (photo.remoteUrl) return photo;
       throw new Error('A foto precisa de um caminho local para ser persistida.');
     }
     const existing = await this.findRow(photo.id);
@@ -44,9 +44,9 @@ export class SqlitePhotoStorage implements PhotoStorage {
       // Copiar a mesma foto de novo atualiza o endereço, não duplica registro.
       await this.db.runAsync(
         'UPDATE local_images SET local_path = ?, remote_url = ?, upload_status = ? WHERE id = ?',
-        [localPath, photo.remoteUrl || null, photo.syncState.value, photo.id]
+        [persistedPath, photo.remoteUrl || null, photo.syncState.value, photo.id]
       );
-      return;
+      return this.withPersistedPath(photo, persistedPath);
     }
 
     await this.db.runAsync(
@@ -56,12 +56,30 @@ export class SqlitePhotoStorage implements PhotoStorage {
       [
         photo.id,
         photo.animalId,
-        localPath,
+        persistedPath,
         photo.remoteUrl || null,
         photo.syncState.value,
         photo.createdAt,
       ]
     );
+    return this.withPersistedPath(photo, persistedPath);
+  }
+
+  /**
+   * Devolve a foto com o **destino definitivo** do arquivo (copiado para a
+   * área segura do app). O chamador anexa essa entidade ao anúncio — nunca
+   * a foto com a URI temporária da câmera/galeria (RNF01/RNF02).
+   */
+  private withPersistedPath(photo: AnimalPhoto, persistedPath: string): AnimalPhoto {
+    if (persistedPath === photo.localPath) return photo;
+    return new AnimalPhoto({
+      id: photo.id,
+      animalId: photo.animalId,
+      localPath: persistedPath,
+      remoteUrl: photo.remoteUrl,
+      syncState: photo.syncState,
+      createdAt: photo.createdAt,
+    });
   }
 
   async listPendingUpload(): Promise<AnimalPhoto[]> {

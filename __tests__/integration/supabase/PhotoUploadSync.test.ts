@@ -1,5 +1,7 @@
 import { loadAppContainer } from '../../../src/infrastructure/composition/loadAppContainer';
 import { InMemorySqliteDriver } from '../../../src/infrastructure/database/sqlite/DatabaseDriver';
+import { DeleteAnimalUseCase } from '../../../src/application/use-cases/DeleteAnimalUseCase';
+import { UpdateAnimalUseCase } from '../../../src/application/use-cases/UpdateAnimalUseCase';
 import { CreateAnimalUseCase } from '../../../src/application/use-cases/CreateAnimalUseCase';
 import { ProcessSyncQueueUseCase } from '../../../src/application/use-cases/ProcessSyncQueueUseCase';
 import { ImageProcessorFake } from '../../../src/application/fakes/ImageProcessorFake';
@@ -170,5 +172,41 @@ describe('Passo 4 — foto vai ao Supabase Storage antes do anúncio (doc §14.1
     expect(db['animal_photos']).toHaveLength(1);
     const local = await container.animalRepository.findById(animalId);
     expect(local?.photos[0].remoteUrl).toContain('/animal-photos/');
+  });
+
+  it('trocar a foto apaga o arquivo antigo do bucket; excluir o anúncio apaga os arquivos', async () => {
+    const { client, container } = await setup();
+    const sync = () =>
+      new ProcessSyncQueueUseCase(
+        container.syncQueueRepository,
+        container.animalRepository,
+        undefined,
+        container.remotePhotoStorage
+      ).execute();
+    const { animalId, photo: first } = await createOfflineAnimalWithPhoto(container);
+    await sync();
+    const oldPath = `${UID}/${animalId}/${first.id}.webp`;
+    expect(client.storageObjects.has(oldPath)).toBe(true);
+
+    const second = await container.photoStorage.persistLocal(
+      new AnimalPhoto({ id: newUuid(), animalId, localPath: 'file:///cache/2.jpg' })
+    );
+    await new UpdateAnimalUseCase(container.animalRepository, container.syncQueueRepository, container.unitOfWork).execute(
+      UID,
+      animalId,
+      { photo: second },
+      false
+    );
+    await sync();
+    expect(client.storageObjects.has(oldPath)).toBe(false);
+    expect(client.storageObjects.has(`${UID}/${animalId}/${second.id}.webp`)).toBe(true);
+
+    await new DeleteAnimalUseCase(container.animalRepository, container.syncQueueRepository, container.unitOfWork).execute(
+      UID,
+      animalId,
+      false
+    );
+    await sync();
+    expect(client.storageObjects.size).toBe(0);
   });
 });

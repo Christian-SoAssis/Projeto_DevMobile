@@ -113,38 +113,42 @@
 
 **Origem:** doc §13 (port `PhotoStorage`), RF09, RF26.
 
-**Fazer neste passo:**
-- [ ] Criar o bucket no Supabase (políticas de acesso por projeto; nomes/tamanhos conforme decisão de limite de fotos §4).
-- [ ] Implementar `src/infrastructure/supabase/storage/` seguindo o padrão S3 do Supabase (chaves por objeto, URLs assinadas conforme decisão de visibilidade — bloqueador §4), implementando o port `PhotoStorage` já existente.
-- [ ] Ligar o upload ao fluxo de criação/edição: foto local → upload → `remote_url` registrado em `animal_photos`/`local_images`.
-- [ ] Testes: upload associa arquivo ao anúncio correto; anúncio de terceiro não altera nem lê objeto fora da política; foto só-remota ignorada corretamente pelo SQLite (já coberta no contrato atual).
+**Feito (código e testes; falta validar no projeto Supabase real e no aparelho):**
+- ✅ Bucket público `animal-photos` + políticas por pasta do dono em `supabase/init.sql` (só `image/webp`, até 2 MB; caminho `{auth.uid()}/{animal}/{foto}.webp`, fotos de perfil em `{auth.uid()}/avatar/…`). Leitura por URL pública (anúncios são públicos, RF06).
+- ✅ **Conversão obrigatória para WebP** (≤ 1280 px, qualidade 0,8) com `expo-image-manipulator`: `WebpPhotoStorage` converte ANTES de copiar para o armazenamento do app; falha na conversão aborta o salvamento com mensagem ao usuário (nunca grava outro formato).
+- ✅ `SupabasePhotoStorage` (`src/infrastructure/supabase/storage/`) implementa o port: upload com `upsert`, recusa não-WebP, exige sessão, grava a URL pública no cache local.
+- ✅ Upload ligado ao fluxo: online (criação/edição) e pela fila — sempre ANTES do anúncio (doc §14.1); `animal_photos` registra `remote_url`; falha de upload mantém a ação na fila.
+- ✅ Troca de foto na edição do anúncio; arquivos órfãos do bucket são apagados ao trocar a foto e ao excluir o anúncio (best-effort).
+- ✅ Foto de perfil sobe ao Storage; a URL fica em `users.avatar_url` (visível em outro aparelho).
+- ✅ Ids de anúncio e foto passaram a UUID (o Supabase usa `uuid` nas chaves; antes a sync real falharia).
 
-**Bloqueadores §4 a decidir antes:** limite de fotos por anúncio (reuso do Passo 2); visibilidade exata dos dados de contato/URLs.
+**Pendente:** aplicar o SQL no projeto real e testar upload/RLS de verdade; reduzir o limite de 2 MB / decidir limite de fotos por anúncio (§4).
 
 ### Passo 5 — Armazenamento no SQLite sincronizando com o Supabase online
 
 **Origem:** RF19–RF23, RF26; UC16–UC18/UC20; doc §§9.3/9.4/14/16.2.
 
-**Fazer neste passo:**
-- [ ] Ordem doc §14.1 (10 passos): mutações locais primeiro, upload de imagens antes da reconciliação, reconciliação, `last_sync_at` em `sync_state`.
-- [ ] Item de fila no formato doc §14.2 (já persistido — manter e estender para `photo`, `favorite`, `interest`).
-- [ ] `ProcessSyncQueueUseCase` fim-a-fim: remover entidade local no DELETE remoto com sucesso, retry automático na reconexão (disparo **uma única vez** por ciclo de reconexão) e retry manual.
-- [ ] `ConflictReviewScreen` + fluxos doc §9.4: conflito simples = versão mais recente; risco de perda = revisão do responsável. Extender `ResolveSyncConflictUseCase` (já existente).
-- [ ] Moderação admin conectada (UC20 — `ModerateAnimalUseCase` do Passo 3).
-- [ ] Indicadores de estado inequívocos (RNF07/RF22: offline, salvo no dispositivo, pendente, sincronizando, atualizado) refletidos na tela Sync e nos banners.
+**Feito (código e testes com backend simulado fiel ao `init.sql`; falta validar contra o Supabase real e em aparelho):**
+- ✅ Ciclo completo `RunFullSyncUseCase`: **push** (fila) → **pull** (servidor → cache local) → `last_sync_at` em `sync_state`. O pull nunca sobrescreve anúncio com ação pendente na fila.
+- ✅ Fila para `animal`, `favorite` e `interest` (idempotente: duplicata no servidor não é falha; favoritar+desfavoritar antes de sincronizar se anulam; ids não-UUID da demo ficam fora).
+- ✅ Disparo **automático** ao reconectar, UMA vez por ciclo offline→online (`useAutoSync`/`AutoSync`) e na abertura se já estiver online; botão manual continua na aba Sync.
+- ✅ Conflitos (doc §9.4): `UPDATE` defasado → situação igual = vence a edição mais recente, automático; situação divergente ou anúncio apagado = **revisão** (`ConflictReviewScreen`, rota `/(protected)/conflitos`): manter a minha edição, usar o servidor, recriar ou descartar. Conflito nunca é reenviado sozinho.
+- ✅ Moderação admin (UC20): aba **Moderação** (só ADMIN) lista todos os anúncios, oculta e reexibe — `ModerateAnimalUseCase` + RLS `is_admin()`.
+- ✅ Responsável vê os **interessados** recebidos (nome, telefone, e-mail; política `interests_animal_owner_read`).
+- ✅ E2E §16.4 itens 4, 5, 6 e 8 com SQLite em arquivo (fechar/reabrir) — `__tests__/e2e/OfflineSyncFlows.real.test.ts`. Com os 5 anteriores em mock, os 8 fluxos têm teste.
 
-**Testes (doc §16.2):** `ProcessSyncQueueUseCase_retries_failed_action`; `..._uploads_local_photo_before_reconcile`; `ResolveSyncConflictUseCase_requests_review_when_data_may_be_lost`; E2E §16.4 itens 4–6 (cria offline→fecha app→reabre→sincroniza; edição offline chega ao servidor; conflito gera revisão) + item 8 (não-editar anúncio de terceiro) contra o backend real.
-**Pronto (evidência):** fila idempotente (decisão doc §18 item 5); sync da fila SQLite → Supabase verificado em device; E2E 8/8.
-**Bloqueadores §4 a decidir antes:** política conflito simples vs. revisão; tipos de ação de moderação; retenção de interesses; offline completo de favoritos/interesses.
+**Pendente:** validar em aparelho e contra o Supabase real; `UPLOAD_PHOTO` como entidade própria da fila (hoje a foto sobe junto da ação do anúncio); retry com backoff entre tentativas.
+**Decisões §4 ainda em aberto (implementadas de forma PROVISÓRIA):** conflito simples vs. revisão (segui o doc §9.4); tipos de moderação (HIDE/UNHIDE); retenção de interesses; favoritos/interesses entrarem na fila.
 
 ---
 
 ## §3 — Atividades remanescentes fora dos 5 passos
 
-- **Rotas Expo Router completas:** ✅ feitas as principais (`(tabs)`, `/animal/[id]`, `/(protected)/novo-anuncio`, `/(protected)/editar-anuncio`, `/login`, `/cadastro`, `/` → `/(tabs)`). Pendentes por desenho: `ConflictReviewScreen` (Passo 5) e tela de moderação (Passo 5 — `ModerateAnimalUseCase` já existe; UI/tipos de ação aguardam UC20/§4). Deep links via `scheme: "enlace"` devem ser verificados quando as telas fecharem.
-- **RNFs de desempenho e escalabilidade (RNF13/14/15):** valores **propostos** na doc §2.2 — abertura de cache ≤ 1 s, operações remotas sem bloquear UI, listagem paginada/limitada no Supabase. Medir em device real e registrar; se o valor "proposto" for rejeitado, volta ao §4 como bloqueador.
-- **E2E finais + apresentação:** 5/8 fluxos em mock já verdes (`SearchToDetails`, `MockFlows` itens 2/3/7/8); 8/8 fecham no Passo 5. Cobertura global ≥ 80% e `expo-doctor` integram a verificação §5.
-- **Visualização no mapa (RF05/RF25):** renderização do mapa aproximado fica atrelada à geolocalização real (Passo 2) e à decisão de raio máximo do §4.
+- **Rotas Expo Router completas:** ✅ `(tabs)` (Início, Favoritos, Meus anúncios, Sync, Moderação, Conta), `/animal/[id]`, `/(protected)/novo-anuncio`, `/(protected)/editar-anuncio`, `/(protected)/conflitos`, `/login`, `/cadastro`, `/` → `/(tabs)`. Guarda de rotas por perfil (`AccessPolicy` + `RequireAccess`). Deep links via `scheme: "enlace"` ainda precisam ser verificados em aparelho.
+- **Autenticação e perfis:** ✅ login/cadastro por e-mail e senha (cadastro já entra na conta), política de acesso (visitante / autenticado / admin), tela Conta com foto, descrição e interesses.
+- **Mapa (RF05/RF25):** ✅ `react-native-maps` com marcador + círculo de área aproximada (nunca a coordenada exata); na web/Jest cai na lista de pinos. Falta o filtro por distância (RF04) e o raio máximo — dependem do §4. Build próprio no Android precisa da chave do Google Maps (`android.config.googleMaps.apiKey`).
+- **RNFs de desempenho e escalabilidade (RNF13/14/15):** valores **propostos** na doc §2.2 — abertura de cache ≤ 1 s, operações remotas sem bloquear UI, listagem paginada/limitada no Supabase. **Não medidos**: medir em aparelho real e registrar; se o valor "proposto" for rejeitado, volta ao §4 como bloqueador.
+- **E2E e verificação:** ✅ os 8 fluxos do §16.4 têm teste (5 em mock, 4–6 e 8 com SQLite em arquivo + backend simulado). `expo-doctor` e validação manual em Expo Go/aparelho continuam pendentes.
 
 ---
 

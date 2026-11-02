@@ -194,12 +194,12 @@ Projeto_DevMobile/
 |---|---|:---:|
 | 1 | Domínio e interface primeiro (100% fakes, cobertura ≥ 80%) | 🟢 Concluído |
 | 2 | Persistência local real (SQLite) | 🟢 Concluído em código/suíte — schema, repositórios, outbox atômico, fila e cache integrados; validação manual em Expo Go/device pendente |
-| 3 | Backend Supabase (Auth, PostgreSQL, Storage, RLS) | 🟡 Integrado por configuração — auth e-mail/senha, repositórios remotos com bloqueio otimista e RLS (`supabase/init.sql`) prontos; pendente projeto Supabase real (credenciais + aplicar o SQL) e `storage/` (Passo 4) |
-| 4 | Dispositivo real (câmera, localização, conectividade, secure store) | 🟡 Em andamento — `expo-secure-store`, `expo-location` (GPS real no formulário, coordenada anonimizada) e `expo-image-picker` (câmera/galeria) integrados; validação em dispositivo e mapa pendentes |
-| 5 | Rotas Expo Router completas | 🟡 Parcial |
-| 6 | Sincronização fim a fim, conflitos e moderação | ⏳ Pendente |
-| 7 | Requisitos de desempenho e escalabilidade | ⏳ Pendente |
-| 8 | Testes E2E finais e apresentação | 🟡 5/8 fluxos em mock |
+| 3 | Backend Supabase (Auth, PostgreSQL, Storage, RLS) | 🟡 Implementado e testado com backend simulado fiel ao `supabase/init.sql`; falta rodar contra o projeto Supabase real |
+| 4 | Dispositivo real (câmera, localização, conectividade, secure store, mapa) | 🟡 Integrado (mapa, GPS aproximado, câmera/galeria com conversão para WebP, secure store); validação em aparelho pendente |
+| 5 | Rotas Expo Router completas | 🟢 Concluído (login/cadastro, áreas por perfil, conflitos, moderação) |
+| 6 | Sincronização fim a fim, conflitos e moderação | 🟡 Push + pull, auto-sync ao reconectar, revisão de conflitos e moderação prontos; falta validar em aparelho |
+| 7 | Requisitos de desempenho e escalabilidade | ⏳ Pendente (medir em aparelho) |
+| 8 | Testes E2E finais e apresentação | 🟢 8/8 fluxos com teste |
 
 Detalhes e bloqueadores de produto estão em [docs/nextsteps.md](docs/nextsteps.md).
 

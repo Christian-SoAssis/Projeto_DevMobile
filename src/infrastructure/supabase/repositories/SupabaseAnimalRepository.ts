@@ -14,6 +14,7 @@ import {
 } from '../../../domain/value-objects/ApproximateLocation';
 import { AdoptionStatus } from '../../../domain/value-objects/AdoptionStatus';
 import { SupabaseClientLike, AnimalRow, AnimalPhotoRow } from '../types';
+import { PHOTO_BUCKET } from '../storage/SupabasePhotoStorage';
 
 export class StaleVersionError extends Error {
   constructor(message = 'Atualização remota rejeitada: versão defasada, registro ausente ou bloqueada pela RLS.') {
@@ -158,6 +159,8 @@ export class SupabaseAnimalRepository implements AnimalRepository, RemoteAnimalS
    */
   private async syncPhotos(animal: Animal): Promise<void> {
     const uploaded = animal.photos.filter((p) => !!p.remoteUrl);
+    // Fotos que saíram do anúncio (troca na edição): apaga os arquivos órfãos do bucket.
+    await this.removeObjectsOfPhotos(animal.id, new Set(uploaded.map((p) => p.id)));
     const del = await this.client.from<AnimalPhotoRow>('animal_photos').delete().eq('animal_id', animal.id);
     if (del.error) {
       throw new RemoteSupabaseError(`Falha ao atualizar as fotos do anúncio: ${del.error.message}`);
@@ -177,7 +180,31 @@ export class SupabaseAnimalRepository implements AnimalRepository, RemoteAnimalS
     }
   }
 
+  /**
+   * Remove do bucket os arquivos das fotos do anúncio que NÃO estão em `keep`.
+   * Best-effort: uma falha aqui deixa arquivo órfão, mas nunca impede a
+   * operação principal (a RLS só deixa o dono apagar na própria pasta).
+   */
+  private async removeObjectsOfPhotos(animalId: string, keep: Set<string> = new Set()): Promise<void> {
+    try {
+      const { data } = await this.client
+        .from<AnimalPhotoRow>('animal_photos')
+        .select('*')
+        .eq('animal_id', animalId);
+      const marker = `/${PHOTO_BUCKET}/`;
+      const paths = (data ?? [])
+        .filter((row) => !keep.has(row.id) && row.remote_url && row.remote_url.includes(marker))
+        .map((row) => decodeURIComponent((row.remote_url as string).split(marker)[1].split('?')[0]));
+      if (paths.length > 0) {
+        await this.client.storage.from(PHOTO_BUCKET).remove(paths);
+      }
+    } catch {
+      // Arquivo órfão é aceitável; limpeza futura.
+    }
+  }
+
   async deleteRemote(id: string): Promise<void> {
+    await this.removeObjectsOfPhotos(id);
     // DELETE é idempotente: registro já ausente (ou bloqueado por RLS, teoricamente
     // impossível — o dono é quem envia) devolve zero linhas e NÃO é erro.
     const { error } = await this.client.from<AnimalRow>('animals').delete().eq('id', id);

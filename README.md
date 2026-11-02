@@ -54,7 +54,7 @@ Busca → Filtros → Detalhes → Favoritar / Demonstrar interesse → Contato 
 | Persistência local | SQLite (`expo-sqlite`) — integrada ao app na Fase 2 (cache, fila e imagens locais) |
 | Sessão segura | `SessionStorageSecureStore` — `expo-secure-store` real (Keychain/Keystore) com fallback em memória em Jest/demo |
 | Conectividade | `@react-native-community/netinfo` via port `ConnectivityGateway` (Fase 2) |
-| Backend (futuro) | Supabase: Auth, PostgreSQL, Storage e RLS (Fase 3) |
+| Backend online | Supabase (`@supabase/supabase-js`): Auth (e-mail/senha), PostgreSQL + RLS, Storage (Passo 4) — **opcional**, ligado por `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_ANON_KEY` |
 | Testes | Jest 29 + `jest-expo` + React Native Testing Library |
 
 ---
@@ -176,8 +176,9 @@ Projeto_DevMobile/
 │   │   └── screens/          # Telas React Native
 │   └── infrastructure/
 │       ├── database/sqlite/  # Driver expo-sqlite (modo honesto), migrations versionadas e repositórios (Fase 2)
-│       ├── device/           # Adaptadores de hardware: conectividade (NetInfo) — câmera/localização na Fase 4
-│       └── composition/      # loadAppContainer: monta SQLite, seed inicial e entrega via provider
+│       ├── device/           # Adaptadores de hardware: conectividade (NetInfo), câmera (expo-image-picker) e GPS (expo-location, coordenada anonimizada)
+│       ├── supabase/         # Fase 3: client (config por env, modo honesto), repositórios remotos com bloqueio otimista, auth e-mail/senha e moderação
+│       └── composition/      # loadAppContainer: monta SQLite + Supabase opcional (remoteMode) e entrega via provider
 ├── __tests__/                # domain/, application/, adapters/, screens/, e2e/
 ├── docs/                     # Especificação, critérios e próximos passos
 ├── app.json                  # Configuração Expo (scheme: "enlace")
@@ -192,8 +193,8 @@ Projeto_DevMobile/
 | # | Fase | Status |
 |---|---|:---:|
 | 1 | Domínio e interface primeiro (100% fakes, cobertura ≥ 80%) | 🟢 Concluído |
-| 2 | Persistência local real (SQLite) | 🟡 Em andamento — schema, repositórios, container, cache seed e conectividade integrados |
-| 3 | Backend Supabase (Auth, PostgreSQL, Storage, RLS) | ⏳ Pendente |
+| 2 | Persistência local real (SQLite) | 🟢 Concluído em código/suíte — schema, repositórios, outbox atômico, fila e cache integrados; validação manual em Expo Go/device pendente |
+| 3 | Backend Supabase (Auth, PostgreSQL, Storage, RLS) | 🟡 Integrado por configuração — auth e-mail/senha, repositórios remotos com bloqueio otimista e RLS (`supabase/init.sql`) prontos; pendente projeto Supabase real (credenciais + aplicar o SQL) e `storage/` (Passo 4) |
 | 4 | Dispositivo real (câmera, localização, conectividade, secure store) | 🟡 Em andamento — `expo-secure-store`, `expo-location` (GPS real no formulário, coordenada anonimizada) e `expo-image-picker` (câmera/galeria) integrados; validação em dispositivo e mapa pendentes |
 | 5 | Rotas Expo Router completas | 🟡 Parcial |
 | 6 | Sincronização fim a fim, conflitos e moderação | ⏳ Pendente |
@@ -222,6 +223,7 @@ Detalhes e bloqueadores de produto estão em [docs/nextsteps.md](docs/nextsteps.
 | [docs/criteriosapresentacao1.md](docs/criteriosapresentacao1.md) | Rubrica da fase "Domínio e Interface Primeiro" |
 | [docs/nextsteps.md](docs/nextsteps.md) | Próximos passos por fase e bloqueadores |
 | [docs/decisao-orm.md](docs/decisao-orm.md) | ADR: acesso ao SQLite com SQL cru (decisão sobre ORM) |
+| [supabase/init.sql](supabase/init.sql) | Schema + políticas RLS do backend Supabase (Fase 3) — rodar no SQL Editor do projeto |
 
 ---
 

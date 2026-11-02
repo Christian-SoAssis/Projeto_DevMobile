@@ -22,12 +22,22 @@ import { SqliteSearchPreferencesRepository } from '../database/sqlite/repositori
 import { SqliteSyncMetadataRepository } from '../database/sqlite/repositories/SqliteSyncMetadataRepository';
 import { ImagePickerCameraAdapter } from '../device/camera/ImagePickerCameraAdapter';
 import { ExpoLocationAdapter } from '../device/location/LocationAdapter';
+import { loadSupabaseClient } from '../supabase/client';
+import { SupabaseClientLike, SupabaseConfig, SupabaseModuleLike } from '../supabase/types';
+import { SupabaseAnimalRepository } from '../supabase/repositories/SupabaseAnimalRepository';
+import { SupabaseAuthGateway } from '../supabase/auth/SupabaseAuthGateway';
+import { SupabaseModerationRepository } from '../supabase/repositories/SupabaseModerationRepository';
+import { AuthGateway } from '../../domain/ports/AuthGateway';
+import { ModerationGateway } from '../../domain/ports/ModerationGateway';
 import { buildSeedAnimals } from '../../adapters/demo/seedAnimals';
 
 export type AppMode = 'sqlite' | 'memory' | 'demo';
+export type RemoteMode = 'none' | 'supabase';
 
 export interface AppContainer {
   mode: AppMode;
+  /** Backend remoto em uso: `none` = 100% local (modo honesto); `supabase` = ligado. */
+  remoteMode: RemoteMode;
   animalRepository: AnimalRepository;
   favoriteRepository: FavoriteRepository;
   interestRepository: AdoptionInterestRepository;
@@ -40,23 +50,54 @@ export interface AppContainer {
   /** Gateways de hardware (passo da geolocalização/fotos real). */
   cameraGateway: CameraGateway;
   locationGateway: LocationGateway;
+  /** Presentes apenas quando o Supabase está configurado (Fase 3). */
+  authGateway?: AuthGateway;
+  moderationGateway?: ModerationGateway;
+}
+
+export interface AppContainerOptions {
+  /** Driver injetado (testes/contratos). Padrão: driver Expo SQLite real. */
+  driver?: SqliteDatabaseDriver;
+  /** Cliente Supabase inteiro injetado (testes). `null` força `remoteMode: 'none'`. */
+  supabaseClient?: SupabaseClientLike | null;
+  /** Módulo SDK injetado (testes), quando não é desejado exigir o pacote. */
+  supabaseModule?: SupabaseModuleLike | null;
+  /** Config explícita (testes) — alternativa a `EXPO_PUBLIC_*`. */
+  supabaseConfig?: SupabaseConfig | null;
 }
 
 /**
- * Ponto de composição do app em runtime (Fase 2 — Persistência local real).
+ * Ponto de composição do app em runtime (Fase 2 — Persistência local real;
+ * Fase 3 — Supabase opcional, ligado por configuração, nunca obrigatório).
  *
  * Monta os repositórios SQLite sobre o driver de banco e popula o cache
  * inicial de anúncios na primeira execução. Em produção, uma falha ao abrir
  * o SQLite não é mascarada por um banco em memória: o erro chega ao provider.
+ *
+ * Regra §0.1: **sem credenciais do Supabase o app segue 100% offline/SQLite**
+ * (remoteMode 'none'). Com credenciais, os mesmos ports ganham a perna remota
+ * (decorador SupabaseAnimalRepository) e auth/moderação reais — o build
+ * do APK e o funcionamento sem rede não são afetados.
  */
-export async function loadAppContainer(driver?: SqliteDatabaseDriver): Promise<AppContainer> {
-  const db = driver || (await getDatabaseDriver());
+export async function loadAppContainer(
+  driver?: SqliteDatabaseDriver,
+  options: AppContainerOptions = {}
+): Promise<AppContainer> {
+  const db = driver || (options.driver ?? (await getDatabaseDriver()));
 
   // O container garante o schema mesmo quando recebe um driver já aberto
   // (testes/contratos). Em produção a chamada é idempotente.
   await applyMigrations(db);
 
-  const animalRepository = new SqliteAnimalRepository(db);
+  const supabaseClient: SupabaseClientLike | null =
+    'supabaseClient' in options
+      ? options.supabaseClient || null
+      : loadSupabaseClient({
+          supabaseModule: 'supabaseModule' in options ? options.supabaseModule : undefined,
+          config: 'supabaseConfig' in options ? options.supabaseConfig : undefined,
+        });
+
+  let animalRepository: AnimalRepository = new SqliteAnimalRepository(db);
   const favoriteRepository = new SqliteFavoriteRepository(db);
   const interestRepository = new SqliteAdoptionInterestRepository(db);
   const syncQueueRepository = new SqliteSyncQueueRepository(db);
@@ -65,6 +106,15 @@ export async function loadAppContainer(driver?: SqliteDatabaseDriver): Promise<A
   const searchPreferencesRepository = new SqliteSearchPreferencesRepository(db);
   const syncMetadataRepository = new SqliteSyncMetadataRepository(db);
   const unitOfWork = new SqliteUnitOfWork(db);
+
+  let authGateway: AuthGateway | undefined;
+  let moderationGateway: ModerationGateway | undefined;
+  if (supabaseClient) {
+    animalRepository = new SupabaseAnimalRepository({ local: animalRepository, client: supabaseClient });
+    authGateway = new SupabaseAuthGateway({ client: supabaseClient });
+    moderationGateway = new SupabaseModerationRepository({ client: supabaseClient });
+  }
+
   // Gateways de hardware reais: os módulos expo-image-picker/expo-location
   // são carregados dinamicamente pelos adapters — em Jest/demo operam sem a
   // ponte nativa, com degradação definida (câmera → null; GPS → erro
@@ -76,6 +126,7 @@ export async function loadAppContainer(driver?: SqliteDatabaseDriver): Promise<A
 
   return {
     mode: db.mode,
+    remoteMode: supabaseClient ? 'supabase' : 'none',
     animalRepository,
     favoriteRepository,
     interestRepository,
@@ -87,6 +138,8 @@ export async function loadAppContainer(driver?: SqliteDatabaseDriver): Promise<A
     unitOfWork,
     cameraGateway,
     locationGateway,
+    authGateway,
+    moderationGateway,
   };
 }
 

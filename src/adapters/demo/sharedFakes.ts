@@ -51,4 +51,5 @@ export const demoContainer = {
   unitOfWork: new NoopUnitOfWork(),
   cameraGateway: new CameraGatewayFake(),
   locationGateway: new LocationGatewayFake(),
+  remoteMode: 'none' as const,
 };

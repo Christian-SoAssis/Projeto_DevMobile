@@ -34,11 +34,17 @@
   - `ProcessSyncQueueUseCase` com anti-concorrência, retry (`maxAttempts` padrão 5) e fila mínima correta para a entidade `animal`.
   - Modo honesto: `AppContainer.mode` = `sqlite` | `memory` | `demo`, sem fallback silencioso em produção.
   - Testes de integração reais com `better-sqlite3` em `__tests__/integration/sqlite/real/`.
-- **O repositório atual está sem `node_modules`** (checkout novo): rodar `npm install` antes de qualquer verificação do §5.
+- **Fase 3 — Supabase (infraestrutura online, comunicação e segurança):** ✅ implementada em código e suíte; **pendente verificação contra um projeto Supabase real** (criar o projeto, rodar `supabase/init.sql`, definir `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_ANON_KEY` e conferir as políticas RLS na mão).
+  - `@supabase/supabase-js@2.118.0` + `supabase/init.sql` (schema `users`, `animals` + `moderation_status`, `animal_photos`, `favorites`, `adoption_interests` e políticas RLS do doc §15.1).
+  - `src/infrastructure/supabase/`: `client.ts` (config por `EXPO_PUBLIC_*`, require dinâmico, modo honesto → `null` sem credencial), `types.ts` (superfície estrutural mínima do SDK), `auth/SupabaseAuthGateway.ts` (e-mail/senha — decisão §4; papel ADMIN lido de `public.users.user_type`), `repositories/SupabaseAnimalRepository.ts` (decorador local→SQLite + remoto→Supabase, bloqueio otimista por `version` doc §14.3 com `StaleVersionError`/`RemoteSupabaseError` e `listPublicRemote`) e `SupabaseModerationRepository.ts` (HIDE/UNHIDE provisórios, aguardando §4).
+  - Composição: `loadAppContainer(driver?, options?)` com `AppContainerOptions` (driver/cliente/módulo/config injetáveis) e `AppContainer.remoteMode: 'none' | 'supabase'` + `authGateway?`/`moderationGateway?`. **Sem credenciais o app segue 100% offline/SQLite e o build do APK não muda (§0.1).**
+  - Port `ModerationGateway` no domínio + `ModerateAnimalUseCase` (UC20; teste `ModerateAnimalUseCase_rejects_non_admin` do §16.2).
+  - UI: `AuthProviderBridge` (em `AuthContext.tsx`) entrega o `SupabaseAuthGateway` do container quando configurado; sem ele, mantém o fake de demo.
+- **`node_modules`** instalado neste ambiente com `npm install --ignore-scripts` (o install normal falha compilando `better-sqlite3` via node-gyp — não há Visual Studio Build Tools na máquina; o binding pré-compilado do `better-sqlite3` funciona). Em checkout novo, usar `npm install --ignore-scripts`.
 
 **Gaps nominais registrados (sem renomear nada por conta própria):**
 - Critério §7 pede `Coordenada`/`StatusSincronizacao`/`SincronizarFilaUseCase`; o código tem `ApproximateLocation`/`SyncState`/`ProcessSyncQueueUseCase`. Manter os nomes do código.
-- Ausente vs. documentação §8/§16: `ModerateAnimalUseCase` — previsto no **Passo 3**.
+- ~~Ausente vs. documentação §8/§16: `ModerateAnimalUseCase`~~ — ✅ implementado no Passo 3 (`src/application/use-cases/ModerateAnimalUseCase.ts` + port `ModerationGateway`).
 - Trilha "estágio/relatórios" (`PeriodoAvaliacao`, `Estagio`, `TokenSupervisor`, telas `AssinaturaScreen`/`AtividadesFormScreen`/`HistoricoRelatoriosScreen`) é **legado** da rubrica, fora do escopo do planejamento. Nada é criado, removido ou renomeado nela sem decisão explícita.
 
 ---
@@ -90,16 +96,17 @@
 **Origem:** RNF03, RNF04, RNF10; RF08–RF13, RF16; UC06/UC07/UC17/UC20; doc §§14.2, 15, §16.3.
 
 **Fazer neste passo:**
-- [ ] Estrutura `src/infrastructure/supabase/`: `client.ts`, `repositories/`, `auth/`, `storage/` (doc §13).
-- [ ] **Comunicação app ↔ Supabase:** implementar os ports já existentes (`createRemote`/`updateRemote`/`deleteRemote` no `AnimalRepository`, entregas remotas do `PhotoStorage`) com o adapter Supabase, no lugar dos stubs atuais. *(Atenção à regra §0.1: nada disso altera o build do APK nem depende dele para o app rodar offline.)*
-- [ ] **Autenticação:** ligar `AuthenticateUserUseCase` ao `supabase/auth/` conforme o método decidido (bloqueador §4).
-- [ ] **Segurança de acesso — RLS mínimas** (doc §15.1): leitura pública de `animals` ativos; escrita só do proprietário; `favorites`/`adoption_interests` privados; moderação só admin.
-- [ ] **Defesa em profundidade** (doc §15.3): validação no caso de uso + repository remoto + RLS. A UI nunca é barreira.
-- [ ] **`ModerateAnimalUseCase`** (tabela §8 + teste §16.2 `ModerateAnimalUseCase_rejects_non_admin`) — único use case do §8 ausente.
+- [x] Estrutura `src/infrastructure/supabase/`: `client.ts` (config por `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_ANON_KEY`, require dinâmico e modo honesto → `null` sem credencial), `types.ts` (superfície estrutural mínima do SDK), `repositories/` e `auth/` (doc §13). `storage/` fica para o **Passo 4** (port `PhotoStorage`).
+- [x] **Comunicação app ↔ Supabase:** decorador `SupabaseAnimalRepository` implementa `createRemote`/`updateRemote`/`deleteRemote` (doc §14.2) + `listPublicRemote`, mantendo os métodos locais no SQLite — os use cases continuam vendo **um único port**. Bloqueio otimista (doc §14.3): a edição local incrementa `version` (`touch()`); o `UPDATE` casa a versão **pré-edição** que o servidor ainda guarda (`animal.version - 1`) e zero linhas → `StaleVersionError` (RF23, sem perda silenciosa; edição de terceiro bloqueada pela RLS é indistinguível no cliente — intencional, §15.3). Wired no composition root: `loadAppContainer` recebe `AppContainerOptions` e expõe `remoteMode: 'none' | 'supabase'` — **nada altera o build do APK nem exige rede quando sem credencial (§0.1)**. A entrega remota do `PhotoStorage` (upload) fica no Passo 4.
+- [x] **Autenticação (e-mail/senha — decisão §4):** `SupabaseAuthGateway` liga `AuthenticateUserUseCase`/`AcessarViaTokenUseCase` ao `supabase.auth`; `AuthProviderBridge` (em `AuthContext.tsx`) entrega o gateway real quando `remoteMode === 'supabase'` e mantém o fake de demo em modo offline. Papel ADMIN lido de `public.users.user_type` (fonte autoritativa; metadata do auth nunca é a única fonte).
+- [x] **Segurança de acesso — RLS mínimas** (doc §15.1): `supabase/init.sql` com schema (`users`, `animals` + `moderation_status`, `animal_photos`, `favorites`, `adoption_interests`) e políticas: leitura pública apenas de anúncios visíveis (`moderation_status <> 'HIDDEN'`); escrita de animals/fotos só do proprietário (`auth.uid()`); `favorites`/`adoption_interests` privados por usuário; moderação só via `is_admin()`. *(Pendente aplicar e conferir num projeto Supabase real; o fake de teste reproduta a semântica dessas políticas.)*
+- [x] **Defesa em profundidade** (doc §15.3): validação no use case (`ModerateAnimalUseCase` rejeita não-admin) + adapter remoto (escreve só `moderation_status`) + RLS no Postgres. A UI nunca é barreira.
+- [x] **`ModerateAnimalUseCase`** (tabela §8 + teste §16.2 `ModerateAnimalUseCase_rejects_non_admin`): port `ModerationGateway` no domínio + use case com a mensagem "Somente administradores podem moderar anúncios (UC20).".
 
-**Testes (doc §§16.2/16.3 Supabase):** RLS leitura pública OK; edição por terceiro bloqueada; favoritos/interesses protegidos; upload associa arquivo ao anúncio correto; `UPDATE` com `version` antiga é rejeitado (doc §14.3).
-**Pronto (evidência):** integração Supabase verde; domínio/application sem import de Supabase; app sem credencial/fallback segue em modo honesto; cobertura ≥ 80%.
-**Bloqueador §4 antes de começar:** método de autenticação (e-mail/senha, magic link, OAuth…).
+**Testes (doc §§16.2/16.3 Supabase):** ✅ — 49 testes novos: `SupabaseClient.test.ts` (config por env, modo honesto, `isSupabaseModule`, SDK real instalado → `null` sem env); `SupabaseAnimalRepository.test.ts` (delegação local no SQLite, CREATE com RLS violada por anônimo, UPDATE com versão atual, **`UPDATE` defasado rejeitado com `StaleVersionError`**, edição por terceiro bloqueada, DELETE idempotente, leitura pública exclui HIDDEN/ADOPTED); `SupabaseAuthGateway.test.ts` (login válido/inválido, rede fora, sessão atual, `acessarViaToken`, papel ADMIN via `public.users`, logout); `SupabaseModerationRepository.test.ts` (HIDE/UNHIDE); **`RlsPrivateTables.test.ts` (favoritos/interesses protegidos: terceiro e anônimo não leem nem gravam, dono/admin ok — doc §15.1)**; `ModerateAnimalUseCase.test.ts` (não-admin rejeitado — USER/RESPONSIBLE/VISITOR/INTERESTED, ator ausente, admin passa); integração `AppContainerSupabase.test.ts` (`remoteMode` por configuração + fila CREATE processada no backend real). Fake fiel ao SQL em `test-support/SupabaseFake.ts` (RLS simulada, tabelas privadas por `user_id`). Suíte completa: **263/263 verdes, 45 suítes**.
+**Verificação (§5):** typecheck 0 erros; cobertura global **93,8% stmts / 83,6% branches** (`npm run test:coverage`); `expo-doctor` **20/20**; APK/build Expo não alterados (§0.1).
+**Pronto (evidência):** integração Supabase verde contra fake fiel ao `init.sql`; domínio/application sem import de Supabase (só ports); app sem credencial segue em modo honesto (`remoteMode: 'none'`); cobertura ≥ 80%.
+**Pendente registrado:** (1) verificação de RLS/auth num projeto Supabase real (credenciais + `supabase/init.sql`); (2) `storage/` = Passo 4; (3) tipos definitivos de ação de moderação → bloqueador §4 do Passo 5 (HIDE/UNHIDE são o mínimo provisório).
 
 ### Passo 4 — Storage: bucket, padrão S3 e armazenamento de arquivos
 
@@ -133,7 +140,7 @@
 
 ## §3 — Atividades remanescentes fora dos 5 passos
 
-- **Rotas Expo Router completas:** ✅ feitas as principais (`(tabs)`, `/animal/[id]`, `/(protected)/novo-anuncio`, `/(protected)/editar-anuncio`, `/login`, `/cadastro`, `/` → `/(tabs)`). Pendentes por desenho: `ConflictReviewScreen` (Passo 5) e tela de moderação (passo 3/5 — bloqueada pela UC20/§4). Deep links via `scheme: "enlace"` devem ser verificados quando as telas fecharem.
+- **Rotas Expo Router completas:** ✅ feitas as principais (`(tabs)`, `/animal/[id]`, `/(protected)/novo-anuncio`, `/(protected)/editar-anuncio`, `/login`, `/cadastro`, `/` → `/(tabs)`). Pendentes por desenho: `ConflictReviewScreen` (Passo 5) e tela de moderação (Passo 5 — `ModerateAnimalUseCase` já existe; UI/tipos de ação aguardam UC20/§4). Deep links via `scheme: "enlace"` devem ser verificados quando as telas fecharem.
 - **RNFs de desempenho e escalabilidade (RNF13/14/15):** valores **propostos** na doc §2.2 — abertura de cache ≤ 1 s, operações remotas sem bloquear UI, listagem paginada/limitada no Supabase. Medir em device real e registrar; se o valor "proposto" for rejeitado, volta ao §4 como bloqueador.
 - **E2E finais + apresentação:** 5/8 fluxos em mock já verdes (`SearchToDetails`, `MockFlows` itens 2/3/7/8); 8/8 fecham no Passo 5. Cobertura global ≥ 80% e `expo-doctor` integram a verificação §5.
 - **Visualização no mapa (RF05/RF25):** renderização do mapa aproximado fica atrelada à geolocalização real (Passo 2) e à decisão de raio máximo do §4.
@@ -144,12 +151,12 @@
 
 Cada item precisa de decisão explícita antes do passo indicado:
 
-- [ ] Método de autenticação Supabase (e-mail/senha, magic link, OAuth…) → antes do **Passo 3**
+- [x] Método de autenticação Supabase → **decidido: e-mail/senha** (implementado no Passo 3; magic link/OAuth também estão fora do escopo acordado)
 - [ ] Campos obrigatórios e limites de cada formulário → antes dos **Passos 3/5**
-- [ ] Regras de exclusão de anúncio já adotado → antes dos **Passos 3/5**
-- [ ] Reabertura Adotado → Disponível (permitida ou não) → antes dos **Passos 3/5** (o diagrama de estados §7.1 só prevê Disponível → Adotado)
-- [ ] Tipos de ação de moderação (ocultar, remover, suspender…) → antes do **Passo 5**
-- [ ] Visibilidade exata dos dados de contato → antes do **Passo 5**
+- [x] Regras de exclusão de anúncio já adotado → **decidido: permitir exclusão normal** (dono pode excluir anúncio em qualquer status; exclusão local + item de fila DELETE — já é o comportamento do `ProcessSyncQueueUseCase`)
+- [x] Reabertura Adotado → Disponível → **decidido: não permitir** (respeita o diagrama de estados §7.1 — Disponível → Adotado, uma via só)
+- [ ] Tipos de ação de moderação (ocultar, remover, suspender…) → antes do **Passo 5** *(HIDE/UNHIDE implementados como mínimo provisório no Passo 3, explícitos no código e aqui)*
+- [x] Visibilidade exata dos dados de contato → **decidido: e-mail + telefone públicos no anúncio** (RF06; mensagem de interesse gravada em `adoption_interests` e visível ao dono — fluxo de tela no Passo 5)
 - [ ] Política de retenção de manifestações de interesse → antes dos **Passos 3/5**
 - [ ] Limite de fotos por anúncio → antes do **Passo 2**
 - [ ] Raio máximo de pesquisa → antes do **Passo 2**
@@ -166,7 +173,7 @@ Cada item precisa de decisão explícita antes do passo indicado:
 npm install          # checkout novo: antes de tudo
 npm run typecheck    # tsc --noEmit, 0 erros
 npm test             # suíte atual + novos testes; cobertura ≥ 80% (jest.config.js:12-19)
-npx expo-doctor      # 21/21
+npx expo-doctor      # 20/20
 npx expo start       # bundle Android + manifest expo válidos
 ```
 

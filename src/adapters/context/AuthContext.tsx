@@ -6,6 +6,7 @@ import { AuthenticateUserUseCase } from '../../application/use-cases/Authenticat
 import { AcessarViaTokenUseCase } from '../../application/use-cases/AcessarViaTokenUseCase';
 import { AuthGatewayFake } from '../../application/fakes/AuthGatewayFake';
 import { SessionStorageFake } from '../../application/fakes/SessionStorageFake';
+import { useRepositories } from './RepositoriesContext';
 
 export interface AuthContextType {
   user: User | null;
@@ -107,4 +108,24 @@ export function useAuth() {
     throw new Error('useAuth deve ser utilizado dentro de um AuthProvider');
   }
   return context;
+}
+
+export interface AuthProviderBridgeProps {
+  children: React.ReactNode;
+  sessionStorage?: SessionStorage;
+}
+
+/**
+ * Ponte entre composição e autenticação (Fase 3): consome o container
+ * montado por `RepositoriesProvider` e entrega o `SupabaseAuthGateway`
+ * quando o backend está configurado — sem ele, cai no fake default
+ * (`AuthGatewayFake`), mantendo o app 100% utilizável offline.
+ */
+export function AuthProviderBridge({ children, sessionStorage }: AuthProviderBridgeProps) {
+  const container = useRepositories();
+  return (
+    <AuthProvider authGateway={container.authGateway} sessionStorage={sessionStorage}>
+      {children}
+    </AuthProvider>
+  );
 }

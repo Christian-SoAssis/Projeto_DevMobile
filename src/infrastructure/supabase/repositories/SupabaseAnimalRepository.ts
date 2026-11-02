@@ -1,0 +1,235 @@
+import {
+  AnimalRepository,
+  AnimalFilterOptions,
+} from '../../../domain/ports/AnimalRepository';
+import { Animal } from '../../../domain/entities/Animal';
+import {
+  AnimalCharacteristics,
+} from '../../../domain/value-objects/AnimalCharacteristics';
+import {
+  ApproximateLocation,
+} from '../../../domain/value-objects/ApproximateLocation';
+import { AdoptionStatus } from '../../../domain/value-objects/AdoptionStatus';
+import { SupabaseClientLike, AnimalRow } from '../types';
+
+export class StaleVersionError extends Error {
+  constructor(message = 'Atualização remota rejeitada: versão defasada, registro ausente ou bloqueada pela RLS.') {
+    super(message);
+    this.name = 'StaleVersionError';
+  }
+}
+
+export class RemoteSupabaseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RemoteSupabaseError';
+  }
+}
+
+export interface SupabaseAnimalRepositoryOptions {
+  /** Repositório local (SQLite) — todos os métodos locais delegam nele. */
+  local: AnimalRepository;
+  client: SupabaseClientLike;
+}
+
+/**
+ * Decorator `AnimalRepository` que mantém tudo local no SQLite e envia as
+ * mutações ao Supabase (doc §13/§14). Um use case continua vendo **um único
+ * port** — `ProcessSyncQueueUseCase` chama `createRemote/updateRemote/
+ * deleteRemote` e passa a falar com o backend real, sem mudanças na aplicação.
+ *
+ * Segurança em profundidade (§15.3): a validação de propriedade já passou no
+ * use case e no domínio; aqui o RLS do Postgres rejeita de novo — e o bloqueio
+ * otimista por `version` (doc §14.3) rejeita `UPDATE` feitos com versão antiga.
+ */
+export class SupabaseAnimalRepository implements AnimalRepository {
+  private local: AnimalRepository;
+  private client: SupabaseClientLike;
+
+  constructor(options: SupabaseAnimalRepositoryOptions) {
+    this.local = options.local;
+    this.client = options.client;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Métodos de verdade local → proxy para o SQLite (offline-first)
+  // ---------------------------------------------------------------------------
+  findById(id: string): Promise<Animal | null> {
+    return this.local.findById(id);
+  }
+
+  search(filters: AnimalFilterOptions): Promise<Animal[]> {
+    return this.local.search(filters);
+  }
+
+  saveLocal(animal: Animal): Promise<void> {
+    return this.local.saveLocal(animal);
+  }
+
+  deleteLocal(id: string): Promise<void> {
+    return this.local.deleteLocal(id);
+  }
+
+  listByOwner(ownerId: string): Promise<Animal[]> {
+    return this.local.listByOwner(ownerId);
+  }
+
+  upsertCache(animals: Animal[]): Promise<void> {
+    return this.local.upsertCache(animals);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Métodos remotos → Supabase
+  // ---------------------------------------------------------------------------
+  async createRemote(animal: Animal): Promise<Animal> {
+    const { data, error } = await this.client
+      .from<AnimalRow>('animals')
+      .insert(this.toInsertPayload(animal))
+      .select();
+
+    if (error) {
+      throw new RemoteSupabaseError(`Falha ao criar o anúncio remotamente: ${error.message}`);
+    }
+    const row = (data ?? [])[0];
+    if (!row) throw new RemoteSupabaseError('Criação remota não retornou o registro do anúncio.');
+    return SupabaseAnimalRepository.rowToAnimal(row);
+  }
+
+  async updateRemote(animal: Animal): Promise<Animal> {
+    const { data, error } = await this.client
+      .from<AnimalRow>('animals')
+      .update(this.toUpdatePayload(animal))
+      /**
+       * Bloqueio otimista (doc §14.3). A edição local já incrementou a
+       * `version` da entidade (`touch()`); o servidor, porém, ainda guarda a
+       * versão PRÉ-edição (`animal.version - 1`). Realizamos o `UPDATE`
+       * casando essa versão esperada — se o servidor avançou (edição remota
+       * concorrente), zero linhas batem → `StaleVersionError` e a ação da fila
+       * permanece para revisão (sem perda silenciosa, RF23). Pela RLS
+       * (§15.3), uma edição de terceiro também devolve zero linhas — o
+       * cliente não distingue as duas causas, que é a propriedade de
+       * defesa em profundidade: nenhuma informação é vazada.
+       */
+      .eq('id', animal.id)
+      .eq('version', animal.version - 1)
+      .select();
+
+    if (error) {
+      throw new RemoteSupabaseError(`Falha ao atualizar o anúncio remotamente: ${error.message}`);
+    }
+    const rows = data ?? [];
+    if (rows.length === 0) {
+      throw new StaleVersionError();
+    }
+    return SupabaseAnimalRepository.rowToAnimal(rows[0]);
+  }
+
+  async deleteRemote(id: string): Promise<void> {
+    // DELETE é idempotente: registro já ausente (ou bloqueado por RLS, teoricamente
+    // impossível — o dono é quem envia) devolve zero linhas e NÃO é erro.
+    const { error } = await this.client.from<AnimalRow>('animals').delete().eq('id', id);
+    if (error) {
+      throw new RemoteSupabaseError(`Falha ao excluir o anúncio remotamente: ${error.message}`);
+    }
+  }
+
+  /**
+   * Leitura pública de anúncios visíveis (§15.1: `READ` para anon via RLS
+   * `animals_read_public`). Usada pela reconciliação (Passo 5) e refletida
+   * aqui para teste unitário antes de credenciais reais existirem.
+   */
+  async listPublicRemote(filters: AnimalFilterOptions = {}): Promise<Animal[]> {
+    let query = this.client
+      .from<AnimalRow>('animals')
+      .select('*')
+      .eq('moderation_status', 'NONE')
+      .eq('status', filters.status && filters.status !== 'AVAILABLE' ? filters.status : 'AVAILABLE');
+
+    if (filters.species) query = query.eq('species', filters.species);
+
+    const { data, error } = await query.limit(100);
+    if (error) {
+      throw new RemoteSupabaseError(`Falha na leitura pública de anúncios: ${error.message}`);
+    }
+    return (data ?? []).map(SupabaseAnimalRepository.rowToAnimal);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mapeamento domínio ↔ linha (`animals` no Supabase, mesmo corte do SQLite)
+  // ---------------------------------------------------------------------------
+  private toInsertPayload(animal: Animal): Partial<AnimalRow> & Record<string, unknown> {
+    return {
+      // O Postgres gerar uuid; aqui mantemos o id local p/ outbox casar.
+      id: animal.id,
+      owner_id: animal.ownerId,
+      name: animal.name,
+      species: animal.characteristics.species,
+      size: animal.characteristics.size,
+      approximate_age: animal.characteristics.approximateAge,
+      sex: animal.characteristics.sex,
+      description: animal.characteristics.characteristics || null,
+      health_notes: animal.characteristics.behavior || null,
+      special_care: animal.characteristics.specialCare || null,
+      status: animal.status.value,
+      neighborhood: animal.location.neighborhood,
+      city: animal.location.city,
+      region: animal.location.region,
+      latitude: animal.location.latitude,
+      longitude: animal.location.longitude,
+      created_at: animal.createdAt,
+      updated_at: animal.updatedAt,
+      version: animal.version,
+    };
+  }
+
+  private toUpdatePayload(animal: Animal): Partial<AnimalRow> {
+    return {
+      name: animal.name,
+      species: animal.characteristics.species,
+      size: animal.characteristics.size,
+      approximate_age: animal.characteristics.approximateAge,
+      sex: animal.characteristics.sex,
+      description: animal.characteristics.characteristics || null,
+      health_notes: animal.characteristics.behavior || null,
+      special_care: animal.characteristics.specialCare || null,
+      status: animal.status.value,
+      neighborhood: animal.location.neighborhood,
+      city: animal.location.city,
+      region: animal.location.region,
+      latitude: animal.location.latitude,
+      longitude: animal.location.longitude,
+      version: animal.version,
+    };
+  }
+
+  static rowToAnimal(row: AnimalRow): Animal {
+    const characteristics = new AnimalCharacteristics({
+      species: row.species,
+      size: row.size,
+      approximateAge: row.approximate_age,
+      sex: row.sex,
+      characteristics: row.description || undefined,
+      behavior: row.health_notes || undefined,
+      specialCare: row.special_care || undefined,
+    });
+    const location = new ApproximateLocation({
+      latitude: row.latitude,
+      longitude: row.longitude,
+      neighborhood: row.neighborhood,
+      city: row.city,
+      region: row.region,
+      timestamp: row.updated_at,
+    });
+    return new Animal({
+      id: row.id,
+      ownerId: row.owner_id,
+      name: row.name,
+      characteristics,
+      status: new AdoptionStatus(row.status as 'AVAILABLE' | 'ADOPTED'),
+      location,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      version: row.version,
+    });
+  }
+}

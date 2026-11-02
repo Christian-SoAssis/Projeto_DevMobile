@@ -7,6 +7,28 @@ export interface ConflictEvaluationResult {
 }
 
 export class ConflictResolutionService {
+  /**
+   * `UPDATE` recusado por versão defasada: o servidor avançou enquanto a
+   * edição local estava pendente, então HÁ conflito mesmo que os números de
+   * versão coincidam (as duas pontas partiram da mesma base e cada uma
+   * somou 1). Regras do doc §9.4: mesma situação do animal → vence a edição
+   * mais recente; situação divergente → revisão manual (risco de perda).
+   */
+  static evaluateStaleUpdate(local: Animal, remote: Animal): ConflictEvaluationResult {
+    if (local.status.value !== remote.status.value) {
+      return {
+        needsReview: true,
+        reason: 'A situação do animal mudou nos dois lugares. Revisão manual do responsável é necessária.',
+      };
+    }
+    const localIsNewer = new Date(local.updatedAt) >= new Date(remote.updatedAt);
+    return {
+      needsReview: false,
+      chosenVersion: localIsNewer ? local : remote,
+      reason: 'Resolvido automaticamente usando a versão com data de atualização mais recente.',
+    };
+  }
+
   static evaluateAnimalConflict(local: Animal, remote: Animal): ConflictEvaluationResult {
     // If local version equals remote version, no conflict
     if (local.version === remote.version) {

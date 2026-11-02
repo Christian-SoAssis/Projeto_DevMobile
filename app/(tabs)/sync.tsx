@@ -3,11 +3,15 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SyncStatusScreen } from '../../src/adapters/screens/SyncStatusScreen';
 import { RequireAccess } from '../../src/adapters/guards/RequireAccess';
+import { useRouter } from 'expo-router';
+import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 
 export default function SyncTab() {
   // Fase 2: fila e repositório persistidos no SQLite ao sincronizar.
-  const { animalRepository, syncQueueRepository, remotePhotoStorage } = useRepositories();
+  const { animalRepository, syncQueueRepository, remotePhotoStorage, remoteMode } = useRepositories();
+  const router = useRouter();
+  const runSync = useFullSync();
 
   return (
     <RequireAccess area="SYNC">
@@ -17,6 +21,8 @@ export default function SyncTab() {
             syncQueueRepository={syncQueueRepository}
             animalRepository={animalRepository}
             remotePhotoStorage={remotePhotoStorage}
+            runSync={remoteMode === 'supabase' ? runSync : undefined}
+            onOpenConflicts={() => router.push('/(protected)/conflitos')}
           />
         </SafeAreaView>
       )}

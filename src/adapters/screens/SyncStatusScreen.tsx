@@ -4,6 +4,7 @@ import { SyncAction } from '../../domain/entities/SyncAction';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
 import { PhotoStorage } from '../../domain/ports/PhotoStorage';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
+import { FullSyncResult } from '../../application/use-cases/RunFullSyncUseCase';
 import { ProcessSyncQueueUseCase } from '../../application/use-cases/ProcessSyncQueueUseCase';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
 import { AnimalRepositoryFake } from '../../application/fakes/AnimalRepositoryFake';
@@ -18,12 +19,18 @@ export interface SyncStatusScreenProps {
   animalRepository?: AnimalRepository;
   /** Upload remoto das fotos (só com backend configurado). */
   remotePhotoStorage?: PhotoStorage;
+  /** Ciclo completo (envia a fila e atualiza pelo servidor). Padrão: só processa a fila. */
+  runSync?: () => Promise<FullSyncResult>;
+  /** Abre a revisão de conflitos (RF23). */
+  onOpenConflicts?: () => void;
 }
 
 export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
   syncQueueRepository = new SyncQueueRepositoryFake(),
   animalRepository = new AnimalRepositoryFake(),
   remotePhotoStorage,
+  runSync,
+  onOpenConflicts,
 }) => {
   const [pending, setPending] = useState<SyncAction[]>([]);
   const [syncing, setSyncing] = useState(false);
@@ -41,21 +48,31 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
   const handleSyncNow = async () => {
     setSyncing(true);
     try {
-      const useCase = new ProcessSyncQueueUseCase(
-        syncQueueRepository,
-        animalRepository,
-        undefined,
-        remotePhotoStorage
-      );
-      const res = await useCase.execute();
-      setLastResult(
-        `Processados: ${res.processedCount} | Sucesso: ${res.successCount} | Falhas: ${res.failedCount}`
-      );
+      let res: FullSyncResult;
+      if (runSync) {
+        res = await runSync();
+      } else {
+        const useCase = new ProcessSyncQueueUseCase(
+          syncQueueRepository,
+          animalRepository,
+          undefined,
+          remotePhotoStorage
+        );
+        res = { push: await useCase.execute() };
+      }
+      const { push, pull, pullError } = res;
+      let summary = `Processados: ${push.processedCount} | Sucesso: ${push.successCount} | Falhas: ${push.failedCount}`;
+      if (push.conflictCount) summary += ` | Conflitos: ${push.conflictCount}`;
+      if (pull) summary += ` | Do servidor: ${pull.added} novos, ${pull.updated} atualizados`;
+      if (pullError) summary += ` | Não foi possível ler o servidor: ${pullError}`;
+      setLastResult(summary);
       await loadPending();
     } finally {
       setSyncing(false);
     }
   };
+
+  const conflicts = pending.filter((a) => a.isConflict);
 
   return (
     <View style={styles.container} testID="sync-status-screen">
@@ -77,6 +94,14 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
           {syncing ? 'Sincronizando...' : '🔄 Sincronizar Agora'}
         </Text>
       </TouchableOpacity>
+
+      {conflicts.length > 0 && onOpenConflicts && (
+        <TouchableOpacity style={styles.conflictBtn} onPress={onOpenConflicts} testID="btn-open-conflicts">
+          <Text style={styles.conflictBtnText}>
+            ⚠️ {conflicts.length} conflito(s) precisam da sua revisão
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <Text style={styles.subtitle}>Operações Pendentes ({pending.length})</Text>
 
@@ -118,8 +143,8 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
               </View>
             ))}
             <Text style={styles.footerNote}>
-              {OFFLINE_BEHAVIOR_LABELS.OFFLINE_PARTIAL} — favoritos e interesses aguardam decisão de
-              produto sobre a entrada na fila (§4 do nextsteps).
+              Favoritos e interesses entram na fila (provisório, aguardando decisão de produto — §4 do
+              nextsteps) e sobem quando houver conexão.
             </Text>
           </View>
         }
@@ -129,6 +154,15 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  conflictBtn: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffc107',
+    borderWidth: 1,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  conflictBtnText: { color: '#856404', fontWeight: 'bold' },
   container: {
     flex: 1,
     flexDirection: 'column',

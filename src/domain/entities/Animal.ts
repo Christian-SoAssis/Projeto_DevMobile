@@ -114,6 +114,14 @@ export class Animal {
     this.touch();
   }
 
+  /**
+   * Conflito resolvido a favor da versão local: assume a versão do servidor
+   * + 1, para o `UPDATE` com bloqueio otimista (doc §14.3) casar de novo.
+   */
+  rebaseOnRemoteVersion(remoteVersion: number): void {
+    this._version = remoteVersion + 1;
+  }
+
   addPhoto(photo: AnimalPhoto): void {
     if (photo.animalId !== this.id) {
       throw new Error('Foto não pertence a este animal.');

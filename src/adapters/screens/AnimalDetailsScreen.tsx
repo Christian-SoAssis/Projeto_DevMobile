@@ -5,8 +5,9 @@ import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { FavoriteRepository } from '../../domain/ports/FavoriteRepository';
 import { AdoptionInterestRepository } from '../../domain/ports/AdoptionInterestRepository';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
+import { InterestRemoteGateway, RemoteInterest } from '../../domain/ports/InterestRemoteGateway';
 import { ToggleFavoriteUseCase } from '../../application/use-cases/ToggleFavoriteUseCase';
-import { RegisterAdoptionInterestUseCase } from '../../application/use-cases/RegisterAdoptionInterestUseCase';
+import { InterestContact, RegisterAdoptionInterestUseCase } from '../../application/use-cases/RegisterAdoptionInterestUseCase';
 import { MarkAnimalAdoptedUseCase } from '../../application/use-cases/MarkAnimalAdoptedUseCase';
 import { GerarPdfUseCase } from '../../application/use-cases/GerarPdfUseCase';
 import { FavoriteRepositoryFake } from '../../application/fakes/FavoriteRepositoryFake';
@@ -21,6 +22,10 @@ export interface AnimalDetailsScreenProps {
   currentUserId?: string | null;
   /** Chamado quando um visitante tenta uma ação que exige login. */
   onRequireLogin?: () => void;
+  /** Contato do usuário logado, enviado ao responsável junto do interesse. */
+  interestContact?: InterestContact;
+  /** Leitura dos interesses recebidos (só o responsável enxerga; exige backend). */
+  remoteInterests?: InterestRemoteGateway;
   animalRepository: AnimalRepository;
   favoriteRepository?: FavoriteRepository;
   interestRepository?: AdoptionInterestRepository;
@@ -33,6 +38,8 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   animal: initialAnimal,
   currentUserId = 'usr_2',
   onRequireLogin,
+  interestContact,
+  remoteInterests,
   animalRepository,
   favoriteRepository = new FavoriteRepositoryFake(),
   interestRepository = new AdoptionInterestRepositoryFake(),
@@ -44,6 +51,8 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   const [isFav, setIsFav] = useState(false);
   const [hasInterest, setHasInterest] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [received, setReceived] = useState<RemoteInterest[] | null>(null);
+  const [receivedError, setReceivedError] = useState<string | null>(null);
 
   const isOwner = currentUserId ? animal.isOwner(currentUserId) : false;
 
@@ -66,6 +75,26 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
     checkState();
   }, [animal.id, currentUserId]);
 
+  // Interesses recebidos: só o responsável lê (RLS `interests_animal_owner_read`).
+  useEffect(() => {
+    if (!isOwner || !remoteInterests) return;
+    let active = true;
+    remoteInterests
+      .listForAnimal(animal.id)
+      .then((list) => {
+        if (active) {
+          setReceived(list);
+          setReceivedError(null);
+        }
+      })
+      .catch(() => {
+        if (active) setReceivedError('Não foi possível carregar os interessados agora (sem conexão?).');
+      });
+    return () => {
+      active = false;
+    };
+  }, [animal.id, isOwner, remoteInterests]);
+
   const handleToggleFavorite = async () => {
     if (!currentUserId) {
       setFeedback('Faça login para favoritar.');
@@ -77,7 +106,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       return;
     }
     try {
-      const useCase = new ToggleFavoriteUseCase(favoriteRepository);
+      const useCase = new ToggleFavoriteUseCase(favoriteRepository, syncQueueRepository, unitOfWork);
       const newState = await useCase.execute(currentUserId, animal.id);
       setIsFav(newState);
       setFeedback(newState ? 'Adicionado aos favoritos!' : 'Removido dos favoritos.');
@@ -92,8 +121,8 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       onRequireLogin?.();
       return;
     }
-    const useCase = new RegisterAdoptionInterestUseCase(interestRepository);
-    await useCase.execute(currentUserId, animal.id);
+    const useCase = new RegisterAdoptionInterestUseCase(interestRepository, syncQueueRepository, unitOfWork);
+    await useCase.execute(currentUserId, animal.id, interestContact);
     setHasInterest(true);
     setFeedback('Manifestação de interesse enviada ao responsável!');
   };
@@ -203,6 +232,28 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
           </TouchableOpacity>
         )}
 
+        {isOwner && remoteInterests && (
+          <View style={styles.interestsBox} testID="received-interests">
+            <Text style={styles.interestsTitle}>
+              Interessados{received ? ` (${received.length})` : ''}
+            </Text>
+            {receivedError && <Text style={styles.interestsEmpty} testID="received-interests-error">{receivedError}</Text>}
+            {received && received.length === 0 && (
+              <Text style={styles.interestsEmpty} testID="received-interests-empty">
+                Ninguém demonstrou interesse ainda.
+              </Text>
+            )}
+            {(received ?? []).map((item) => (
+              <View key={item.id} style={styles.interestCard} testID={`received-interest-${item.id}`}>
+                <Text style={styles.interestName}>{item.contactName || 'Interessado'}</Text>
+                {item.contactPhone ? <Text style={styles.interestLine}>Telefone: {item.contactPhone}</Text> : null}
+                {item.contactEmail ? <Text style={styles.interestLine}>E-mail: {item.contactEmail}</Text> : null}
+                {item.message ? <Text style={styles.interestLine}>{item.message}</Text> : null}
+              </View>
+            ))}
+          </View>
+        )}
+
         <TouchableOpacity style={[styles.btn, styles.btnSecondary]} onPress={handleExportPdf} testID="export-pdf-button">
           <Text style={styles.btnText}>📄 Gerar PDF do Anúncio</Text>
         </TouchableOpacity>
@@ -212,6 +263,12 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  interestsBox: { marginTop: 8, marginBottom: 8 },
+  interestsTitle: { fontSize: 16, fontWeight: 'bold', color: '#1c1c1e', marginBottom: 8 },
+  interestsEmpty: { color: '#8e8e93', marginBottom: 8 },
+  interestCard: { backgroundColor: '#fff', borderRadius: 8, padding: 12, marginBottom: 8 },
+  interestName: { fontWeight: 'bold', color: '#1c1c1e', marginBottom: 2 },
+  interestLine: { color: '#48484a', fontSize: 14 },
   container: {
     flex: 1,
     flexDirection: 'column',

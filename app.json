@@ -7,7 +7,15 @@
     "scheme": "enlace",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "br.com.enlace.app"
+    },
+    "android": {
+      "package": "br.com.enlace.app",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -24,7 +32,20 @@
         }
       ],
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O Enlace usa sua localização apenas quando você pede, para preencher o bairro e a cidade do anúncio. Só a localização aproximada é salva."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "O Enlace usa a câmera para fotografar o animal do anúncio ou a sua foto de perfil.",
+          "photosPermission": "O Enlace acessa suas fotos para escolher a imagem do animal ou a sua foto de perfil."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -18,6 +18,7 @@ export default function AnimalDetailsRoute() {
     interestRepository,
     syncQueueRepository,
     unitOfWork,
+    remoteInterests,
   } = useRepositories();
   const [animal, setAnimal] = React.useState<Awaited<
     ReturnType<typeof animalRepository.findById>
@@ -61,6 +62,12 @@ export default function AnimalDetailsRoute() {
         animal={animal}
         currentUserId={user?.id ?? null}
         onRequireLogin={() => router.push('/login')}
+        interestContact={
+          user
+            ? { name: user.name, email: user.contactInfo.email, phone: user.contactInfo.phone }
+            : undefined
+        }
+        remoteInterests={remoteInterests}
         animalRepository={animalRepository}
         favoriteRepository={favoriteRepository}
         interestRepository={interestRepository}

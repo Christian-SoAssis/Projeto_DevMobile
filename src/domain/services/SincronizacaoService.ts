@@ -2,7 +2,7 @@ import { SyncAction } from '../entities/SyncAction';
 
 export class SincronizacaoService {
   static shouldRetry(action: SyncAction, maxAttempts: number = 5): boolean {
-    return action.status.isFailed() && action.canRetry(maxAttempts);
+    return action.status.isFailed() && !action.isConflict && action.canRetry(maxAttempts);
   }
 
   static calculateBackoffDelayMs(attempts: number): number {

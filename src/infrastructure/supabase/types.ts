@@ -53,6 +53,24 @@ export interface AnimalPhotoRow {
   created_at: string;
 }
 
+export interface FavoriteRow {
+  user_id: string;
+  animal_id: string;
+  created_at?: string;
+}
+
+export interface AdoptionInterestRow {
+  id: string;
+  user_id: string;
+  animal_id: string;
+  message: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  status: string;
+  created_at: string;
+}
+
 export interface UserRow {
   id: string;
   name?: string | null;

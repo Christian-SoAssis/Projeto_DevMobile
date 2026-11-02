@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { RepositoriesProvider } from '../src/adapters/context/RepositoriesContext';
 import { AuthProviderBridge } from '../src/adapters/context/AuthContext';
+import { AutoSync } from '../src/adapters/sync/AutoSync';
 import { SessionStorageSecureStore } from '../src/adapters/auth/SessionStorageSecureStore';
 
 /**
@@ -23,6 +24,7 @@ export default function RootLayout() {
       <RepositoriesProvider>
         <AuthProviderBridge sessionStorage={AppSessionStorage}>
           <StatusBar style="dark" />
+          <AutoSync />
           <Slot />
         </AuthProviderBridge>
       </RepositoriesProvider>

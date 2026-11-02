@@ -19,6 +19,10 @@ import { SqliteSyncQueueRepository } from '../database/sqlite/repositories/Sqlit
 import { ImageProcessor } from '../../domain/ports/ImageProcessor';
 import { WebpPhotoStorage } from '../../application/photos/WebpPhotoStorage';
 import { ExpoImageManipulatorAdapter } from '../device/image/ExpoImageManipulatorAdapter';
+import { RemoteAnimalSource } from '../../domain/ports/RemoteAnimalSource';
+import { FavoriteRemoteGateway } from '../../domain/ports/FavoriteRemoteGateway';
+import { InterestRemoteGateway } from '../../domain/ports/InterestRemoteGateway';
+import { SupabaseFavoriteGateway, SupabaseInterestGateway } from '../supabase/repositories/SupabaseUserDataGateways';
 import { SupabasePhotoStorage, FileReader } from '../supabase/storage/SupabasePhotoStorage';
 import { SqlitePhotoStorage } from '../database/sqlite/repositories/SqlitePhotoStorage';
 import { SqliteUserRepository } from '../database/sqlite/repositories/SqliteUserRepository';
@@ -49,6 +53,10 @@ export interface AppContainer {
   photoStorage: PhotoStorage;
   /** Upload ao Supabase Storage; só existe com backend configurado (Passo 4). */
   remotePhotoStorage?: PhotoStorage;
+  /** Pernas remotas da sincronização — só existem com backend configurado. */
+  remoteAnimalSource?: RemoteAnimalSource;
+  remoteFavorites?: FavoriteRemoteGateway;
+  remoteInterests?: InterestRemoteGateway;
   userRepository: UserRepository;
   searchPreferencesRepository: SearchPreferencesRepository;
   syncMetadataRepository: SyncMetadataRepository;
@@ -117,6 +125,9 @@ export async function loadAppContainer(
     options.imageProcessor ?? new ExpoImageManipulatorAdapter()
   );
   let remotePhotoStorage: PhotoStorage | undefined;
+  let remoteAnimalSource: RemoteAnimalSource | undefined;
+  let remoteFavorites: FavoriteRemoteGateway | undefined;
+  let remoteInterests: InterestRemoteGateway | undefined;
   const userRepository = new SqliteUserRepository(db);
   const searchPreferencesRepository = new SqliteSearchPreferencesRepository(db);
   const syncMetadataRepository = new SqliteSyncMetadataRepository(db);
@@ -125,7 +136,11 @@ export async function loadAppContainer(
   let authGateway: AuthGateway | undefined;
   let moderationGateway: ModerationGateway | undefined;
   if (supabaseClient) {
-    animalRepository = new SupabaseAnimalRepository({ local: animalRepository, client: supabaseClient });
+    const supabaseAnimals = new SupabaseAnimalRepository({ local: animalRepository, client: supabaseClient });
+    animalRepository = supabaseAnimals;
+    remoteAnimalSource = supabaseAnimals;
+    remoteFavorites = new SupabaseFavoriteGateway(supabaseClient);
+    remoteInterests = new SupabaseInterestGateway(supabaseClient);
     photoStorage = new SupabasePhotoStorage({
       local: photoStorage,
       client: supabaseClient,
@@ -154,6 +169,9 @@ export async function loadAppContainer(
     syncQueueRepository,
     photoStorage,
     remotePhotoStorage,
+    remoteAnimalSource,
+    remoteFavorites,
+    remoteInterests,
     userRepository,
     searchPreferencesRepository,
     syncMetadataRepository,

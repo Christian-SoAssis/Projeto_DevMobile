@@ -3,6 +3,8 @@ import {
   AnimalFilterOptions,
 } from '../../../domain/ports/AnimalRepository';
 import { Animal } from '../../../domain/entities/Animal';
+import { AnimalPhoto } from '../../../domain/entities/AnimalPhoto';
+import { RemoteAnimalSource } from '../../../domain/ports/RemoteAnimalSource';
 import {
   AnimalCharacteristics,
 } from '../../../domain/value-objects/AnimalCharacteristics';
@@ -42,7 +44,7 @@ export interface SupabaseAnimalRepositoryOptions {
  * use case e no domínio; aqui o RLS do Postgres rejeita de novo — e o bloqueio
  * otimista por `version` (doc §14.3) rejeita `UPDATE` feitos com versão antiga.
  */
-export class SupabaseAnimalRepository implements AnimalRepository {
+export class SupabaseAnimalRepository implements AnimalRepository, RemoteAnimalSource {
   private local: AnimalRepository;
   private client: SupabaseClientLike;
 
@@ -180,7 +182,65 @@ export class SupabaseAnimalRepository implements AnimalRepository {
     if (error) {
       throw new RemoteSupabaseError(`Falha na leitura pública de anúncios: ${error.message}`);
     }
-    return (data ?? []).map(SupabaseAnimalRepository.rowToAnimal);
+    return (data ?? []).map((row) => SupabaseAnimalRepository.rowToAnimal(row));
+  }
+
+  /**
+   * Anúncios visíveis (não ocultados pela moderação) em qualquer situação,
+   * com as fotos já enviadas — insumo da reconciliação local (doc §14.1).
+   * A RLS `animals_read_public` já esconde os ocultados de quem não é dono.
+   */
+  async listVisibleRemote(): Promise<Animal[]> {
+    const { data, error } = await this.client
+      .from<AnimalRow>('animals')
+      .select('*')
+      .eq('moderation_status', 'NONE')
+      .order('updated_at', { ascending: false })
+      .limit(200);
+    if (error) {
+      throw new RemoteSupabaseError(`Falha ao ler anúncios do servidor: ${error.message}`);
+    }
+    const rows = data ?? [];
+    const photos = await this.loadRemotePhotos(rows.map((r) => r.id));
+    return rows.map((row) => SupabaseAnimalRepository.rowToAnimal(row, photos.get(row.id) ?? []));
+  }
+
+  async findRemoteById(id: string): Promise<Animal | null> {
+    const { data, error } = await this.client.from<AnimalRow>('animals').select('*').eq('id', id);
+    if (error) {
+      throw new RemoteSupabaseError(`Falha ao ler o anúncio no servidor: ${error.message}`);
+    }
+    const row = (data ?? [])[0];
+    if (!row) return null;
+    const photos = await this.loadRemotePhotos([row.id]);
+    return SupabaseAnimalRepository.rowToAnimal(row, photos.get(row.id) ?? []);
+  }
+
+  private async loadRemotePhotos(animalIds: string[]): Promise<Map<string, AnimalPhoto[]>> {
+    const byAnimal = new Map<string, AnimalPhoto[]>();
+    if (animalIds.length === 0) return byAnimal;
+    const { data, error } = await this.client
+      .from<AnimalPhotoRow>('animal_photos')
+      .select('*')
+      .in('animal_id', animalIds);
+    if (error) {
+      throw new RemoteSupabaseError(`Falha ao ler as fotos dos anúncios: ${error.message}`);
+    }
+    const rows = [...(data ?? [])].sort((a, b) => Number(b.is_main) - Number(a.is_main));
+    for (const row of rows) {
+      if (!row.remote_url) continue;
+      const list = byAnimal.get(row.animal_id) ?? [];
+      list.push(
+        new AnimalPhoto({
+          id: row.id,
+          animalId: row.animal_id,
+          remoteUrl: row.remote_url,
+          createdAt: row.created_at,
+        })
+      );
+      byAnimal.set(row.animal_id, list);
+    }
+    return byAnimal;
   }
 
   // ---------------------------------------------------------------------------
@@ -231,7 +291,7 @@ export class SupabaseAnimalRepository implements AnimalRepository {
     };
   }
 
-  static rowToAnimal(row: AnimalRow): Animal {
+  static rowToAnimal(row: AnimalRow, photos: AnimalPhoto[] = []): Animal {
     const characteristics = new AnimalCharacteristics({
       species: row.species,
       size: row.size,
@@ -259,6 +319,7 @@ export class SupabaseAnimalRepository implements AnimalRepository {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       version: row.version,
+      photos,
     });
   }
 }

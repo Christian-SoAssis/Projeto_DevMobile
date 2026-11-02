@@ -15,6 +15,9 @@ export interface SyncActionProps {
   lastError?: string;
 }
 
+/** Prefixo gravado em `lastError` quando a ação exige revisão manual do responsável (RF23). */
+export const SYNC_CONFLICT_MARKER = '[CONFLITO]';
+
 export class SyncAction {
   readonly id: string;
   readonly operation: SyncOperation;
@@ -68,6 +71,22 @@ export class SyncAction {
     this._attempts += 1;
     this._lastError = error;
     this._status = SyncState.failed();
+  }
+
+  /** Conflito com risco de perda: nunca é reenviado sozinho, só após revisão (doc §9.4). */
+  get isConflict(): boolean {
+    return this._status.isFailed() && (this._lastError ?? '').startsWith(SYNC_CONFLICT_MARKER);
+  }
+
+  markConflict(reason: string): void {
+    this.markFailed(`${SYNC_CONFLICT_MARKER} ${reason}`);
+  }
+
+  /** Revisão concluída: a ação volta à fila como nova. */
+  clearConflict(): void {
+    this._attempts = 0;
+    this._lastError = undefined;
+    this._status = SyncState.pending();
   }
 
   canRetry(maxAttempts: number = 5): boolean {

@@ -126,6 +126,6 @@ describe('Outbox local sobre SQLite real', () => {
     expect(result.failedCount).toBe(1);
     const action = await queue.findById('sync_photo');
     expect(action!.status.isFailed()).toBe(true);
-    expect(action!.lastError).toContain('não está disponível na Fase 2');
+    expect(action!.lastError).toContain('ainda não está disponível');
   });
 });

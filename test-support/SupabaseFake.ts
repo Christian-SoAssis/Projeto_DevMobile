@@ -131,6 +131,8 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
       (ctx.db.animals ?? []).some((a: FakeRow) => a.id === animalId && a.owner_id === ctx.currentUserId);
     const canSeeRow = (row: FakeRow): boolean => {
       if (isPhotoRow) return true;
+      // adoption_interests: o dono do anúncio também lê os interesses recebidos.
+      if (table === 'adoption_interests' && ownsAnimal(row.animal_id)) return true;
       if (isUserRow) return ctx.currentUserId !== null && row.id === ctx.currentUserId;
       if (ctx.isAdmin) return true;
       if (isPrivateRow(row)) {
@@ -157,6 +159,18 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
         ? this.args.payload
         : [this.args.payload as Partial<FakeRow>];
       const toInsert = payloadList.map((p) => ({ ...(p as FakeRow) }));
+      // unique (user_id, animal_id) de favorites/adoption_interests.
+      if (table === 'favorites' || table === 'adoption_interests') {
+        for (const row of toInsert) {
+          const dup = rows.some((r: FakeRow) => r.user_id === row.user_id && r.animal_id === row.animal_id);
+          if (dup && canWriteRow(row)) {
+            return {
+              data: null,
+              error: { code: '23505', message: 'duplicate key value violates unique constraint' },
+            };
+          }
+        }
+      }
       for (const row of toInsert) {
         if (!canWriteRow(row)) {
           // RLS: qualquer tabela exige usuário autenticado e linha própria

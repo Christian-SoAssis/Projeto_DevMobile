@@ -209,6 +209,14 @@ drop policy if exists photos_delete_owner on public.animal_photos;
 create policy photos_delete_owner on public.animal_photos
   for delete using (public.is_animal_owner(animal_id));
 
+-- adoption_interests: contato do interessado, visível ao responsável pelo anúncio.
+alter table public.adoption_interests add column if not exists contact_name text;
+alter table public.adoption_interests add column if not exists contact_email text;
+
+drop policy if exists interests_animal_owner_read on public.adoption_interests;
+create policy interests_animal_owner_read on public.adoption_interests
+  for select using (public.is_animal_owner(animal_id));
+
 -- favorites: 100% privados (§15.1 — "favoritos e interesses protegidos")
 drop policy if exists favorites_owner_all on public.favorites;
 create policy favorites_owner_all on public.favorites

@@ -80,7 +80,7 @@ describe('ImagePickerCameraAdapter — câmera/galeria com expo-image-picker (RF
     expect(photo!.uri).toBe('file://picked.jpg');
   });
 
-  it('galeria cancelada/quebrada devolve null — fluxo segue sem foto (狼="#"><', async () => {
+  it('galeria cancelada/quebrada devolve null — fluxo segue sem foto (doc §16.3)', async () => {
     const cancelada = new ImagePickerCameraAdapter({
       imagePickerModule: buildFakeImagePicker({
         pickResult: () => ({ canceled: true }),

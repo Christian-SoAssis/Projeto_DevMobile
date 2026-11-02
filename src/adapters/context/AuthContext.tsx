@@ -38,6 +38,8 @@ export interface AuthProviderProps {
   /** Perfil local (SQLite): descrição, interesses e foto editados neste aparelho. */
   userRepository?: UserRepository;
   photoStorage?: PhotoStorage;
+  /** Upload da foto de perfil ao Storage (só com backend configurado). */
+  remotePhotoStorage?: PhotoStorage;
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({
@@ -46,6 +48,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   sessionStorage = new SessionStorageFake(),
   userRepository,
   photoStorage,
+  remotePhotoStorage,
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -123,7 +126,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     const useCase = new UpdateProfileUseCase(
       authGateway,
       userRepository ?? new UserRepositoryFake(),
-      photoStorage
+      photoStorage,
+      remotePhotoStorage
     );
     const result = await useCase.execute(user, patch);
     setUser(result.user);
@@ -196,6 +200,7 @@ export function AuthProviderBridge({ children, sessionStorage }: AuthProviderBri
       sessionStorage={sessionStorage}
       userRepository={container.userRepository}
       photoStorage={container.photoStorage}
+      remotePhotoStorage={container.remotePhotoStorage}
     >
       {children}
     </AuthProvider>

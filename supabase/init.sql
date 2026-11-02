@@ -31,6 +31,7 @@ create table if not exists public.users (
 alter table public.users add column if not exists bio text
   check (bio is null or char_length(bio) <= 300);
 alter table public.users add column if not exists interests text[] not null default '{}';
+alter table public.users add column if not exists avatar_url text;
 
 -- ----------------------------------------------------------------------------
 -- animals — anúncio (coordenadas APENAS aproximadas — RNF05/RNF06)

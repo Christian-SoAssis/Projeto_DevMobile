@@ -1,4 +1,5 @@
 import { Animal } from '../../domain/entities/Animal';
+import { AnimalPhoto } from '../../domain/entities/AnimalPhoto';
 import { SyncAction } from '../../domain/entities/SyncAction';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
@@ -21,6 +22,8 @@ export class UpdateAnimalUseCase {
       name?: string;
       characteristics?: AnimalCharacteristics;
       location?: ApproximateLocation;
+      /** Foto nova (já persistida localmente): substitui a atual. */
+      photo?: AnimalPhoto;
     },
     isOnline: boolean
   ): Promise<Animal> {
@@ -29,6 +32,10 @@ export class UpdateAnimalUseCase {
       throw new Error('Anúncio de animal não encontrado.');
     }
 
+    // Uma edição = um bump de versão: a troca de foto não conta à parte.
+    if (updates.photo) {
+      animal.replacePhotos(requestorId, updates.photo, false);
+    }
     animal.updateData(requestorId, updates);
     const action = this.buildUpdateAction(animal);
 

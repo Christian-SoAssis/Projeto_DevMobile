@@ -10,6 +10,8 @@ export interface UserProps {
   role?: UserRole;
   bio?: string;
   avatarUri?: string;
+  /** Foto de perfil no Storage (visível em qualquer aparelho); `avatarUri` é a cópia local. */
+  avatarUrl?: string;
   interests?: readonly string[];
 }
 
@@ -20,6 +22,7 @@ export class User {
   readonly role: UserRole;
   readonly bio: string;
   readonly avatarUri?: string;
+  readonly avatarUrl?: string;
   readonly interests: string[];
 
   constructor(props: UserProps) {
@@ -38,6 +41,7 @@ export class User {
     this.role = props.role || 'USER';
     this.bio = bio;
     this.avatarUri = props.avatarUri || undefined;
+    this.avatarUrl = props.avatarUrl || undefined;
     this.interests = normalizeInterests(props.interests);
   }
 
@@ -58,6 +62,7 @@ export class User {
       role: this.role,
       bio: patch.bio === undefined ? this.bio : patch.bio,
       avatarUri: patch.avatarUri === undefined ? this.avatarUri : patch.avatarUri || undefined,
+      avatarUrl: patch.avatarUrl === undefined ? this.avatarUrl : patch.avatarUrl || undefined,
       interests: patch.interests === undefined ? this.interests : patch.interests,
     });
   }

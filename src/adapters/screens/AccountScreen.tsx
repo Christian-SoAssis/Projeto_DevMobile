@@ -51,7 +51,7 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
   const [phone, setPhone] = useState(user?.contactInfo.phone ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
   const [interests, setInterests] = useState<string[]>(user?.interests ?? []);
-  const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatarUri ?? null);
+  const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatarUri ?? user?.avatarUrl ?? null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -61,7 +61,7 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
     setPhone(user?.contactInfo.phone ?? '');
     setBio(user?.bio ?? '');
     setInterests(user?.interests ?? []);
-    setAvatarUri(user?.avatarUri ?? null);
+    setAvatarUri(user?.avatarUri ?? user?.avatarUrl ?? null);
     setFeedback(null);
   }, [user?.id]);
 
@@ -138,7 +138,7 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
   return (
     <ScrollView style={styles.container} testID="account-user">
       <View style={styles.header}>
-        <Avatar user={user} uri={user.avatarUri} />
+        <Avatar user={user} uri={user.avatarUri ?? user.avatarUrl} />
         <View style={styles.headerText}>
           <Text style={styles.title} testID="account-name">{user.name}</Text>
           <Text style={styles.text} testID="account-email">{user.contactInfo.email}</Text>

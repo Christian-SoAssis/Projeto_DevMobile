@@ -35,4 +35,6 @@ export interface ProfilePatch {
   interests?: readonly string[];
   /** `null` remove a foto; `undefined` mantém. */
   avatarUri?: string | null;
+  /** URL pública da foto no Storage (`null` remove; `undefined` mantém). */
+  avatarUrl?: string | null;
 }

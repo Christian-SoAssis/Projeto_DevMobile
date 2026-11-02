@@ -11,6 +11,7 @@ function makeGateway(): ModerationGateway & { calls: Array<{ animalId: string; a
   const calls: Array<{ animalId: string; action: ModerationAction }> = [];
   return {
     calls,
+    listForModeration: async () => [],
     moderateAnimal: async (animalId: string, action: ModerationAction) => {
       calls.push({ animalId, action });
     },

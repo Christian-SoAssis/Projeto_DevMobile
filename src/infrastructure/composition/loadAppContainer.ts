@@ -136,17 +136,23 @@ export async function loadAppContainer(
   let authGateway: AuthGateway | undefined;
   let moderationGateway: ModerationGateway | undefined;
   if (supabaseClient) {
-    const supabaseAnimals = new SupabaseAnimalRepository({ local: animalRepository, client: supabaseClient });
-    animalRepository = supabaseAnimals;
-    remoteAnimalSource = supabaseAnimals;
-    remoteFavorites = new SupabaseFavoriteGateway(supabaseClient);
-    remoteInterests = new SupabaseInterestGateway(supabaseClient);
+    // Fotos primeiro: o repositório remoto precisa do upload para subir as imagens
+    // antes de gravar o anúncio, também no caminho online (doc §14.1).
     photoStorage = new SupabasePhotoStorage({
       local: photoStorage,
       client: supabaseClient,
       readFile: options.readFile,
     });
     remotePhotoStorage = photoStorage;
+    const supabaseAnimals = new SupabaseAnimalRepository({
+      local: animalRepository,
+      client: supabaseClient,
+      photoUploader: photoStorage,
+    });
+    animalRepository = supabaseAnimals;
+    remoteAnimalSource = supabaseAnimals;
+    remoteFavorites = new SupabaseFavoriteGateway(supabaseClient);
+    remoteInterests = new SupabaseInterestGateway(supabaseClient);
     authGateway = new SupabaseAuthGateway({ client: supabaseClient });
     moderationGateway = new SupabaseModerationRepository({ client: supabaseClient });
   }

@@ -7,6 +7,7 @@ import { PhotoStorageFake } from '../../src/application/fakes/PhotoStorageFake';
 import { CameraGateway, CameraPhotoResult } from '../../src/domain/ports/CameraGateway';
 import { PhotoStorage } from '../../src/domain/ports/PhotoStorage';
 import { AnimalPhoto } from '../../src/domain/entities/AnimalPhoto';
+import { makeAnimal, makePhoto } from '../../test-support/fixtures';
 
 /**
  * Fluxo de salvamento da foto do anúncio (doc §5.1/§14.1):
@@ -115,5 +116,56 @@ describe('AnimalFormScreen — foto capturada pode ser salva no banco local de f
     expect(storage.photos.size).toBe(0);
     const saved = Array.from(repo.items.values())[0];
     expect(saved.photos).toHaveLength(0);
+  });
+
+  it('edição: foto nova é persistida (WebP) antes de substituir a atual do anúncio', async () => {
+    const existing = makeAnimal({ photos: [makePhoto({ id: 'old' })] });
+    const repo = new AnimalRepositoryFake([existing]);
+    const storage = new PersistingStorageSpy();
+
+    const { getByTestId } = await render(
+      <AnimalFormScreen
+        initialAnimal={existing}
+        ownerId="user_1"
+        animalRepository={repo}
+        syncQueueRepository={new SyncQueueRepositoryFake()}
+        cameraGateway={cameraWith(CAPTURED_URI)}
+        photoStorage={storage}
+      />
+    );
+    await fireEvent.press(getByTestId('btn-capture-photo'));
+    await waitFor(() => expect(getByTestId('photo-status')).toBeTruthy());
+    await fireEvent.press(getByTestId('btn-submit-animal'));
+
+    await waitFor(async () => {
+      const saved = await repo.findById('animal_1');
+      expect(saved?.photos).toHaveLength(1);
+      expect(saved?.photos[0].id).not.toBe('old');
+      expect(saved?.photos[0].localPath).toContain(PERSISTED_PREFIX);
+    });
+    expect(storage.calls).toHaveLength(1);
+    expect(storage.calls[0].animalId).toBe('animal_1');
+  });
+
+  it('edição sem foto nova mantém a foto atual e não chama o armazenamento', async () => {
+    const existing = makeAnimal({ photos: [makePhoto({ id: 'old' })] });
+    const repo = new AnimalRepositoryFake([existing]);
+    const storage = new PersistingStorageSpy();
+    const { getByTestId } = await render(
+      <AnimalFormScreen
+        initialAnimal={existing}
+        ownerId="user_1"
+        animalRepository={repo}
+        syncQueueRepository={new SyncQueueRepositoryFake()}
+        cameraGateway={cameraWith(null)}
+        photoStorage={storage}
+      />
+    );
+    await fireEvent.press(getByTestId('btn-submit-animal'));
+    await waitFor(async () => {
+      expect((await repo.findById('animal_1'))?.version).toBe(2);
+    });
+    expect((await repo.findById('animal_1'))?.photos[0].id).toBe('old');
+    expect(storage.calls).toHaveLength(0);
   });
 });

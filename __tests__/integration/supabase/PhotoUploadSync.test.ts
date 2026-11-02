@@ -1,5 +1,6 @@
 import { loadAppContainer } from '../../../src/infrastructure/composition/loadAppContainer';
 import { InMemorySqliteDriver } from '../../../src/infrastructure/database/sqlite/DatabaseDriver';
+import { CreateAnimalUseCase } from '../../../src/application/use-cases/CreateAnimalUseCase';
 import { ProcessSyncQueueUseCase } from '../../../src/application/use-cases/ProcessSyncQueueUseCase';
 import { ImageProcessorFake } from '../../../src/application/fakes/ImageProcessorFake';
 import { SyncAction } from '../../../src/domain/entities/SyncAction';
@@ -141,5 +142,33 @@ describe('Passo 4 — foto vai ao Supabase Storage antes do anúncio (doc §14.1
       imageProcessor: new ImageProcessorFake(),
     });
     expect(container.remotePhotoStorage).toBeUndefined();
+  });
+
+  it('criação ONLINE também sobe a foto antes do anúncio (sem passar pela fila)', async () => {
+    const { db, client, container } = await setup();
+    const animalId = newUuid();
+    const animal = new Animal({
+      id: animalId,
+      ownerId: UID,
+      name: 'Online',
+      characteristics: new AnimalCharacteristics({ species: 'Cão', size: 'Médio', approximateAge: '2 anos', sex: 'Macho' }),
+      location: new ApproximateLocation({ latitude: -21.5, longitude: -45.4, neighborhood: 'Centro', city: 'Varginha', region: 'MG' }),
+    });
+    const photo = await container.photoStorage.persistLocal(
+      new AnimalPhoto({ id: newUuid(), animalId, localPath: 'file:///cache/c.jpg' })
+    );
+    animal.addPhoto(photo);
+
+    const result = await new CreateAnimalUseCase(
+      container.animalRepository,
+      container.syncQueueRepository,
+      container.unitOfWork
+    ).execute(animal, true);
+
+    expect(result.synced).toBe(true);
+    expect(client.storageObjects.has(`${UID}/${animalId}/${photo.id}.webp`)).toBe(true);
+    expect(db['animal_photos']).toHaveLength(1);
+    const local = await container.animalRepository.findById(animalId);
+    expect(local?.photos[0].remoteUrl).toContain('/animal-photos/');
   });
 });

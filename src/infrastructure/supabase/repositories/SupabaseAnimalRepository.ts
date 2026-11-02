@@ -4,6 +4,7 @@ import {
 } from '../../../domain/ports/AnimalRepository';
 import { Animal } from '../../../domain/entities/Animal';
 import { AnimalPhoto } from '../../../domain/entities/AnimalPhoto';
+import { PhotoStorage } from '../../../domain/ports/PhotoStorage';
 import { RemoteAnimalSource } from '../../../domain/ports/RemoteAnimalSource';
 import {
   AnimalCharacteristics,
@@ -32,6 +33,11 @@ export interface SupabaseAnimalRepositoryOptions {
   /** Repositório local (SQLite) — todos os métodos locais delegam nele. */
   local: AnimalRepository;
   client: SupabaseClientLike;
+  /**
+   * Upload das fotos ainda só locais. Com ele, a criação/edição ONLINE também
+   * sobe as imagens antes de gravar o anúncio (sem ele só a fila sobe).
+   */
+  photoUploader?: PhotoStorage;
 }
 
 /**
@@ -47,10 +53,12 @@ export interface SupabaseAnimalRepositoryOptions {
 export class SupabaseAnimalRepository implements AnimalRepository, RemoteAnimalSource {
   private local: AnimalRepository;
   private client: SupabaseClientLike;
+  private photoUploader?: PhotoStorage;
 
   constructor(options: SupabaseAnimalRepositoryOptions) {
     this.local = options.local;
     this.client = options.client;
+    this.photoUploader = options.photoUploader;
   }
 
   // ---------------------------------------------------------------------------
@@ -84,6 +92,7 @@ export class SupabaseAnimalRepository implements AnimalRepository, RemoteAnimalS
   // Métodos remotos → Supabase
   // ---------------------------------------------------------------------------
   async createRemote(animal: Animal): Promise<Animal> {
+    await this.uploadPendingPhotos(animal);
     const { data, error } = await this.client
       .from<AnimalRow>('animals')
       .insert(this.toInsertPayload(animal))
@@ -99,6 +108,7 @@ export class SupabaseAnimalRepository implements AnimalRepository, RemoteAnimalS
   }
 
   async updateRemote(animal: Animal): Promise<Animal> {
+    await this.uploadPendingPhotos(animal);
     const { data, error } = await this.client
       .from<AnimalRow>('animals')
       .update(this.toUpdatePayload(animal))
@@ -126,6 +136,18 @@ export class SupabaseAnimalRepository implements AnimalRepository, RemoteAnimalS
     }
     await this.syncPhotos(animal);
     return SupabaseAnimalRepository.rowToAnimal(rows[0]);
+  }
+
+  /** Sobe as fotos locais sem URL remota (antes do anúncio, doc §14.1) e guarda a URL no cache. */
+  private async uploadPendingPhotos(animal: Animal): Promise<void> {
+    if (!this.photoUploader) return;
+    let uploadedAny = false;
+    for (const photo of animal.photos) {
+      if (photo.remoteUrl || !photo.localPath) continue;
+      await this.photoUploader.uploadPending(photo);
+      uploadedAny = true;
+    }
+    if (uploadedAny) await this.local.saveLocal(animal);
   }
 
   /**

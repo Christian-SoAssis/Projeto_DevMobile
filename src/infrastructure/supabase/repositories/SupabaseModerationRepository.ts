@@ -1,6 +1,6 @@
-import { ModerationAction, ModerationGateway } from '../../../domain/ports/ModerationGateway';
-import { SupabaseClientLike } from '../types';
-import { RemoteSupabaseError } from './SupabaseAnimalRepository';
+import { ModerationAction, ModerationEntry, ModerationGateway } from '../../../domain/ports/ModerationGateway';
+import { SupabaseClientLike, AnimalRow } from '../types';
+import { RemoteSupabaseError, SupabaseAnimalRepository } from './SupabaseAnimalRepository';
 
 export interface SupabaseModerationRepositoryOptions {
   client: SupabaseClientLike;
@@ -20,6 +20,21 @@ export class SupabaseModerationRepository implements ModerationGateway {
 
   constructor(options: SupabaseModerationRepositoryOptions) {
     this.client = options.client;
+  }
+
+  async listForModeration(): Promise<ModerationEntry[]> {
+    const { data, error } = await this.client
+      .from<AnimalRow>('animals')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(200);
+    if (error) {
+      throw new RemoteSupabaseError(`Falha ao listar anúncios para moderação: ${error.message}`);
+    }
+    return (data ?? []).map((row) => ({
+      animal: SupabaseAnimalRepository.rowToAnimal(row),
+      hidden: row.moderation_status === 'HIDDEN',
+    }));
   }
 
   async moderateAnimal(animalId: string, action: ModerationAction): Promise<void> {

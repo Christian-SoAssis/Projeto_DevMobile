@@ -18,6 +18,11 @@ export function photoObjectPath(userId: string, animalId: string, photoId: strin
   return `${userId}/${animalId}/${photoId}.webp`;
 }
 
+/** Foto de perfil: `{uid}/avatar/{foto}.webp` — também dentro da pasta do dono. */
+export function avatarObjectPath(userId: string, photoId: string): string {
+  return `${userId}/avatar/${photoId}.webp`;
+}
+
 export type FileReader = (uri: string) => Promise<Uint8Array>;
 
 /** Lê o arquivo local como bytes via `expo-file-system` (mesmo idioma do SqlitePhotoStorage). */
@@ -79,7 +84,10 @@ export class SupabasePhotoStorage implements PhotoStorage {
       throw new PhotoUploadError('Faça login para enviar fotos ao servidor.');
     }
 
-    const path = photoObjectPath(userId, photo.animalId, photo.id);
+    // Foto de perfil usa animalId `user:<id>` (ver UpdateProfileUseCase) → pasta própria.
+    const path = photo.animalId.startsWith('user:')
+      ? avatarObjectPath(userId, photo.id)
+      : photoObjectPath(userId, photo.animalId, photo.id);
     let bytes: Uint8Array;
     try {
       bytes = await this.readFile(localPath);

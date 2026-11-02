@@ -115,7 +115,18 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           syncQueueRepository,
           unitOfWork
         );
-        await useCase.execute(ownerId, initialAnimal.id, { name, characteristics, location }, isOnline);
+        // Foto nova: persistida (e convertida para WebP) ANTES de anexar, como no cadastro.
+        const photo = capturedPhotoUri
+          ? await photoStorage.persistLocal(
+              new AnimalPhoto({ id: newUuid(), animalId: initialAnimal.id, localPath: capturedPhotoUri })
+            )
+          : undefined;
+        await useCase.execute(
+          ownerId,
+          initialAnimal.id,
+          { name, characteristics, location, photo },
+          isOnline
+        );
         setFeedback('Anúncio atualizado com sucesso!');
         if (onSuccess) onSuccess();
         return;

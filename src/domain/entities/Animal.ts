@@ -130,6 +130,19 @@ export class Animal {
     this.touch();
   }
 
+  /** Troca a(s) foto(s) do anúncio pela nova (edição do anúncio). */
+  replacePhotos(requestorId: string, photo: AnimalPhoto, touch: boolean = true): void {
+    if (!this.isOwner(requestorId)) {
+      throw new Error('Somente o responsável pode alterar as fotos.');
+    }
+    if (photo.animalId !== this.id) {
+      throw new Error('Foto não pertence a este animal.');
+    }
+    this._photos = [photo];
+    // Quem já está registrando uma edição (updateData) passa `touch=false` e bumpa a versão uma vez só.
+    if (touch) this.touch();
+  }
+
   removePhoto(photoId: string, requestorId: string): void {
     if (!this.isOwner(requestorId)) {
       throw new Error('Somente o responsável pode remover fotos.');

@@ -69,6 +69,7 @@ export class SupabaseAuthGateway implements AuthGateway {
             phone: user.contactInfo.phone ?? null,
             bio: user.bio,
             interests: user.interests,
+            avatar_url: user.avatarUrl ?? null,
           })
           .eq('id', user.id)
           .select()
@@ -144,10 +145,11 @@ export class SupabaseAuthGateway implements AuthGateway {
     let role = normalizeRole(metadata.user_type);
     let bio: string | undefined;
     let interests: string[] | undefined;
+    let avatarUrl: string | undefined;
 
     try {
       const { data, error } = (await Promise.resolve(
-        this.client.from<UserRow>('users').select('name,email,phone,user_type,bio,interests').eq('id', authUser.id)
+        this.client.from<UserRow>('users').select('name,email,phone,user_type,bio,interests,avatar_url').eq('id', authUser.id)
       )) as { data: UserRow[] | null; error: { message: string } | null };
 
       if (!error && data && data.length > 0) {
@@ -157,6 +159,7 @@ export class SupabaseAuthGateway implements AuthGateway {
         role = normalizeRole(profile.user_type) || role;
         bio = profile.bio || undefined;
         interests = profile.interests || undefined;
+        avatarUrl = profile.avatar_url || undefined;
       }
     } catch {
       // Perfil indisponível: sessão ainda é válida com o papel padrão 'USER'
@@ -174,6 +177,7 @@ export class SupabaseAuthGateway implements AuthGateway {
         role,
         bio,
         interests,
+        avatarUrl,
       });
     } catch {
       // E-mail ausente/inválido: mantém a sessão com um contato neutro (o app
@@ -185,6 +189,7 @@ export class SupabaseAuthGateway implements AuthGateway {
         role,
         bio,
         interests,
+        avatarUrl,
       });
     }
   }

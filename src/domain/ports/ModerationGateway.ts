@@ -1,3 +1,5 @@
+import { Animal } from '../entities/Animal';
+
 /**
  * Moderação de anúncios (UC20, RF27, doc §15.1 "moderação só admin").
  *
@@ -8,7 +10,15 @@
  */
 export type ModerationAction = 'HIDE' | 'UNHIDE';
 
+/** Anúncio na lista de moderação, com a situação de visibilidade atual. */
+export interface ModerationEntry {
+  animal: Animal;
+  hidden: boolean;
+}
+
 export interface ModerationGateway {
+  /** Todos os anúncios, inclusive os ocultados (só o admin enxerga — RLS `is_admin()`). */
+  listForModeration(): Promise<ModerationEntry[]>;
   /**
    * Aplica a ação no cadastro remoto. A autenticação e o papel ADMIN do
    * usuário são verificados duas vezes: no use case e na RLS do Postgres

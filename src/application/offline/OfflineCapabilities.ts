@@ -7,9 +7,9 @@
  * A referência visual dos estados (RF22) é `OFFLINE_STATUS_LABELS`, e a tela
  * de Sync lista estas capacidades para o usuário.
  *
- * Bloqueador de produto (§4): favoritos e interesses continuam local-only
- * até a decisão sobre quais mutações entram na fila de sincronização — as
- * entradas `OFFLINE_PARTIAL` registram exatamente essa indefinição.
+ * Favoritos e interesses entram na fila de sincronização (implementação
+ * PROVISÓRIA: a decisão de produto sobre "offline completo" segue em aberto
+ * no §4 do nextsteps).
  */
 
 export type OfflineBehavior =
@@ -83,16 +83,16 @@ export const OFFLINE_CAPABILITIES: Record<OfflineFeatureName, OfflineCapability>
   favoritar_animal: {
     label: 'Favoritar animal',
     rf: ['RF14'],
-    behavior: 'OFFLINE_PARTIAL',
+    behavior: 'OFFLINE_WITH_QUEUE',
     offlineFlow:
-      'Registro gravado no SQLite local (local-only). Entrada na fila remota depende de §4.',
+      'Registro gravado no SQLite e ação na fila; sobe ao servidor quando houver conexão (favoritar e desfavoritar antes de sincronizar se anulam).',
   },
   interesse_adocao: {
     label: 'Demonstrar interesse em adotar',
     rf: ['RF16'],
-    behavior: 'OFFLINE_PARTIAL',
+    behavior: 'OFFLINE_WITH_QUEUE',
     offlineFlow:
-      'Interesse gravado no SQLite local (local-only). Entrada na fila remota depende de §4.',
+      'Interesse gravado no SQLite e ação na fila; sobe com o contato do interessado quando houver conexão.',
   },
   criar_anuncio: {
     label: 'Criar anúncio',

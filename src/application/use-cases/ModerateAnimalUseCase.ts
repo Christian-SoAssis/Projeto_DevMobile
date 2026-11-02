@@ -1,4 +1,4 @@
-import { ModerationAction, ModerationGateway } from '../../domain/ports/ModerationGateway';
+import { ModerationAction, ModerationEntry, ModerationGateway } from '../../domain/ports/ModerationGateway';
 import { User } from '../../domain/entities/User';
 
 /**
@@ -11,6 +11,16 @@ import { User } from '../../domain/entities/User';
  */
 export class ModerateAnimalUseCase {
   constructor(private moderationGateway: ModerationGateway) {}
+
+  async list(actor: User | null): Promise<ModerationEntry[]> {
+    if (!actor) {
+      throw new Error('Usuário não autenticado.');
+    }
+    if (!actor.isAdmin()) {
+      throw new Error('Somente administradores podem moderar anúncios (UC20).');
+    }
+    return this.moderationGateway.listForModeration();
+  }
 
   async execute(actor: User | null, animalId: string, action: ModerationAction): Promise<void> {
     if (!actor) {

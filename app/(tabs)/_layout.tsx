@@ -71,6 +71,16 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="moderacao"
+        options={{
+          href: tabHref('MODERATION'),
+          title: 'Moderação',
+          tabBarIcon: ({ focused, size }) => (
+            <Ionicons name="shield-checkmark-outline" size={size} color={focused ? '#0066cc' : '#8e8e93'} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="conta"
         options={{
           title: user ? 'Conta' : 'Entrar',

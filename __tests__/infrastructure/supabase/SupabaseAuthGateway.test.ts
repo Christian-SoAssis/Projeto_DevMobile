@@ -269,4 +269,12 @@ describe('SupabaseAuthGateway.updateProfile (RLS users_update_own)', () => {
       failing(() => Promise.reject(new Error('network down'))).updateProfile(me())
     ).rejects.toThrow('Sem conexão com o servidor.');
   });
+
+  it('avatar_url é gravado e lido no perfil', async () => {
+    const { gw, db } = gatewayFor('u-1');
+    await gw.updateProfile(me().withProfile({ avatarUrl: 'https://cdn/a.webp' }));
+    expect(db.users[0]).toMatchObject({ avatar_url: 'https://cdn/a.webp' });
+    await gw.updateProfile(me());
+    expect(db.users[0]).toMatchObject({ avatar_url: null });
+  });
 });

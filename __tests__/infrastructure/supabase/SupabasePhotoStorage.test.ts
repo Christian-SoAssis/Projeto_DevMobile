@@ -4,6 +4,7 @@ import {
   SupabasePhotoStorage,
   PhotoUploadError,
   photoObjectPath,
+  avatarObjectPath,
   PHOTO_BUCKET,
 } from '../../../src/infrastructure/supabase/storage/SupabasePhotoStorage';
 import { FakeSupabaseClient, FAKE_BUCKET_MAX_BYTES } from '../../../test-support/SupabaseFake';
@@ -125,5 +126,13 @@ describe('SupabasePhotoStorage (bucket animal-photos)', () => {
     expect(await storage.listPendingUpload()).toHaveLength(1);
     await storage.remove('photo-1');
     expect(local.photos.has('photo-1')).toBe(false);
+  });
+
+  it('foto de perfil (animalId user:<id>) vai para {uid}/avatar/{foto}.webp', async () => {
+    const { client, storage } = setup();
+    const result = await storage.uploadPending(webp({ id: 'av-1', animalId: `user:${UID}` }));
+    expect(avatarObjectPath(UID, 'av-1')).toBe(`${UID}/avatar/av-1.webp`);
+    expect(client.storageObjects.has(`${UID}/avatar/av-1.webp`)).toBe(true);
+    expect(result.remoteUrl).toContain(`${UID}/avatar/av-1.webp`);
   });
 });

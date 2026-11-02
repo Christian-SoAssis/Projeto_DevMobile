@@ -42,6 +42,7 @@ export type AnimalRow = {
   created_at: string;
   updated_at: string;
   version: number;
+  moderation_status?: string;
 };
 
 export interface AnimalPhotoRow {
@@ -79,6 +80,7 @@ export interface UserRow {
   user_type?: string | null;
   bio?: string | null;
   interests?: string[] | null;
+  avatar_url?: string | null;
 }
 
 /** Cadeia fluente PostgREST: métodos de filtro retornam o próprio builder. */

@@ -60,10 +60,10 @@ describe('OfflineCapabilities — mapeamento formal das funcionalidades offline'
     }
   });
 
-  it('favoritos e interesses são OSCILANTES: local-only até decisão do §4', () => {
-    expect(getOfflineCapability('favoritar_animal').behavior).toBe('OFFLINE_PARTIAL');
-    expect(getOfflineCapability('interesse_adocao').behavior).toBe('OFFLINE_PARTIAL');
-    expect(getOfflineCapability('favoritar_animal').offlineFlow).toContain('local-only');
+  it('favoritos e interesses entram na fila (provisório, §4 segue em aberto)', () => {
+    expect(getOfflineCapability('favoritar_animal').behavior).toBe('OFFLINE_WITH_QUEUE');
+    expect(getOfflineCapability('interesse_adocao').behavior).toBe('OFFLINE_WITH_QUEUE');
+    expect(getOfflineCapability('favoritar_animal').offlineFlow).toContain('fila');
   });
 
   it('lista para a UI mantém rótulos consistentes com o mapa', () => {

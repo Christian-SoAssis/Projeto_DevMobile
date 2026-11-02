@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Animal } from '../../domain/entities/Animal';
 import { AnimalFilterOptions, AnimalRepository } from '../../domain/ports/AnimalRepository';
+import { AnimalMap } from '../map/AnimalMap';
 import { SearchAnimalsUseCase } from '../../application/use-cases/SearchAnimalsUseCase';
 
 export interface SearchScreenProps {
@@ -182,14 +183,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
       {loading ? (
         <ActivityIndicator size="large" color="#0066cc" testID="loading-indicator" style={styles.loader} />
       ) : viewMode === 'map' ? (
-        <View style={styles.mapContainer} testID="map-view">
-          <Text style={styles.mapTitle}>Visualização em Mapa (Localizações Aproximadas)</Text>
-          {animals.map((item) => (
-            <Text key={item.id} style={styles.pinText} testID={`map-pin-${item.id}`}>
-              📍 {item.name} ({item.location.neighborhood}, {item.location.city})
-            </Text>
-          ))}
-        </View>
+        <AnimalMap animals={animals} onSelectAnimal={onSelectAnimal} />
       ) : (
         <FlatList
           data={animals}
@@ -369,21 +363,6 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: 13,
     color: '#8e8e93',
-  },
-  mapContainer: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 10,
-  },
-  mapTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  pinText: {
-    fontSize: 14,
-    marginVertical: 4,
-    color: '#333',
   },
   emptyText: {
     textAlign: 'center',

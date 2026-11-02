@@ -9,6 +9,9 @@ interface UserRow {
   email: string;
   phone: string | null;
   user_type: string;
+  bio: string | null;
+  avatar_uri: string | null;
+  interests: string | null;
   created_at: string;
 }
 
@@ -35,18 +38,24 @@ export class SqliteUserRepository implements UserRepository {
 
   async save(user: User): Promise<void> {
     await this.db.runAsync(
-      `INSERT INTO users (id, name, email, phone, user_type, created_at) VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO users (id, name, email, phone, user_type, bio, avatar_uri, interests, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
          email = excluded.email,
          phone = excluded.phone,
-         user_type = excluded.user_type`,
+         user_type = excluded.user_type,
+         bio = excluded.bio,
+         avatar_uri = excluded.avatar_uri,
+         interests = excluded.interests`,
       [
         user.id,
         user.name,
         user.contactInfo.email,
         user.contactInfo.phone || null,
         user.role,
+        user.bio || null,
+        user.avatarUri || null,
+        JSON.stringify(user.interests),
         new Date().toISOString(),
       ]
     );
@@ -58,6 +67,19 @@ export class SqliteUserRepository implements UserRepository {
       name: row.name,
       contactInfo: new ContactInfo(row.email, row.phone || undefined),
       role: row.user_type as UserRole,
+      bio: row.bio || undefined,
+      avatarUri: row.avatar_uri || undefined,
+      interests: parseInterests(row.interests),
     });
+  }
+}
+
+function parseInterests(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
   }
 }

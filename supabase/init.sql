@@ -27,6 +27,11 @@ create table if not exists public.users (
   created_at timestamptz not null default now()
 );
 
+-- Perfil editável (tela Conta). A foto de perfil fica só no aparelho até o Storage (Passo 4).
+alter table public.users add column if not exists bio text
+  check (bio is null or char_length(bio) <= 300);
+alter table public.users add column if not exists interests text[] not null default '{}';
+
 -- ----------------------------------------------------------------------------
 -- animals — anúncio (coordenadas APENAS aproximadas — RNF05/RNF06)
 -- ----------------------------------------------------------------------------
@@ -215,6 +220,37 @@ create policy interests_owner_all on public.adoption_interests
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- ============================================================================
+-- Cadastro: cria public.users quando nasce um usuário em auth.users.
+-- security definer: no signUp ainda não há sessão, e a RLS barraria o insert.
+-- user_type é sempre 'USER' — nunca lido do metadata (editável pelo cliente).
+-- Promover admin: update public.users set user_type = 'ADMIN' where email = '...';
+-- ============================================================================
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.users (id, name, email, phone, user_type)
+  values (
+    new.id,
+    coalesce(nullif(new.raw_user_meta_data ->> 'name', ''), split_part(new.email, '@', 1), 'Usuario'),
+    new.email,
+    nullif(new.raw_user_meta_data ->> 'phone', ''),
+    'USER'
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- ============================================================================
 -- Storage (Passo 4 — bucket padrão S3): as políticas do bucket "animal-photos"
 -- serão documentadas junto com o cliente de upload (src/infrastructure/supabase/storage/).
 -- Placeholder mínimo, para não bloquear o deploy do schema:
@@ -222,3 +258,29 @@ create policy interests_owner_all on public.adoption_interests
 -- insert into storage.buckets (id, name, public)
 -- values ('animal-photos', 'animal-photos', true)
 -- on conflict (id) do update set public = true;
+
+-- ============================================================================
+-- Anti-escalada de privilégio: a política users_update_own deixa o usuário
+-- editar a própria linha, o que incluiria user_type. Só admin (ou o SQL
+-- Editor/service, onde auth.uid() é nulo) pode alterar o papel.
+-- ============================================================================
+create or replace function public.protect_user_type()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.user_type is distinct from old.user_type
+     and auth.uid() is not null
+     and not public.is_admin() then
+    raise exception 'Somente administradores podem alterar o papel de um usuário.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_users_protect_user_type on public.users;
+create trigger trg_users_protect_user_type
+  before update on public.users
+  for each row execute function public.protect_user_type();

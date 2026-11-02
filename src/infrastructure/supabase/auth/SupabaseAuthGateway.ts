@@ -1,4 +1,4 @@
-import { AuthGateway, AuthSession } from '../../../domain/ports/AuthGateway';
+import { AuthGateway, AuthSession, RegisterInput, RegisterResult } from '../../../domain/ports/AuthGateway';
 import { User } from '../../../domain/entities/User';
 import { ContactInfo } from '../../../domain/value-objects/ContactInfo';
 import {
@@ -24,6 +24,68 @@ export class SupabaseAuthGateway implements AuthGateway {
 
   constructor(options: SupabaseAuthGatewayOptions) {
     this.client = options.client;
+  }
+
+  async register(input: RegisterInput): Promise<RegisterResult> {
+    const email = input.email.trim();
+    const name = input.name.trim();
+    const phone = input.phone?.trim() || undefined;
+    const { data, error } = await this.client.auth.signUp({
+      email,
+      password: input.password,
+      // `user_type` fica de fora de propósito: o papel nasce 'USER' no trigger.
+      options: { data: { name, phone } },
+    });
+
+    if (error) {
+      throw new Error(mapSupabaseAuthError(error.message, 'Não foi possível concluir o cadastro.'));
+    }
+    if (!data.user) {
+      throw new Error('Não foi possível concluir o cadastro.');
+    }
+    // E-mail já cadastrado: o Supabase devolve um usuário sem identidades em vez de erro.
+    const identities = (data.user as { identities?: unknown[] }).identities;
+    if (Array.isArray(identities) && identities.length === 0) {
+      throw new Error('E-mail já cadastrado.');
+    }
+
+    const user = new User({
+      id: data.user.id,
+      name: name || 'Usuário Enlace',
+      contactInfo: new ContactInfo(data.user.email || email, phone),
+      role: 'USER',
+    });
+    return { user, needsEmailConfirmation: !data.session };
+  }
+
+  async updateProfile(user: User): Promise<User> {
+    let result: { data: UserRow[] | null; error: { message: string } | null };
+    try {
+      result = (await Promise.resolve(
+        this.client
+          .from<UserRow>('users')
+          .update({
+            name: user.name,
+            phone: user.contactInfo.phone ?? null,
+            bio: user.bio,
+            interests: user.interests,
+          })
+          .eq('id', user.id)
+          .select()
+      )) as typeof result;
+    } catch (err) {
+      throw new Error(
+        mapSupabaseAuthError(err instanceof Error ? err.message : '', 'Não foi possível salvar o perfil.')
+      );
+    }
+    if (result.error) {
+      throw new Error(mapSupabaseAuthError(result.error.message, 'Não foi possível salvar o perfil.'));
+    }
+    // Zero linhas: RLS barrou ou o perfil não existe — nada foi gravado.
+    if (!result.data || result.data.length === 0) {
+      throw new Error('Não foi possível salvar o perfil no servidor.');
+    }
+    return user;
   }
 
   async login(email: string, pass: string): Promise<AuthSession> {
@@ -80,10 +142,12 @@ export class SupabaseAuthGateway implements AuthGateway {
     let name = typeof metadata.name === 'string' ? metadata.name : undefined;
     let phone = typeof metadata.phone === 'string' ? metadata.phone : undefined;
     let role = normalizeRole(metadata.user_type);
+    let bio: string | undefined;
+    let interests: string[] | undefined;
 
     try {
       const { data, error } = (await Promise.resolve(
-        this.client.from<UserRow>('users').select('name,email,phone,user_type').eq('id', authUser.id)
+        this.client.from<UserRow>('users').select('name,email,phone,user_type,bio,interests').eq('id', authUser.id)
       )) as { data: UserRow[] | null; error: { message: string } | null };
 
       if (!error && data && data.length > 0) {
@@ -91,6 +155,8 @@ export class SupabaseAuthGateway implements AuthGateway {
         name = profile.name || name;
         phone = profile.phone || phone;
         role = normalizeRole(profile.user_type) || role;
+        bio = profile.bio || undefined;
+        interests = profile.interests || undefined;
       }
     } catch {
       // Perfil indisponível: sessão ainda é válida com o papel padrão 'USER'
@@ -106,6 +172,8 @@ export class SupabaseAuthGateway implements AuthGateway {
           phone
         ),
         role,
+        bio,
+        interests,
       });
     } catch {
       // E-mail ausente/inválido: mantém a sessão com um contato neutro (o app
@@ -115,6 +183,8 @@ export class SupabaseAuthGateway implements AuthGateway {
         name: name || 'Usuário Enlace',
         contactInfo: new ContactInfo('sem-email@enlace.local'),
         role,
+        bio,
+        interests,
       });
     }
   }
@@ -127,6 +197,12 @@ export function mapSupabaseAuthError(message: string, fallback: string): string 
   }
   if (normalized.includes('email not confirmed')) {
     return 'Confirme seu e-mail antes de entrar.';
+  }
+  if (normalized.includes('already registered')) {
+    return 'E-mail já cadastrado.';
+  }
+  if (normalized.includes('password should be') || normalized.includes('weak password')) {
+    return 'Senha muito fraca: use ao menos 6 caracteres.';
   }
   if (normalized.includes('failed to fetch') || normalized.includes('network')) {
     return 'Sem conexão com o servidor. O app continua funcionando offline.';

@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalFormScreen } from '../../src/adapters/screens/AnimalFormScreen';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
-import { DEMO_OWNER_ID } from '../../src/adapters/demo/sharedFakes';
+import { RequireAccess } from '../../src/adapters/guards/RequireAccess';
 
 export default function NovoAnuncioRoute() {
   const router = useRouter();
@@ -16,19 +16,23 @@ export default function NovoAnuncioRoute() {
   const isOnline = useConnectivity();
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
-      <AnimalFormScreen
-        ownerId={DEMO_OWNER_ID}
-        animalRepository={animalRepository}
-        syncQueueRepository={syncQueueRepository}
-        unitOfWork={unitOfWork}
-        cameraGateway={cameraGateway}
-        locationGateway={locationGateway}
-        photoStorage={photoStorage}
-        isOnline={isOnline}
-        onSuccess={() => router.back()}
-      />
-    </SafeAreaView>
+    <RequireAccess area="MANAGE_ANIMAL">
+      {(user) => (
+        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+          <AnimalFormScreen
+            ownerId={user.id}
+            animalRepository={animalRepository}
+            syncQueueRepository={syncQueueRepository}
+            unitOfWork={unitOfWork}
+            cameraGateway={cameraGateway}
+            locationGateway={locationGateway}
+            photoStorage={photoStorage}
+            isOnline={isOnline}
+            onSuccess={() => router.back()}
+          />
+        </SafeAreaView>
+      )}
+    </RequireAccess>
   );
 }
 

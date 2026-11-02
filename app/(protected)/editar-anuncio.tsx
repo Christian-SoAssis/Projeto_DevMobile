@@ -4,9 +4,13 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalFormScreen } from '../../src/adapters/screens/AnimalFormScreen';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
-import { DEMO_OWNER_ID } from '../../src/adapters/demo/sharedFakes';
+import { RequireAccess } from '../../src/adapters/guards/RequireAccess';
 
 export default function EditarAnuncioRoute() {
+  return <RequireAccess area="MANAGE_ANIMAL">{(user) => <EditarAnuncioForm ownerId={user.id} />}</RequireAccess>;
+}
+
+function EditarAnuncioForm({ ownerId }: { ownerId: string }) {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
@@ -35,7 +39,8 @@ export default function EditarAnuncioRoute() {
         <ActivityIndicator size="large" color="#0066cc" />
       </View>
     );
-  } else if (!animal) {
+  } else if (!animal || !animal.isOwner(ownerId)) {
+    // Anúncio de terceiros é tratado como inexistente (UI não é a barreira — §15.3).
     content = (
       <View style={styles.center} testID="edit-not-found">
         <Text style={styles.message}>Anúncio não encontrado para edição.</Text>
@@ -51,7 +56,7 @@ export default function EditarAnuncioRoute() {
   } else {
     content = (
       <AnimalFormScreen
-        ownerId={DEMO_OWNER_ID}
+        ownerId={ownerId}
         initialAnimal={animal}
         animalRepository={animalRepository}
         syncQueueRepository={syncQueueRepository}

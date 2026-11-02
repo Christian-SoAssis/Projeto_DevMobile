@@ -10,6 +10,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import HomeTab from '../../app/(tabs)/index';
+import { AuthProvider } from '../../src/adapters/context/AuthContext';
 import AnimalDetailsRoute from '../../app/animal/[id]';
 
 describe('E2E — Visitante pesquisa e abre um animal (doc §16.4 item 1)', () => {
@@ -34,7 +35,11 @@ describe('E2E — Visitante pesquisa e abre um animal (doc §16.4 item 1)', () =
   });
 
   it('deve abrir os detalhes do animal pelo id da rota', async () => {
-    const { getByTestId } = await render(<AnimalDetailsRoute />);
+    const { getByTestId } = await render(
+      <AuthProvider>
+        <AnimalDetailsRoute />
+      </AuthProvider>
+    );
 
     await waitFor(() => {
       expect(getByTestId('animal-details-screen')).toBeTruthy();

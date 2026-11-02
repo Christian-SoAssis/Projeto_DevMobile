@@ -1,10 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../../domain/entities/User';
-import { AuthGateway, AuthSession } from '../../domain/ports/AuthGateway';
+import { AuthGateway, AuthSession, RegisterInput, RegisterResult } from '../../domain/ports/AuthGateway';
+import { UserRepository } from '../../domain/ports/UserRepository';
+import { PhotoStorage } from '../../domain/ports/PhotoStorage';
+import { ProfilePatch } from '../../domain/value-objects/UserProfile';
+import { UpdateProfileUseCase, UpdateProfileResult } from '../../application/use-cases/UpdateProfileUseCase';
 import { SessionStorage } from '../../domain/ports/SessionStorage';
 import { AuthenticateUserUseCase } from '../../application/use-cases/AuthenticateUserUseCase';
 import { AcessarViaTokenUseCase } from '../../application/use-cases/AcessarViaTokenUseCase';
 import { AuthGatewayFake } from '../../application/fakes/AuthGatewayFake';
+import { UserRepositoryFake } from '../../application/fakes/UserRepositoryFake';
 import { SessionStorageFake } from '../../application/fakes/SessionStorageFake';
 import { useRepositories } from './RepositoriesContext';
 
@@ -13,7 +18,13 @@ export interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, pass: string) => Promise<void>;
+  /** Gateway/armazenamento ativos (Supabase quando configurado, fake no demo). */
+  authGateway: AuthGateway;
+  sessionStorage: SessionStorage;
+  login: (email: string, pass: string) => Promise<User>;
+  /** Cria a conta e, se o servidor não exigir confirmação de e-mail, já entra (`loggedIn`). */
+  register: (input: RegisterInput) => Promise<RegisterResult & { loggedIn: boolean }>;
+  updateProfile: (patch: ProfilePatch) => Promise<UpdateProfileResult>;
   acessarViaToken: (token: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -24,12 +35,17 @@ export interface AuthProviderProps {
   children: React.ReactNode;
   authGateway?: AuthGateway;
   sessionStorage?: SessionStorage;
+  /** Perfil local (SQLite): descrição, interesses e foto editados neste aparelho. */
+  userRepository?: UserRepository;
+  photoStorage?: PhotoStorage;
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({
   children,
   authGateway = new AuthGatewayFake(),
   sessionStorage = new SessionStorageFake(),
+  userRepository,
+  photoStorage,
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -38,13 +54,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const authenticateUseCase = new AuthenticateUserUseCase(authGateway, sessionStorage);
   const tokenUseCase = new AcessarViaTokenUseCase(authGateway, sessionStorage);
 
+  /**
+   * O perfil editado neste aparelho vence o do servidor (evita perder uma
+   * edição feita offline). Sem edição local, vale o perfil remoto.
+   */
+  async function hydrate(remote: User): Promise<User> {
+    if (!userRepository) return remote;
+    try {
+      const local = await userRepository.findById(remote.id);
+      if (!local) return remote;
+      return remote.withProfile({
+        name: local.name,
+        phone: local.contactInfo.phone ?? remote.contactInfo.phone,
+        bio: local.bio || remote.bio,
+        interests: local.interests.length ? local.interests : remote.interests,
+        avatarUri: local.avatarUri ?? remote.avatarUri,
+      });
+    } catch {
+      return remote;
+    }
+  }
+
   useEffect(() => {
     async function loadSession() {
       try {
         const savedToken = await sessionStorage.getSessionToken();
         if (savedToken) {
           const session = await authGateway.acessarViaToken(savedToken);
-          setUser(session.user);
+          setUser(await hydrate(session.user));
           setToken(session.token);
         }
       } catch {
@@ -56,22 +93,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     loadSession();
   }, []);
 
-  const login = async (email: string, pass: string) => {
+  const login = async (email: string, pass: string): Promise<User> => {
     setIsLoading(true);
     try {
       const session = await authenticateUseCase.execute(email, pass);
-      setUser(session.user);
+      const hydrated = await hydrate(session.user);
+      setUser(hydrated);
       setToken(session.token);
+      return hydrated;
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const register = async (input: RegisterInput) => {
+    const result = await authGateway.register(input);
+    if (result.needsEmailConfirmation) return { ...result, loggedIn: false };
+    try {
+      await login(input.email, input.password);
+      return { ...result, loggedIn: true };
+    } catch {
+      // Conta criada, mas a entrada automática falhou: a pessoa entra pela tela de login.
+      return { ...result, loggedIn: false };
+    }
+  };
+
+  const updateProfile = async (patch: ProfilePatch): Promise<UpdateProfileResult> => {
+    if (!user) throw new Error('Faça login para editar o perfil.');
+    const useCase = new UpdateProfileUseCase(
+      authGateway,
+      userRepository ?? new UserRepositoryFake(),
+      photoStorage
+    );
+    const result = await useCase.execute(user, patch);
+    setUser(result.user);
+    return result;
   };
 
   const acessarViaToken = async (tok: string) => {
     setIsLoading(true);
     try {
       const session = await tokenUseCase.execute(tok);
-      setUser(session.user);
+      setUser(await hydrate(session.user));
       setToken(session.token);
     } finally {
       setIsLoading(false);
@@ -92,7 +155,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         token,
         isAuthenticated: !!user,
         isLoading,
+        authGateway,
+        sessionStorage,
         login,
+        register,
+        updateProfile,
         acessarViaToken,
         logout,
       }}
@@ -124,7 +191,12 @@ export interface AuthProviderBridgeProps {
 export function AuthProviderBridge({ children, sessionStorage }: AuthProviderBridgeProps) {
   const container = useRepositories();
   return (
-    <AuthProvider authGateway={container.authGateway} sessionStorage={sessionStorage}>
+    <AuthProvider
+      authGateway={container.authGateway}
+      sessionStorage={sessionStorage}
+      userRepository={container.userRepository}
+      photoStorage={container.photoStorage}
+    >
       {children}
     </AuthProvider>
   );

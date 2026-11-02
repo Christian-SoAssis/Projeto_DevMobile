@@ -25,7 +25,7 @@ O **Enlace** é um aplicativo mobile (React Native + Expo Router) que conecta qu
 - **Meus anúncios**: editar, excluir e marcar como adotado
 - **Novo anúncio / Editar anúncio**: formulário de cadastro
 - **Sync**: estado da fila de sincronização offline
-- **Login / Cadastro**: autenticação (stub nesta fase)
+- **Login / Cadastro / Conta**: e-mail e senha (Supabase quando configurado; modo demonstração sem servidor). Visitantes só pesquisam e veem detalhes; favoritos, interesse, "Meus anúncios" e Sync exigem login (`src/domain/services/AccessPolicy.ts`)
 
 ### Princípios
 

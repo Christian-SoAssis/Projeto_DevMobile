@@ -7,7 +7,7 @@ import { INITIAL_SCHEMA_SQL } from './schema.sql';
  * A migração 001 é o schema inicial da Fase 2. Ela usa `IF NOT EXISTS` para
  * também ser segura em bancos criados antes do controle de versão existir.
  */
-export const LATEST_SCHEMA_VERSION = 1;
+export const LATEST_SCHEMA_VERSION = 2;
 
 interface UserVersionRow {
   user_version: number;
@@ -23,6 +23,17 @@ const MIGRATIONS: Migration[] = [
     version: 1,
     up: async (db) => {
       await db.execAsync(INITIAL_SCHEMA_SQL);
+    },
+  },
+  {
+    // Perfil editável do usuário: descrição, foto (caminho local) e interesses (JSON).
+    version: 2,
+    up: async (db) => {
+      await db.execAsync(
+        `ALTER TABLE users ADD COLUMN bio TEXT;
+         ALTER TABLE users ADD COLUMN avatar_uri TEXT;
+         ALTER TABLE users ADD COLUMN interests TEXT;`
+      );
     },
   },
 ];

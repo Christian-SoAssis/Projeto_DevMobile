@@ -1,57 +1,64 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { User } from '../../domain/entities/User';
-import { ContactInfo } from '../../domain/value-objects/ContactInfo';
-import { AuthGateway } from '../../domain/ports/AuthGateway';
+import { AuthGateway, RegisterInput, RegisterResult } from '../../domain/ports/AuthGateway';
 import { AuthGatewayFake } from '../../application/fakes/AuthGatewayFake';
+import { MIN_PASSWORD_LENGTH, validateRegistration } from '../../domain/services/CredentialPolicy';
 
 export interface RegisterScreenProps {
   authGateway?: AuthGateway;
-  onSuccess?: (user: User) => void;
+  /** Substitui `authGateway.register` (ex.: o `register` do AuthContext, que já entra na conta). */
+  onRegister?: (input: RegisterInput) => Promise<RegisterResult & { loggedIn?: boolean }>;
+  onSuccess?: (user: User, needsEmailConfirmation: boolean, loggedIn: boolean) => void;
+  onGoToLogin?: () => void;
 }
 
 export const RegisterScreen: React.FC<RegisterScreenProps> = ({
   authGateway = new AuthGatewayFake(),
+  onRegister,
   onSuccess,
+  onGoToLogin,
 }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [pass, setPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleRegister = async () => {
+    if (submitting) return;
     setFeedback(null);
+    const invalid = validateRegistration({ name, email, password: pass, confirmPassword: confirmPass });
+    if (invalid) {
+      setFeedback(invalid);
+      return;
+    }
+    setSubmitting(true);
     try {
-      if (!name.trim()) throw new Error('Nome é obrigatório.');
-      if (!email.trim()) throw new Error('E-mail é obrigatório.');
-      if (!pass) throw new Error('Senha é obrigatória.');
-      const fake = authGateway as AuthGatewayFake;
-      const exists = Array.isArray((fake as any).mockUsers)
-        ? (fake as any).mockUsers.find(
-            (u: User) => u.contactInfo.email.toLowerCase() === email.trim().toLowerCase()
-          )
-        : null;
-      if (exists) throw new Error('E-mail já cadastrado (mock).');
-      const user = new User({
-        id: `usr_${Date.now()}`,
-        name: name.trim(),
-        contactInfo: new ContactInfo(email.trim(), phone.trim() || '11900000000'),
-        role: 'USER',
-      });
-      if (Array.isArray((fake as any).mockUsers)) {
-        (fake as any).mockUsers.push(user);
-      }
-      setFeedback('Cadastro realizado com sucesso! Faça login.');
-      if (onSuccess) onSuccess(user);
+      const input = { name, email, phone, password: pass };
+      const result = await (onRegister ? onRegister(input) : authGateway.register(input));
+      const { user, needsEmailConfirmation } = result;
+      const loggedIn = 'loggedIn' in result && result.loggedIn === true;
+      setFeedback(
+        needsEmailConfirmation
+          ? 'Cadastro realizado! Confirme seu e-mail e depois faça login.'
+          : loggedIn
+            ? 'Conta criada! Você já está conectado.'
+            : 'Cadastro realizado com sucesso! Faça login.'
+      );
+      if (onSuccess) onSuccess(user, needsEmailConfirmation, loggedIn);
     } catch (err: any) {
       setFeedback(err.message || 'Erro ao cadastrar.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <View style={styles.container} testID="register-screen">
-      <Text style={styles.title}>Criar conta (mock)</Text>
+    <ScrollView style={styles.container} testID="register-screen">
+      <Text style={styles.title}>Criar conta</Text>
       {feedback && (
         <View style={styles.feedbackBanner} testID="register-feedback">
           <Text style={styles.feedbackText}>{feedback}</Text>
@@ -72,6 +79,8 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="email-address"
         testID="input-email"
       />
       <Text style={styles.label}>Telefone</Text>
@@ -80,21 +89,41 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
         placeholder="Ex.: 11999998888"
         value={phone}
         onChangeText={setPhone}
+        keyboardType="phone-pad"
         testID="input-phone"
       />
       <Text style={styles.label}>Senha *</Text>
       <TextInput
         style={styles.input}
-        placeholder="Crie uma senha"
+        placeholder={`Mínimo de ${MIN_PASSWORD_LENGTH} caracteres`}
         value={pass}
         onChangeText={setPass}
         secureTextEntry
         testID="input-pass"
       />
-      <TouchableOpacity style={styles.submitBtn} onPress={handleRegister} testID="btn-register">
-        <Text style={styles.submitText}>Cadastrar</Text>
+      <Text style={styles.label}>Confirmar senha *</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Repita a senha"
+        value={confirmPass}
+        onChangeText={setConfirmPass}
+        secureTextEntry
+        testID="input-confirm-pass"
+      />
+      <TouchableOpacity
+        style={[styles.submitBtn, submitting && styles.submitDisabled]}
+        onPress={handleRegister}
+        disabled={submitting}
+        testID="btn-register"
+      >
+        <Text style={styles.submitText}>{submitting ? 'Cadastrando...' : 'Cadastrar'}</Text>
       </TouchableOpacity>
-    </View>
+      {onGoToLogin && (
+        <TouchableOpacity style={styles.link} onPress={onGoToLogin} testID="link-login">
+          <Text style={styles.linkText}>Já tem conta? Entrar</Text>
+        </TouchableOpacity>
+      )}
+    </ScrollView>
   );
 };
 
@@ -138,15 +167,26 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   submitBtn: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#0066cc',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 16,
   },
+  submitDisabled: {
+    opacity: 0.6,
+  },
   submitText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  link: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  linkText: {
+    color: '#0066cc',
     fontWeight: 'bold',
   },
 });

@@ -4,14 +4,13 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalDetailsScreen } from '../../src/adapters/screens/AnimalDetailsScreen';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
-import {
-  DEMO_OWNER_ID,
-  DEMO_USER_ID,
-} from '../../src/adapters/demo/sharedFakes';
+import { useAuth } from '../../src/adapters/context/AuthContext';
 
 export default function AnimalDetailsRoute() {
   const router = useRouter();
-  const { id, asOwner } = useLocalSearchParams<{ id: string; asOwner?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  // Detalhes são públicos (RF06); sem sessão o usuário é visitante.
+  const { user } = useAuth();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
   const {
     animalRepository,
@@ -60,11 +59,8 @@ export default function AnimalDetailsRoute() {
     content = (
       <AnimalDetailsScreen
         animal={animal}
-        // Identidade 100% mock: Meus anúncios abre com ?asOwner=1 (dono, pode
-        // marcar adotado, NÃO pode favoritar o próprio anúncio). Início e
-        // Favoritos abrem sem o parâmetro (visitante usr_2: pode favoritar —
-        // e o favorito fica visível na aba Favoritos, que lista usr_2).
-        currentUserId={asOwner === '1' ? DEMO_OWNER_ID : DEMO_USER_ID}
+        currentUserId={user?.id ?? null}
+        onRequireLogin={() => router.push('/login')}
         animalRepository={animalRepository}
         favoriteRepository={favoriteRepository}
         interestRepository={interestRepository}

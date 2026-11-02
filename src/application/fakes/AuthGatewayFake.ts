@@ -1,4 +1,4 @@
-import { AuthGateway, AuthSession } from '../../domain/ports/AuthGateway';
+import { AuthGateway, AuthSession, RegisterInput, RegisterResult } from '../../domain/ports/AuthGateway';
 import { User } from '../../domain/entities/User';
 import { ContactInfo } from '../../domain/value-objects/ContactInfo';
 
@@ -24,6 +24,30 @@ export class AuthGatewayFake implements AuthGateway {
       role: 'ADMIN',
     }),
   ];
+
+  async register(input: RegisterInput): Promise<RegisterResult> {
+    const email = input.email.trim();
+    if (this.mockUsers.some((u) => u.contactInfo.email.toLowerCase() === email.toLowerCase())) {
+      throw new Error('E-mail já cadastrado (mock).');
+    }
+    const user = new User({
+      id: `usr_${Date.now()}`,
+      name: input.name.trim(),
+      contactInfo: new ContactInfo(email, input.phone?.trim() || '11900000000'),
+      role: 'USER',
+    });
+    this.mockUsers.push(user);
+    return { user, needsEmailConfirmation: false };
+  }
+
+  async updateProfile(user: User): Promise<User> {
+    const idx = this.mockUsers.findIndex((u) => u.id === user.id);
+    if (idx >= 0) this.mockUsers[idx] = user;
+    if (this.currentSession?.user.id === user.id) {
+      this.currentSession = { ...this.currentSession, user };
+    }
+    return user;
+  }
 
   async login(email: string, pass: string): Promise<AuthSession> {
     if (pass === 'wrong_password') {

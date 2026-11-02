@@ -17,7 +17,10 @@ import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
 
 export interface AnimalDetailsScreenProps {
   animal: Animal;
-  currentUserId?: string;
+  /** `null` = visitante (sem sessão); `undefined` mantém o usuário demo dos testes. */
+  currentUserId?: string | null;
+  /** Chamado quando um visitante tenta uma ação que exige login. */
+  onRequireLogin?: () => void;
   animalRepository: AnimalRepository;
   favoriteRepository?: FavoriteRepository;
   interestRepository?: AdoptionInterestRepository;
@@ -29,6 +32,7 @@ export interface AnimalDetailsScreenProps {
 export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   animal: initialAnimal,
   currentUserId = 'usr_2',
+  onRequireLogin,
   animalRepository,
   favoriteRepository = new FavoriteRepositoryFake(),
   interestRepository = new AdoptionInterestRepositoryFake(),
@@ -41,7 +45,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   const [hasInterest, setHasInterest] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const isOwner = animal.isOwner(currentUserId);
+  const isOwner = currentUserId ? animal.isOwner(currentUserId) : false;
 
   useEffect(() => {
     async function checkState() {
@@ -65,6 +69,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   const handleToggleFavorite = async () => {
     if (!currentUserId) {
       setFeedback('Faça login para favoritar.');
+      onRequireLogin?.();
       return;
     }
     if (isOwner) {
@@ -84,6 +89,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   const handleDemonstrateInterest = async () => {
     if (!currentUserId) {
       setFeedback('Faça login para demonstrar interesse.');
+      onRequireLogin?.();
       return;
     }
     const useCase = new RegisterAdoptionInterestUseCase(interestRepository);
@@ -93,6 +99,10 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   };
 
   const handleMarkAdopted = async () => {
+    if (!currentUserId) {
+      onRequireLogin?.();
+      return;
+    }
     try {
       const useCase = new MarkAnimalAdoptedUseCase(
         animalRepository,

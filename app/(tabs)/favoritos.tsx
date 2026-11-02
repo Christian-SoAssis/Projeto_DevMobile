@@ -4,12 +4,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FavoritesScreen } from '../../src/adapters/screens/FavoritesScreen';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
-import { DEMO_USER_ID } from '../../src/adapters/demo/sharedFakes';
+import { RequireAccess } from '../../src/adapters/guards/RequireAccess';
 
 export default function FavoritesTab() {
   const router = useRouter();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider
-  // (identidade de usuário continua mock até a Fase 3).
+  // (identidade vem da sessão: favoritos são privados por usuário — §15.1).
   const { animalRepository, favoriteRepository } = useRepositories();
   // Remontar no foco garante que a lista reflita favoritos adicionados/
   // removidos nos detalhes.
@@ -21,17 +21,21 @@ export default function FavoritesTab() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <FavoritesScreen
-        key={focusKey}
-        animalRepository={animalRepository}
-        favoriteRepository={favoriteRepository}
-        currentUserId={DEMO_USER_ID}
-        onSelectAnimal={(animal) =>
-          router.push({ pathname: '/animal/[id]', params: { id: animal.id } })
-        }
-      />
-    </SafeAreaView>
+    <RequireAccess area="FAVORITES">
+      {(user) => (
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+          <FavoritesScreen
+            key={focusKey}
+            animalRepository={animalRepository}
+            favoriteRepository={favoriteRepository}
+            currentUserId={user.id}
+            onSelectAnimal={(animal) =>
+              router.push({ pathname: '/animal/[id]', params: { id: animal.id } })
+            }
+          />
+        </SafeAreaView>
+      )}
+    </RequireAccess>
   );
 }
 

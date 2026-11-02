@@ -50,6 +50,8 @@ export interface UserRow {
   email?: string | null;
   phone?: string | null;
   user_type?: string | null;
+  bio?: string | null;
+  interests?: string[] | null;
 }
 
 /** Cadeia fluente PostgREST: métodos de filtro retornam o próprio builder. */
@@ -96,6 +98,11 @@ export interface SupabaseAuthResponse {
   error: { message: string } | null;
 }
 
+export interface SupabaseSignUpResponse {
+  data: { user: SupabaseAuthUser | null; session: SupabaseSession | null };
+  error: { message: string } | null;
+}
+
 export interface SupabaseUserFetchResponse {
   data: { user: SupabaseAuthUser | null };
   error: { message: string } | null;
@@ -106,6 +113,12 @@ export interface SupabaseAuthApi {
     email: string;
     password: string;
   }): Promise<SupabaseAuthResponse>;
+  /** `options.data` vira `user_metadata` e alimenta o trigger `handle_new_user`. */
+  signUp(credentials: {
+    email: string;
+    password: string;
+    options?: { data?: Record<string, unknown> };
+  }): Promise<SupabaseSignUpResponse>;
   signOut(): Promise<{ error: { message: string } | null }>;
   getSession(): Promise<{ data: { session: SupabaseSession | null }; error: { message: string } | null }>;
   /** Usado para validar um access_token externo (`acessarViaToken`). */

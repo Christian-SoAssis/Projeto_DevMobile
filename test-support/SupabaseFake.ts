@@ -121,7 +121,10 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
     //  - demais tabelas: escrita restrita ao dono (`owner_id`) da linha.
     // ------------------------------------------------------------------
     const isPrivateRow = (row: FakeRow): boolean => row.user_id !== undefined;
+    // `users`: policies users_*_own (id = auth.uid()).
+    const isUserRow = table === 'users';
     const canSeeRow = (row: FakeRow): boolean => {
+      if (isUserRow) return ctx.currentUserId !== null && row.id === ctx.currentUserId;
       if (ctx.isAdmin) return true;
       if (isPrivateRow(row)) {
         return ctx.currentUserId !== null && row.user_id === ctx.currentUserId;
@@ -130,6 +133,7 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
       return row.moderation_status !== 'HIDDEN'; // anônimo/terceiro: público
     };
     const canWriteRow = (row: FakeRow): boolean => {
+      if (isUserRow) return ctx.currentUserId !== null && row.id === ctx.currentUserId;
       if (ctx.isAdmin) return true;
       if (ctx.currentUserId === null) return false;
       if (row.user_id !== undefined) return row.user_id === ctx.currentUserId;
@@ -226,6 +230,11 @@ export class FakeSupabaseClient implements SupabaseClientLike {
         }
         return { data: { session: null }, error: { message: 'invalid login credentials' } };
       }),
+      signUp: jest.fn(async (credentials: any) =>
+        options.authHandlers?.signUp
+          ? options.authHandlers.signUp(credentials)
+          : { data: { user: null, session: null }, error: { message: 'signup disabled' } }
+      ),
       signOut: jest.fn(async () =>
         options.authHandlers?.signOut
           ? options.authHandlers.signOut()

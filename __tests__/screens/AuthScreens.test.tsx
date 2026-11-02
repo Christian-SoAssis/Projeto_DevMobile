@@ -67,6 +67,7 @@ describe('Auth stub screens (100% mock)', () => {
       await fireEvent.changeText(getByTestId('input-name'), 'Ana Silva');
       await fireEvent.changeText(getByTestId('input-email'), 'ana@exemplo.com');
       await fireEvent.changeText(getByTestId('input-pass'), '123456');
+      await fireEvent.changeText(getByTestId('input-confirm-pass'), '123456');
       await fireEvent.press(getByTestId('btn-register'));
       await waitFor(() => {
         expect(getByText('E-mail já cadastrado (mock).')).toBeTruthy();
@@ -82,12 +83,85 @@ describe('Auth stub screens (100% mock)', () => {
       await fireEvent.changeText(getByTestId('input-name'), 'Maria Souza');
       await fireEvent.changeText(getByTestId('input-email'), 'maria@exemplo.com');
       await fireEvent.changeText(getByTestId('input-pass'), '123456');
+      await fireEvent.changeText(getByTestId('input-confirm-pass'), '123456');
       await fireEvent.press(getByTestId('btn-register'));
       await waitFor(() => {
         expect(getByText('Cadastro realizado com sucesso! Faça login.')).toBeTruthy();
       });
-      expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ name: 'Maria Souza' }));
+      expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ name: 'Maria Souza' }), false, false);
       expect(gateway.mockUsers.some((u) => u.contactInfo.email === 'maria@exemplo.com')).toBe(true);
+    });
+  });
+
+  describe('Políticas de credenciais', () => {
+    it('login rejeita e-mail malformado', async () => {
+      const { getByTestId, getByText } = await render(<LoginScreen />);
+      await fireEvent.changeText(getByTestId('input-email'), 'sem-arroba');
+      await fireEvent.changeText(getByTestId('input-pass'), 'qualquer');
+      await fireEvent.press(getByTestId('btn-login'));
+      await waitFor(() => expect(getByText('Informe um e-mail válido.')).toBeTruthy());
+    });
+
+    it('login usa onLogin (AuthContext) quando informado e expõe atalhos', async () => {
+      const onLogin = jest.fn().mockResolvedValue({ id: 'usr_1' });
+      const onSuccess = jest.fn();
+      const onGoToRegister = jest.fn();
+      const onContinueAsVisitor = jest.fn();
+      const { getByTestId } = await render(
+        <LoginScreen
+          onLogin={onLogin}
+          onSuccess={onSuccess}
+          onGoToRegister={onGoToRegister}
+          onContinueAsVisitor={onContinueAsVisitor}
+          demoHint="demo"
+        />
+      );
+      expect(getByTestId('login-demo-hint')).toBeTruthy();
+      await fireEvent.changeText(getByTestId('input-email'), 'ana@exemplo.com');
+      await fireEvent.changeText(getByTestId('input-pass'), 'x');
+      await fireEvent.press(getByTestId('btn-login'));
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith({ id: 'usr_1' }));
+      expect(onLogin).toHaveBeenCalledWith('ana@exemplo.com', 'x');
+      await fireEvent.press(getByTestId('link-register'));
+      await fireEvent.press(getByTestId('link-visitor'));
+      expect(onGoToRegister).toHaveBeenCalled();
+      expect(onContinueAsVisitor).toHaveBeenCalled();
+    });
+
+    it('cadastro rejeita senha curta e senhas diferentes', async () => {
+      const gateway = new AuthGatewayFake();
+      const { getByTestId, getByText } = await render(
+        <RegisterScreen authGateway={gateway} onGoToLogin={() => {}} />
+      );
+      await fireEvent.changeText(getByTestId('input-name'), 'Maria');
+      await fireEvent.changeText(getByTestId('input-email'), 'maria@exemplo.com');
+      await fireEvent.changeText(getByTestId('input-pass'), '123');
+      await fireEvent.changeText(getByTestId('input-confirm-pass'), '123');
+      await fireEvent.press(getByTestId('btn-register'));
+      await waitFor(() => expect(getByText('A senha deve ter ao menos 6 caracteres.')).toBeTruthy());
+
+      await fireEvent.changeText(getByTestId('input-pass'), '123456');
+      await fireEvent.changeText(getByTestId('input-confirm-pass'), '654321');
+      await fireEvent.press(getByTestId('btn-register'));
+      await waitFor(() => expect(getByText('As senhas não coincidem.')).toBeTruthy());
+      expect(gateway.mockUsers.some((u) => u.contactInfo.email === 'maria@exemplo.com')).toBe(false);
+    });
+
+    it('cadastro avisa quando é preciso confirmar o e-mail', async () => {
+      const gateway = new AuthGatewayFake();
+      gateway.register = jest.fn().mockResolvedValue({
+        user: gateway.mockUsers[0],
+        needsEmailConfirmation: true,
+      });
+      const { getByTestId, getByText } = await render(<RegisterScreen authGateway={gateway} />);
+      await fireEvent.changeText(getByTestId('input-name'), 'Maria');
+      await fireEvent.changeText(getByTestId('input-email'), 'maria@exemplo.com');
+      await fireEvent.changeText(getByTestId('input-pass'), '123456');
+      await fireEvent.changeText(getByTestId('input-confirm-pass'), '123456');
+      await fireEvent.press(getByTestId('btn-register'));
+      await waitFor(() =>
+        expect(getByText('Cadastro realizado! Confirme seu e-mail e depois faça login.')).toBeTruthy()
+      );
     });
   });
 });

@@ -2,6 +2,7 @@ import {
   SupabaseClientLike,
   SupabaseModuleLike,
   SupabaseAuthApi,
+  SupabaseStorageApi,
   SupabaseTable,
   SupabaseFilter,
   SupabaseInsertBuilder,
@@ -123,7 +124,13 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
     const isPrivateRow = (row: FakeRow): boolean => row.user_id !== undefined;
     // `users`: policies users_*_own (id = auth.uid()).
     const isUserRow = table === 'users';
+    // `animal_photos`: leitura pública; escrita só do dono do anúncio (is_animal_owner).
+    const isPhotoRow = table === 'animal_photos';
+    const ownsAnimal = (animalId: unknown): boolean =>
+      ctx.currentUserId !== null &&
+      (ctx.db.animals ?? []).some((a: FakeRow) => a.id === animalId && a.owner_id === ctx.currentUserId);
     const canSeeRow = (row: FakeRow): boolean => {
+      if (isPhotoRow) return true;
       if (isUserRow) return ctx.currentUserId !== null && row.id === ctx.currentUserId;
       if (ctx.isAdmin) return true;
       if (isPrivateRow(row)) {
@@ -133,6 +140,7 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
       return row.moderation_status !== 'HIDDEN'; // anônimo/terceiro: público
     };
     const canWriteRow = (row: FakeRow): boolean => {
+      if (isPhotoRow) return ctx.isAdmin || ownsAnimal(row.animal_id);
       if (isUserRow) return ctx.currentUserId !== null && row.id === ctx.currentUserId;
       if (ctx.isAdmin) return true;
       if (ctx.currentUserId === null) return false;
@@ -215,14 +223,59 @@ class FakeTable<TRow extends object> implements SupabaseTable<TRow> {
   }
 }
 
+export interface FakeStorageObject {
+  bucket: string;
+  contentType?: string;
+  size: number;
+}
+
+/** Limites do bucket `animal-photos` (espelham o SQL de `supabase/init.sql`). */
+export const FAKE_BUCKET = 'animal-photos';
+export const FAKE_BUCKET_MAX_BYTES = 2 * 1024 * 1024;
+
 export class FakeSupabaseClient implements SupabaseClientLike {
   auth: SupabaseAuthApi;
+  storage: SupabaseStorageApi;
+  /** Objetos gravados no "bucket", por caminho — para asserções nos testes. */
+  storageObjects = new Map<string, FakeStorageObject>();
   private ctx: FakeSupabaseContext;
 
   constructor(
     options: FakeSupabaseOptions & { authHandlers?: FakeSupabaseAuthHandlers }
   ) {
     this.ctx = options.context;
+    this.storage = {
+      from: (bucket: string) => ({
+        upload: async (path: string, body: ArrayBuffer | Uint8Array, opts?: { contentType?: string; upsert?: boolean }) => {
+          const size = body instanceof Uint8Array ? body.byteLength : (body as ArrayBuffer).byteLength;
+          const ownFolder = this.ctx.currentUserId !== null && path.split('/')[0] === this.ctx.currentUserId;
+          if (bucket !== FAKE_BUCKET || !ownFolder) {
+            // Política animal_photos_insert_own_folder (1ª pasta = auth.uid()).
+            return { data: null, error: { message: 'new row violates row-level security policy' } };
+          }
+          if (opts?.contentType !== 'image/webp') {
+            return { data: null, error: { message: `mime type ${opts?.contentType} is not supported` } };
+          }
+          if (size > FAKE_BUCKET_MAX_BYTES) {
+            return { data: null, error: { message: 'The object exceeded the maximum allowed size' } };
+          }
+          if (this.storageObjects.has(path) && !opts?.upsert) {
+            return { data: null, error: { message: 'The resource already exists' } };
+          }
+          this.storageObjects.set(path, { bucket, contentType: opts?.contentType, size });
+          return { data: { path }, error: null };
+        },
+        remove: async (paths: string[]) => {
+          for (const p of paths) {
+            if (this.ctx.currentUserId !== null && p.split('/')[0] === this.ctx.currentUserId) this.storageObjects.delete(p);
+          }
+          return { error: null };
+        },
+        getPublicUrl: (path: string) => ({
+          data: { publicUrl: `https://fake.supabase.co/storage/v1/object/public/${bucket}/${path}` },
+        }),
+      }),
+    };
     this.auth = {
       signInWithPassword: jest.fn(async ({ email, password }: { email: string; password: string }) => {
         if (options.authHandlers?.signInWithPassword) {
@@ -243,7 +296,14 @@ export class FakeSupabaseClient implements SupabaseClientLike {
       getSession: jest.fn(async () =>
         options.authHandlers?.getSession
           ? options.authHandlers.getSession()
-          : { data: { session: null }, error: null }
+          : {
+              data: {
+                session: this.ctx.currentUserId
+                  ? { access_token: 'fake-token', user: { id: this.ctx.currentUserId } }
+                  : null,
+              },
+              error: null,
+            }
       ),
       getUser: jest.fn(async () =>
         options.authHandlers?.getUser

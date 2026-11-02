@@ -10,7 +10,7 @@ import {
   ApproximateLocation,
 } from '../../../domain/value-objects/ApproximateLocation';
 import { AdoptionStatus } from '../../../domain/value-objects/AdoptionStatus';
-import { SupabaseClientLike, AnimalRow } from '../types';
+import { SupabaseClientLike, AnimalRow, AnimalPhotoRow } from '../types';
 
 export class StaleVersionError extends Error {
   constructor(message = 'Atualização remota rejeitada: versão defasada, registro ausente ou bloqueada pela RLS.') {
@@ -92,6 +92,7 @@ export class SupabaseAnimalRepository implements AnimalRepository {
     }
     const row = (data ?? [])[0];
     if (!row) throw new RemoteSupabaseError('Criação remota não retornou o registro do anúncio.');
+    await this.syncPhotos(animal);
     return SupabaseAnimalRepository.rowToAnimal(row);
   }
 
@@ -121,7 +122,35 @@ export class SupabaseAnimalRepository implements AnimalRepository {
     if (rows.length === 0) {
       throw new StaleVersionError();
     }
+    await this.syncPhotos(animal);
     return SupabaseAnimalRepository.rowToAnimal(rows[0]);
+  }
+
+  /**
+   * Registra em `animal_photos` as fotos já enviadas ao Storage (com
+   * `remote_url`). Fotos ainda só locais não vão: o servidor nunca aponta
+   * para um arquivo que não existe. Apaga-e-regrava para ser idempotente em
+   * reenvios da fila (a RLS restringe ao dono do anúncio).
+   */
+  private async syncPhotos(animal: Animal): Promise<void> {
+    const uploaded = animal.photos.filter((p) => !!p.remoteUrl);
+    const del = await this.client.from<AnimalPhotoRow>('animal_photos').delete().eq('animal_id', animal.id);
+    if (del.error) {
+      throw new RemoteSupabaseError(`Falha ao atualizar as fotos do anúncio: ${del.error.message}`);
+    }
+    if (uploaded.length === 0) return;
+    const rows: Array<Partial<AnimalPhotoRow>> = uploaded.map((p, index) => ({
+      id: p.id,
+      animal_id: animal.id,
+      remote_url: p.remoteUrl,
+      is_main: index === 0,
+      upload_status: 'SYNCED',
+      created_at: p.createdAt,
+    }));
+    const ins = await this.client.from<AnimalPhotoRow>('animal_photos').insert(rows);
+    if (ins.error) {
+      throw new RemoteSupabaseError(`Falha ao registrar as fotos do anúncio: ${ins.error.message}`);
+    }
   }
 
   async deleteRemote(id: string): Promise<void> {

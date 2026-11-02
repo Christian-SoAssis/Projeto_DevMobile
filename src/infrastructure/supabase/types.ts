@@ -44,6 +44,15 @@ export type AnimalRow = {
   version: number;
 };
 
+export interface AnimalPhotoRow {
+  id: string;
+  animal_id: string;
+  remote_url: string | null;
+  is_main: boolean;
+  upload_status: string;
+  created_at: string;
+}
+
 export interface UserRow {
   id: string;
   name?: string | null;
@@ -125,9 +134,25 @@ export interface SupabaseAuthApi {
   getUser(token?: string): Promise<SupabaseUserFetchResponse>;
 }
 
+/** `client.storage.from(bucket)`: só o que o `SupabasePhotoStorage` usa. */
+export interface SupabaseStorageBucket {
+  upload(
+    path: string,
+    body: ArrayBuffer | Uint8Array,
+    options?: { contentType?: string; upsert?: boolean }
+  ): Promise<{ data: { path: string } | null; error: { message: string } | null }>;
+  remove(paths: string[]): Promise<{ error: { message: string } | null }>;
+  getPublicUrl(path: string): { data: { publicUrl: string } };
+}
+
+export interface SupabaseStorageApi {
+  from(bucket: string): SupabaseStorageBucket;
+}
+
 /** Cliente mínimo do SDK. */
 export interface SupabaseClientLike {
   auth: SupabaseAuthApi;
+  storage: SupabaseStorageApi;
   /** O parâmetro `TRow` dá tipografia do row por tabela usado pelo adapter. */
   from<TRow extends object = Record<string, unknown>>(table: string): SupabaseTable<TRow>;
 }

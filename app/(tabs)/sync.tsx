@@ -7,7 +7,7 @@ import { useRepositories } from '../../src/adapters/context/RepositoriesContext'
 
 export default function SyncTab() {
   // Fase 2: fila e repositório persistidos no SQLite ao sincronizar.
-  const { animalRepository, syncQueueRepository } = useRepositories();
+  const { animalRepository, syncQueueRepository, remotePhotoStorage } = useRepositories();
 
   return (
     <RequireAccess area="SYNC">
@@ -16,6 +16,7 @@ export default function SyncTab() {
           <SyncStatusScreen
             syncQueueRepository={syncQueueRepository}
             animalRepository={animalRepository}
+            remotePhotoStorage={remotePhotoStorage}
           />
         </SafeAreaView>
       )}

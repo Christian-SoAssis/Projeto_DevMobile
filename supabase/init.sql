@@ -251,13 +251,49 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- ============================================================================
--- Storage (Passo 4 — bucket padrão S3): as políticas do bucket "animal-photos"
--- serão documentadas junto com o cliente de upload (src/infrastructure/supabase/storage/).
--- Placeholder mínimo, para não bloquear o deploy do schema:
+-- Storage (Passo 4): bucket público "animal-photos" (padrão S3 do Supabase).
+-- Só aceita WebP (o app converte toda foto antes do envio) até 2 MB.
+-- Caminho: {auth.uid()}/{animal_id}/{photo_id}.webp — a 1ª pasta é o dono.
+-- Leitura: pública por URL (anúncios são públicos, RF06); sem política de
+-- SELECT em storage.objects, então listar objetos pela API continua bloqueado.
 -- ============================================================================
--- insert into storage.buckets (id, name, public)
--- values ('animal-photos', 'animal-photos', true)
--- on conflict (id) do update set public = true;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('animal-photos', 'animal-photos', true, 2097152, array['image/webp'])
+on conflict (id) do update
+  set public = true,
+      file_size_limit = 2097152,
+      allowed_mime_types = array['image/webp'];
+
+drop policy if exists "animal_photos_insert_own_folder" on storage.objects;
+create policy "animal_photos_insert_own_folder" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'animal-photos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "animal_photos_update_own_folder" on storage.objects;
+create policy "animal_photos_update_own_folder" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'animal-photos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'animal-photos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "animal_photos_delete_own_or_admin" on storage.objects;
+create policy "animal_photos_delete_own_or_admin" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'animal-photos'
+    and (
+      (storage.foldername(name))[1] = auth.uid()::text
+      or public.is_admin()
+    )
+  );
 
 -- ============================================================================
 -- Anti-escalada de privilégio: a política users_update_own deixa o usuário

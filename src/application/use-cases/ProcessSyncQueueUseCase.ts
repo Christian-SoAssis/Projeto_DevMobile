@@ -1,5 +1,7 @@
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
+import { PhotoStorage } from '../../domain/ports/PhotoStorage';
+import { Animal } from '../../domain/entities/Animal';
 import { SyncAction } from '../../domain/entities/SyncAction';
 import { SincronizacaoService } from '../../domain/services/SincronizacaoService';
 
@@ -15,7 +17,12 @@ export class ProcessSyncQueueUseCase {
   constructor(
     private syncQueueRepository: SyncQueueRepository,
     private animalRepository: AnimalRepository,
-    private maxAttempts: number = 5
+    private maxAttempts: number = 5,
+    /**
+     * Upload remoto das fotos (só informado com backend configurado). As
+     * imagens sobem ANTES da gravação do anúncio (doc §14.1 passos 5–6).
+     */
+    private remotePhotoStorage?: PhotoStorage
   ) {}
 
   async execute(): Promise<SyncProcessResult> {
@@ -63,6 +70,24 @@ export class ProcessSyncQueueUseCase {
     }
   }
 
+  /**
+   * Envia as fotos locais ainda sem URL remota e persiste a URL no cache
+   * local. Se um upload falhar, a ação inteira falha e é reenviada depois
+   * (sem anúncio remoto apontando para foto inexistente).
+   */
+  private async uploadPendingPhotos(animal: Animal): Promise<void> {
+    if (!this.remotePhotoStorage) return;
+    let uploadedAny = false;
+    for (const photo of animal.photos) {
+      if (photo.remoteUrl || !photo.localPath) continue;
+      await this.remotePhotoStorage.uploadPending(photo);
+      uploadedAny = true;
+    }
+    if (uploadedAny) {
+      await this.animalRepository.saveLocal(animal);
+    }
+  }
+
   private async applyAction(action: SyncAction): Promise<void> {
     if (action.entityType !== 'animal') {
       throw new Error(
@@ -76,6 +101,7 @@ export class ProcessSyncQueueUseCase {
         if (!animal) {
           throw new Error('Registro local do anúncio não encontrado para sincronizar.');
         }
+        await this.uploadPendingPhotos(animal);
         await this.animalRepository.createRemote(animal);
         return;
       }
@@ -85,6 +111,7 @@ export class ProcessSyncQueueUseCase {
         if (!animal) {
           throw new Error('Registro local do anúncio não encontrado para sincronizar.');
         }
+        await this.uploadPendingPhotos(animal);
         await this.animalRepository.updateRemote(animal);
         return;
       }

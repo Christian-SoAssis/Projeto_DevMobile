@@ -16,7 +16,7 @@ export class PhotoStorageFake implements PhotoStorage {
   }
 
   async uploadPending(photo: AnimalPhoto): Promise<AnimalPhoto> {
-    photo.markUploaded(`https://storage.fake/${photo.animalId}/${photo.id}.jpg`);
+    photo.markUploaded(photo.remoteUrl || `https://storage.fake/${photo.animalId}/${photo.id}.jpg`);
     this.photos.set(photo.id, photo);
     return photo;
   }

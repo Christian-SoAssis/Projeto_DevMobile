@@ -16,6 +16,10 @@ import { SqliteAnimalRepository } from '../database/sqlite/repositories/SqliteAn
 import { SqliteFavoriteRepository } from '../database/sqlite/repositories/SqliteFavoriteRepository';
 import { SqliteAdoptionInterestRepository } from '../database/sqlite/repositories/SqliteAdoptionInterestRepository';
 import { SqliteSyncQueueRepository } from '../database/sqlite/repositories/SqliteSyncQueueRepository';
+import { ImageProcessor } from '../../domain/ports/ImageProcessor';
+import { WebpPhotoStorage } from '../../application/photos/WebpPhotoStorage';
+import { ExpoImageManipulatorAdapter } from '../device/image/ExpoImageManipulatorAdapter';
+import { SupabasePhotoStorage, FileReader } from '../supabase/storage/SupabasePhotoStorage';
 import { SqlitePhotoStorage } from '../database/sqlite/repositories/SqlitePhotoStorage';
 import { SqliteUserRepository } from '../database/sqlite/repositories/SqliteUserRepository';
 import { SqliteSearchPreferencesRepository } from '../database/sqlite/repositories/SqliteSearchPreferencesRepository';
@@ -43,6 +47,8 @@ export interface AppContainer {
   interestRepository: AdoptionInterestRepository;
   syncQueueRepository: SyncQueueRepository;
   photoStorage: PhotoStorage;
+  /** Upload ao Supabase Storage; só existe com backend configurado (Passo 4). */
+  remotePhotoStorage?: PhotoStorage;
   userRepository: UserRepository;
   searchPreferencesRepository: SearchPreferencesRepository;
   syncMetadataRepository: SyncMetadataRepository;
@@ -64,6 +70,10 @@ export interface AppContainerOptions {
   supabaseModule?: SupabaseModuleLike | null;
   /** Config explícita (testes) — alternativa a `EXPO_PUBLIC_*`. */
   supabaseConfig?: SupabaseConfig | null;
+  /** Conversor de imagens injetado (testes). Padrão: expo-image-manipulator (WebP). */
+  imageProcessor?: ImageProcessor;
+  /** Leitor de arquivos para o upload (testes). Padrão: expo-file-system. */
+  readFile?: FileReader;
 }
 
 /**
@@ -101,7 +111,12 @@ export async function loadAppContainer(
   const favoriteRepository = new SqliteFavoriteRepository(db);
   const interestRepository = new SqliteAdoptionInterestRepository(db);
   const syncQueueRepository = new SqliteSyncQueueRepository(db);
-  const photoStorage = new SqlitePhotoStorage(db);
+  // Conversão para WebP obrigatória em toda foto guardada (local e remota).
+  let photoStorage: PhotoStorage = new WebpPhotoStorage(
+    new SqlitePhotoStorage(db),
+    options.imageProcessor ?? new ExpoImageManipulatorAdapter()
+  );
+  let remotePhotoStorage: PhotoStorage | undefined;
   const userRepository = new SqliteUserRepository(db);
   const searchPreferencesRepository = new SqliteSearchPreferencesRepository(db);
   const syncMetadataRepository = new SqliteSyncMetadataRepository(db);
@@ -111,6 +126,12 @@ export async function loadAppContainer(
   let moderationGateway: ModerationGateway | undefined;
   if (supabaseClient) {
     animalRepository = new SupabaseAnimalRepository({ local: animalRepository, client: supabaseClient });
+    photoStorage = new SupabasePhotoStorage({
+      local: photoStorage,
+      client: supabaseClient,
+      readFile: options.readFile,
+    });
+    remotePhotoStorage = photoStorage;
     authGateway = new SupabaseAuthGateway({ client: supabaseClient });
     moderationGateway = new SupabaseModerationRepository({ client: supabaseClient });
   }
@@ -132,6 +153,7 @@ export async function loadAppContainer(
     interestRepository,
     syncQueueRepository,
     photoStorage,
+    remotePhotoStorage,
     userRepository,
     searchPreferencesRepository,
     syncMetadataRepository,

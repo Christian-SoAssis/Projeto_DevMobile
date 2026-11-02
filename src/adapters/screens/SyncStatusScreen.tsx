@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { SyncAction } from '../../domain/entities/SyncAction';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
+import { PhotoStorage } from '../../domain/ports/PhotoStorage';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { ProcessSyncQueueUseCase } from '../../application/use-cases/ProcessSyncQueueUseCase';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
@@ -15,11 +16,14 @@ import {
 export interface SyncStatusScreenProps {
   syncQueueRepository?: SyncQueueRepository;
   animalRepository?: AnimalRepository;
+  /** Upload remoto das fotos (só com backend configurado). */
+  remotePhotoStorage?: PhotoStorage;
 }
 
 export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
   syncQueueRepository = new SyncQueueRepositoryFake(),
   animalRepository = new AnimalRepositoryFake(),
+  remotePhotoStorage,
 }) => {
   const [pending, setPending] = useState<SyncAction[]>([]);
   const [syncing, setSyncing] = useState(false);
@@ -37,7 +41,12 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
   const handleSyncNow = async () => {
     setSyncing(true);
     try {
-      const useCase = new ProcessSyncQueueUseCase(syncQueueRepository, animalRepository);
+      const useCase = new ProcessSyncQueueUseCase(
+        syncQueueRepository,
+        animalRepository,
+        undefined,
+        remotePhotoStorage
+      );
       const res = await useCase.execute();
       setLastResult(
         `Processados: ${res.processedCount} | Sucesso: ${res.successCount} | Falhas: ${res.failedCount}`

@@ -137,7 +137,9 @@ export class SqlitePhotoStorage implements PhotoStorage {
       // (File/Directory/Paths) não expõe `documentDirectory`/`copyAsync`.
       const FileSystem = require('expo-file-system/legacy');
       const directory = `${FileSystem.documentDirectory}animal_photos/`;
-      const target = `${directory}${photo.id}.jpg`;
+      // Mantém a extensão de origem (o pipeline de fotos gera .webp).
+      const extension = /\.([a-z0-9]{2,5})(?:\?.*)?$/i.exec(source)?.[1]?.toLowerCase() ?? 'jpg';
+      const target = `${directory}${photo.id}.${extension}`;
 
       const dirInfo = await FileSystem.getInfoAsync(directory);
       if (!dirInfo.exists) {

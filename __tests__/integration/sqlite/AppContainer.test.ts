@@ -1,5 +1,6 @@
 import { InMemorySqliteDriver } from '../../../src/infrastructure/database/sqlite/DatabaseDriver';
 import { INITIAL_SCHEMA_SQL } from '../../../src/infrastructure/database/sqlite/migrations/schema.sql';
+import { ImageProcessorFake } from '../../../src/application/fakes/ImageProcessorFake';
 import { loadAppContainer } from '../../../src/infrastructure/composition/loadAppContainer';
 import { Animal } from '../../../src/domain/entities/Animal';
 import { AnimalPhoto } from '../../../src/domain/entities/AnimalPhoto';
@@ -78,7 +79,7 @@ describe('loadAppContainer — composição da Fase 2 (cache online/offline no S
     const db = new InMemorySqliteDriver();
     await db.execAsync(INITIAL_SCHEMA_SQL);
 
-    const container = await loadAppContainer(db);
+    const container = await loadAppContainer(db, { imageProcessor: new ImageProcessorFake() });
 
     await container.favoriteRepository.addFavorite(new Favorite('usr_2', 'anim_1'));
     await container.interestRepository.registerInterest(
@@ -102,7 +103,9 @@ describe('loadAppContainer — composição da Fase 2 (cache online/offline no S
       animalId: 'anim_1',
       localPath: 'file://p1.jpg',
     });
-    await container.photoStorage.persistLocal(photo);
+    const saved = await container.photoStorage.persistLocal(photo);
+    // A conversão para WebP é obrigatória: a foto guardada já é .webp.
+    expect(saved.localPath).toMatch(/\.webp$/);
     const pending = await container.photoStorage.listPendingUpload();
     expect(pending).toHaveLength(1);
     expect(pending[0].animalId).toBe('anim_1');

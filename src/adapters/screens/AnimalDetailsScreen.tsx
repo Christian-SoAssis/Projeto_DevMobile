@@ -10,6 +10,7 @@ import { ToggleFavoriteUseCase } from '../../application/use-cases/ToggleFavorit
 import { InterestContact, RegisterAdoptionInterestUseCase } from '../../application/use-cases/RegisterAdoptionInterestUseCase';
 import { MarkAnimalAdoptedUseCase } from '../../application/use-cases/MarkAnimalAdoptedUseCase';
 import { GerarPdfUseCase } from '../../application/use-cases/GerarPdfUseCase';
+import { AnimalPhotoView } from '../components/AnimalPhotoView';
 import { FavoriteRepositoryFake } from '../../application/fakes/FavoriteRepositoryFake';
 import { AdoptionInterestRepositoryFake } from '../../application/fakes/AdoptionInterestRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
@@ -164,6 +165,14 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
         </TouchableOpacity>
       )}
 
+      {/* Foto em destaque (RF09): arquivo local primeiro, URL remota se sobrar apenas
+          ela — ver AnimalPhotoView. Placeholder quando o anúncio ainda não tem foto. */}
+      <AnimalPhotoView
+        photo={animal.photos.length > 0 ? animal.photos[0] : null}
+        testID="animal-photo"
+        style={styles.photoHero}
+      />
+
       {feedback && (
         <View style={styles.feedbackBanner} testID="feedback-message">
           <Text style={styles.feedbackText}>{feedback}</Text>
@@ -263,6 +272,10 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  photoHero: {
+    height: 200,
+    marginBottom: 16,
+  },
   interestsBox: { marginTop: 8, marginBottom: 8 },
   interestsTitle: { fontSize: 16, fontWeight: 'bold', color: '#1c1c1e', marginBottom: 8 },
   interestsEmpty: { color: '#8e8e93', marginBottom: 8 },

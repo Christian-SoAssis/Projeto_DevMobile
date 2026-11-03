@@ -17,6 +17,7 @@ import { LocationGatewayFake } from '../../application/fakes/LocationGatewayFake
 import { PhotoStorageFake } from '../../application/fakes/PhotoStorageFake';
 import { UnitOfWork } from '../../application/ports/UnitOfWork';
 import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
+import { AnimalPhotoView } from '../components/AnimalPhotoView';
 
 export interface AnimalFormScreenProps {
   ownerId?: string;
@@ -272,6 +273,15 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         <TouchableOpacity style={styles.hwBtn} onPress={handleCapturePhoto} testID="btn-capture-photo">
           <Text style={styles.hwBtnText}>📷 Capturar Foto (Câmera)</Text>
         </TouchableOpacity>
+
+        {/* Pré-visualização (RF09): mostra a foto recém-capturada; em edição,
+            começa já com a foto atual do anúncio (só é substituída por nova captura). */}
+        <AnimalPhotoView
+          uri={capturedPhotoUri}
+          photo={capturedPhotoUri ? null : initialAnimal?.photos?.[0] ?? null}
+          testID="form-photo-preview"
+          style={styles.photoPreview}
+        />
         {capturedPhotoUri && (
           <Text style={styles.hwStatus} testID="photo-status">
             Foto capturada: {capturedPhotoUri}
@@ -369,6 +379,10 @@ const styles = StyleSheet.create({
   hwBtnText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  photoPreview: {
+    height: 170,
+    marginBottom: 10,
   },
   hwStatus: {
     fontSize: 12,

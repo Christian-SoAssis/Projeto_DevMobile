@@ -104,6 +104,10 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
         setAvatarUri(photo.uri);
       } else if (source === 'camera') {
         setFeedback('Não foi possível usar a câmera. Escolha uma foto da galeria.');
+      } else {
+        // Galeria devolveu nada (cancelamento ou permissão negada) — antes disso
+        // o botão "Escolher da galeria" ficava mudo e parecia não funcionar.
+        setFeedback('Nenhuma foto selecionada.');
       }
     } catch {
       setFeedback('Não foi possível acessar a foto. Tente novamente.');

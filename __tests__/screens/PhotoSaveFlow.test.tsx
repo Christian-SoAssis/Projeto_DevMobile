@@ -53,6 +53,13 @@ function cameraWith(uri: string | null): CameraGateway {
   } as unknown as CameraGateway;
 }
 
+function galleryWith(uri: string): CameraGateway {
+  return {
+    capturePhoto: async () => null,
+    pickImageFromGallery: async () => ({ uri } as CameraPhotoResult),
+  } as unknown as CameraGateway;
+}
+
 describe('AnimalFormScreen — foto capturada pode ser salva no banco local de forma robusta', () => {
   it('foto capturada → PhotoStorage copia o arquivo e a foto no animal leva o destino persistido', async () => {
     const repo = new AnimalRepositoryFake();
@@ -92,6 +99,44 @@ describe('AnimalFormScreen — foto capturada pode ser salva no banco local de f
     expect(saved.photos).toHaveLength(1);
     expect(saved.photos[0].localPath).toBe(`${PERSISTED_PREFIX}${saved.photos[0].id}.jpg`);
     expect(saved.photos[0].localPath).not.toBe(CAPTURED_URI);
+  });
+
+  it('galeria: foto escolhida segue o mesmo fluxo da câmera (persistida antes de anexar)', async () => {
+    const repo = new AnimalRepositoryFake();
+    const storage = new PersistingStorageSpy();
+    const GALLERY_URI = 'file:///expo-galeria/anim-photo.jpg';
+
+    const { getByTestId, getByText } = await render(
+      <AnimalFormScreen
+        animalRepository={repo}
+        syncQueueRepository={new SyncQueueRepositoryFake()}
+        cameraGateway={galleryWith(GALLERY_URI)}
+        photoStorage={storage}
+      />
+    );
+
+    await fireEvent.press(getByTestId('btn-pick-gallery'));
+    await waitFor(() => {
+      expect(getByText('Foto escolhida da galeria!')).toBeTruthy();
+    });
+
+    // O preview aparece imediatamente com a URI escolhida (RF09).
+    expect(getByTestId('form-photo-preview').props.source).toEqual({ uri: GALLERY_URI });
+
+    await fireEvent.changeText(getByTestId('input-name'), 'Luna DaGaleria');
+    await fireEvent.press(getByTestId('btn-submit-animal'));
+    await waitFor(() => {
+      expect(getByText(/Anúncio cadastrado/)).toBeTruthy();
+    });
+
+    // Mesmo contrato da câmera: PhotoStorage recebe a URI bruta ANTES do anúncio…
+    expect(storage.calls).toHaveLength(1);
+    expect(storage.calls[0].localPath).toBe(GALLERY_URI);
+    // …e o agregado leva o destino copiado.
+    const saved = Array.from(repo.items.values())[0];
+    expect(saved.photos).toHaveLength(1);
+    expect(saved.photos[0].localPath).toBe(`${PERSISTED_PREFIX}${saved.photos[0].id}.jpg`);
+    expect(saved.photos[0].localPath).not.toBe(GALLERY_URI);
   });
 
   it('sem foto capturada → nada é enviado ao PhotoStorage (anúncio segue sem foto)', async () => {

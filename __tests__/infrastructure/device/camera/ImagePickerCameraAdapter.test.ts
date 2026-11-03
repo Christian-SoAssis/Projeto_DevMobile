@@ -12,7 +12,7 @@ function buildFakeImagePicker(options: {
     requestCameraPermissionsAsync: async () => ({ granted: options.cameraGranted ?? true }),
     launchCameraAsync: async () =>
       (options.launchResult?.() ?? { canceled: false, assets: [{ uri: 'file://fake.jpg' }] }) as any,
-    pickImageAsync: async () =>
+    launchImageLibraryAsync: async () =>
       (options.pickResult?.() ?? { canceled: false, assets: [{ uri: 'file://picked.jpg' }] }) as any,
   };
 }
@@ -80,6 +80,27 @@ describe('ImagePickerCameraAdapter — câmera/galeria com expo-image-picker (RF
     expect(photo!.uri).toBe('file://picked.jpg');
   });
 
+  it('galeria funciona com o módulo EXATO do expo-image-picker SDK 58 (sem `pickImageAsync`)', async () => {
+    // Regressão: no app real o módulo só tem `launchImageLibraryAsync`. Antes,
+    // chamar `pickImageAsync` (inexistente) dava TypeError silencioso e o botão
+    // "Escolher da galeria" da conta não fazia nada no device.
+    const RealSdkShapeModule = {
+      requestCameraPermissionsAsync: async () => ({ granted: true }),
+      launchCameraAsync: async () => ({ canceled: true }),
+      launchImageLibraryAsync: async () => ({
+        canceled: false,
+        assets: [{ uri: 'file://galeria-real.jpg' }],
+      }),
+    };
+    const adapter = new ImagePickerCameraAdapter({
+      imagePickerModule: RealSdkShapeModule as unknown as ImagePickerModule,
+    });
+
+    const photo = await adapter.pickImageFromGallery();
+
+    expect(photo?.uri).toBe('file://galeria-real.jpg');
+  });
+
   it('galeria cancelada/quebrada devolve null — fluxo segue sem foto (doc §16.3)', async () => {
     const cancelada = new ImagePickerCameraAdapter({
       imagePickerModule: buildFakeImagePicker({
@@ -108,12 +129,12 @@ describe('ImagePickerCameraAdapter — câmera/galeria com expo-image-picker (RF
 
   it('qualidade padrão é aplicada nas chamadas de captura', async () => {
     const launch = jest.fn().mockResolvedValue({ canceled: true });
-    const pick = jest.fn().mockResolvedValue({ canceled: true });
+    const library = jest.fn().mockResolvedValue({ canceled: true });
     const adapter = new ImagePickerCameraAdapter({
       imagePickerModule: {
         requestCameraPermissionsAsync: async () => ({ granted: true }),
         launchCameraAsync: launch,
-        pickImageAsync: pick,
+        launchImageLibraryAsync: library,
       },
       quality: 0.4,
     });
@@ -122,6 +143,6 @@ describe('ImagePickerCameraAdapter — câmera/galeria com expo-image-picker (RF
     await adapter.pickImageFromGallery();
 
     expect(launch).toHaveBeenCalledWith({ quality: 0.4 });
-    expect(pick).toHaveBeenCalledWith({ quality: 0.4 });
+    expect(library).toHaveBeenCalledWith({ quality: 0.4 });
   });
 });

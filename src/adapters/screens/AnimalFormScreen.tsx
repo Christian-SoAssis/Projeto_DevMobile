@@ -68,6 +68,18 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
     }
   };
 
+  // RF09: a foto pode vir da câmera OU da galeria — mesmo fluxo de
+  // persistência (WebP + cópia) e mesmo preview dos dois caminhos.
+  const handlePickGallery = async () => {
+    const photo = await cameraGateway.pickImageFromGallery();
+    if (photo) {
+      setCapturedPhotoUri(photo.uri);
+      setFeedback('Foto escolhida da galeria!');
+    } else {
+      setFeedback('Nenhuma foto selecionada. Conceda a permissão da galeria ou salve o anúncio sem foto.');
+    }
+  };
+
   const handleCaptureLocation = async () => {
     try {
       const loc = await locationGateway.getCurrentLocation();
@@ -268,11 +280,16 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         testID="input-city"
       />
 
-      {/* Camera & Location Triggers */}
+      {/* Camera & Gallery Triggers */}
       <View style={styles.hardwareSection}>
-        <TouchableOpacity style={styles.hwBtn} onPress={handleCapturePhoto} testID="btn-capture-photo">
-          <Text style={styles.hwBtnText}>📷 Capturar Foto (Câmera)</Text>
-        </TouchableOpacity>
+        <View style={styles.hwBtnRow}>
+          <TouchableOpacity style={styles.hwBtn} onPress={handleCapturePhoto} testID="btn-capture-photo">
+            <Text style={styles.hwBtnText}>📷 Câmera</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.hwBtn} onPress={handlePickGallery} testID="btn-pick-gallery">
+            <Text style={styles.hwBtnText}>🖼️ Galeria</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Pré-visualização (RF09): mostra a foto recém-capturada; em edição,
             começa já com a foto atual do anúncio (só é substituída por nova captura). */}
@@ -288,7 +305,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           </Text>
         )}
 
-        <TouchableOpacity style={styles.hwBtn} onPress={handleCaptureLocation} testID="btn-capture-location">
+        <TouchableOpacity style={[styles.hwBtn, styles.hwBtnWide]} onPress={handleCaptureLocation} testID="btn-capture-location">
           <Text style={styles.hwBtnText}>📍 Obter Geolocalização</Text>
         </TouchableOpacity>
         <Text style={styles.hwStatus} testID="location-status">
@@ -370,10 +387,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   hwBtn: {
+    flex: 1,
     backgroundColor: '#6c757d',
     paddingVertical: 10,
     borderRadius: 6,
     alignItems: 'center',
+  },
+  hwBtnWide: {
+    flex: 0,
+  },
+  hwBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
     marginBottom: 6,
   },
   hwBtnText: {

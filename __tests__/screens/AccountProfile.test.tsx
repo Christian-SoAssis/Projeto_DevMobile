@@ -83,6 +83,27 @@ describe('AccountScreen — edição de perfil', () => {
     expect(queryByTestId('avatar-remove')).toBeNull();
   });
 
+  it('galeria cancelada/negada → aviso “Nenhuma foto selecionada” em vez de silêncio', async () => {
+    const camera: CameraGateway = {
+      capturePhoto: jest.fn().mockResolvedValue(null),
+      pickImageFromGallery: jest.fn().mockResolvedValue(null),
+    };
+    const onSaveProfile = jest.fn().mockResolvedValue({ user: ana(), syncedRemotely: true });
+    const { getByTestId, getByText, queryByTestId } = await render(
+      <AccountScreen user={ana()} cameraGateway={camera} onSaveProfile={onSaveProfile} />
+    );
+
+    await fireEvent.press(getByTestId('avatar-gallery'));
+
+    await waitFor(() => expect(getByText('Nenhuma foto selecionada.')).toBeTruthy());
+    // Sem foto: botão remover não aparece e nada é salvo com avatar.
+    expect(queryByTestId('avatar-remove')).toBeNull();
+    await fireEvent.press(getByTestId('profile-save'));
+    await waitFor(() =>
+      expect(onSaveProfile).toHaveBeenCalledWith(expect.objectContaining({ avatarUri: null }))
+    );
+  });
+
   it('erro ao acessar a foto vira mensagem, não exceção', async () => {
     const camera: CameraGateway = {
       capturePhoto: jest.fn(),

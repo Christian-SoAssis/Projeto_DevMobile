@@ -25,10 +25,11 @@ export interface ImagePickerModule {
    */
   launchCameraAsync(options?: { quality?: number; allowsEditing?: boolean }): Promise<PickResult>;
   /**
-   * `ImagePicker.pickImageAsync` — a própria API trata a permissão da
-   * biblioteca de mídia e o cancelamento do usuário.
+   * `ImagePicker.launchImageLibraryAsync` — abre a galeria; o SDK já trata a
+   * permissão de mídia e o cancelamento do usuário (`mediaTypes` tem default
+   * `'images'`, então vídeo não entra).
    */
-  pickImageAsync(options?: { quality?: number; allowsMultipleSelection?: boolean }): Promise<PickResult>;
+  launchImageLibraryAsync(options?: { quality?: number; allowsMultipleSelection?: boolean }): Promise<PickResult>;
 }
 
 export interface ImagePickerCameraAdapterOptions {
@@ -88,7 +89,10 @@ export class ImagePickerCameraAdapter implements CameraGateway {
       return null;
     }
     try {
-      const result = await this.imagePicker.pickImageAsync({ quality: this.quality });
+      // SDK 57+: a API da galeria é `launchImageLibraryAsync`. `pickImageAsync`
+      // NÃO existe no módulo real — chamá-la lança `TypeError`, que era capturado
+      // pelo catch abaixo e virava `null` silencioso (bug do botão da conta).
+      const result = await this.imagePicker.launchImageLibraryAsync({ quality: this.quality });
       return this.toPhotoResult(result);
     } catch {
       return null;

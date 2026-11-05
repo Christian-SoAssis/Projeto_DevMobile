@@ -13,7 +13,7 @@ import { ImageProcessorFake } from '../../src/application/fakes/ImageProcessorFa
 import { CreateAnimalUseCase } from '../../src/application/use-cases/CreateAnimalUseCase';
 import { UpdateAnimalUseCase } from '../../src/application/use-cases/UpdateAnimalUseCase';
 import { MarkAnimalAdoptedUseCase } from '../../src/application/use-cases/MarkAnimalAdoptedUseCase';
-import { ResolveConflictUseCase } from '../../src/application/use-cases/ResolveConflictUseCase';
+import { ResolveSyncConflictUseCase } from '../../src/application/use-cases/ResolveSyncConflictUseCase';
 import { Animal } from '../../src/domain/entities/Animal';
 import { AnimalPhoto } from '../../src/domain/entities/AnimalPhoto';
 import { AnimalCharacteristics } from '../../src/domain/value-objects/AnimalCharacteristics';
@@ -126,7 +126,7 @@ describe('E2E offline → sync (doc §16.4 itens 4, 5, 6 e 8)', () => {
     expect(first.push.conflictCount).toBe(1);
     expect(db.animals[0].status).toBe('AVAILABLE');
 
-    const resolver = new ResolveConflictUseCase(app.animalRepository, app.remoteAnimalSource!, app.syncQueueRepository);
+    const resolver = new ResolveSyncConflictUseCase(app.animalRepository, app.remoteAnimalSource!, app.syncQueueRepository);
     const [conflict] = await resolver.listConflicts();
     await resolver.keepLocal(conflict.action.id);
     const second = await getFullSync(app).execute();

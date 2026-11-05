@@ -45,7 +45,8 @@
 **Gaps nominais registrados (sem renomear nada por conta própria):**
 - Critério §7 pede `Coordenada`/`StatusSincronizacao`/`SincronizarFilaUseCase`; o código tem `ApproximateLocation`/`SyncState`/`ProcessSyncQueueUseCase`. Manter os nomes do código.
 - ~~Ausente vs. documentação §8/§16: `ModerateAnimalUseCase`~~ — ✅ implementado no Passo 3 (`src/application/use-cases/ModerateAnimalUseCase.ts` + port `ModerationGateway`).
-- Trilha "estágio/relatórios" (`PeriodoAvaliacao`, `Estagio`, `TokenSupervisor`, telas `AssinaturaScreen`/`AtividadesFormScreen`/`HistoricoRelatoriosScreen`) é **legado** da rubrica, fora do escopo do planejamento. Nada é criado, removido ou renomeado nela sem decisão explícita.
+- ~~Duplicidade `ResolveSyncConflictUseCase` + `ResolveConflictUseCase`~~ — ✅ **consolidado (Fase A, 05/11):** a classe única `ResolveSyncConflictUseCase` (nome exigido pela doc §§3.2/11/16.2) absorveu a revisão manual completa (`listConflicts`/`keepLocal`/`useRemote`) e `ResolveConflictUseCase` foi removido; a avaliação automática permanece no domínio (`ConflictResolutionService`). Suíte verde (405/405), typecheck limpo; a doc de software já usava o nome consolidado — agora o código casa com ela.
+- ~~Trilha "estágio/relatórios" (`PeriodoAvaliacao`, `Estagio`, `TokenSupervisor`, telas `AssinaturaScreen`/`AtividadesFormScreen`/`HistoricoRelatoriosScreen`)~~ — **decisão explícita registrada:** a trilha é **legado da rubrica original** (template de estágio/relatórios, não do Enlace) e foi **removida deliberadamente** no commit `75bce6c`. Nenhum modelo/service/tela dela voltará sem nova decisão; os nomes do código (`ApproximateLocation`, `SyncState`, etc.) prevalecem sobre os homônimos da rubrica.
 
 ---
 
@@ -148,7 +149,7 @@
 - **Autenticação e perfis:** ✅ login/cadastro por e-mail e senha (cadastro já entra na conta), política de acesso (visitante / autenticado / admin), tela Conta com foto, descrição e interesses.
 - **Mapa (RF05/RF25):** ✅ `react-native-maps` com marcador + círculo de área aproximada (nunca a coordenada exata); na web/Jest cai na lista de pinos. Falta o filtro por distância (RF04) e o raio máximo — dependem do §4. Build próprio no Android precisa da chave do Google Maps (`android.config.googleMaps.apiKey`).
 - **RNFs de desempenho e escalabilidade (RNF13/14/15):** valores **propostos** na doc §2.2 — abertura de cache ≤ 1 s, operações remotas sem bloquear UI, listagem paginada/limitada no Supabase. **Não medidos**: medir em aparelho real e registrar; se o valor "proposto" for rejeitado, volta ao §4 como bloqueador.
-- **E2E e verificação:** ✅ os 8 fluxos do §16.4 têm teste (5 em mock, 4–6 e 8 com SQLite em arquivo + backend simulado). `expo-doctor` e validação manual em Expo Go/aparelho continuam pendentes.
+- **E2E e verificação:** ✅ os 8 fluxos do §16.4 têm teste (5 em mock, 4–6 e 8 com SQLite em arquivo + backend simulado). Dependências realinhadas com `npx expo install --fix` → `expo-doctor` **20/20** (6 pacotes do SDK 58 estavam um patch/minor atrás após a reinstalação do checkout). Validação manual em Expo Go/aparelho continua pendente.
 
 ---
 

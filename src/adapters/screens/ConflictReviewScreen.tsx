@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import { Animal } from '../../domain/entities/Animal';
-import { ConflictView, ResolveConflictUseCase } from '../../application/use-cases/ResolveConflictUseCase';
+import { ConflictView, ResolveSyncConflictUseCase } from '../../application/use-cases/ResolveSyncConflictUseCase';
 
 export interface ConflictReviewScreenProps {
-  useCase: ResolveConflictUseCase;
+  useCase: ResolveSyncConflictUseCase;
   /** Chamado depois de resolver, para a tela Sync atualizar o resumo. */
   onResolved?: () => void;
   onBack?: () => void;

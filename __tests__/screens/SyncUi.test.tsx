@@ -6,7 +6,7 @@ import { AnimalDetailsScreen } from '../../src/adapters/screens/AnimalDetailsScr
 import { useAutoSync } from '../../src/adapters/hooks/useAutoSync';
 import { SyncAction } from '../../src/domain/entities/SyncAction';
 import { ConflictResolutionService } from '../../src/domain/services/ConflictResolutionService';
-import { ConflictView, ResolveConflictUseCase } from '../../src/application/use-cases/ResolveConflictUseCase';
+import { ConflictView, ResolveSyncConflictUseCase } from '../../src/application/use-cases/ResolveSyncConflictUseCase';
 import { SyncQueueRepositoryFake } from '../../src/application/fakes/SyncQueueRepositoryFake';
 import { AnimalRepositoryFake } from '../../src/application/fakes/AnimalRepositoryFake';
 import { ConnectivityGateway } from '../../src/domain/ports/ConnectivityGateway';
@@ -55,7 +55,7 @@ describe('ConflictReviewScreen', () => {
         state.views = [];
       }),
     };
-    return { useCase: useCase as unknown as ResolveConflictUseCase, mocks: useCase };
+    return { useCase: useCase as unknown as ResolveSyncConflictUseCase, mocks: useCase };
   }
 
   it('mostra sua edição ao lado da do servidor e permite manter a local', async () => {
@@ -97,7 +97,7 @@ describe('ConflictReviewScreen', () => {
   });
 
   it('falha ao listar mostra aviso e voltar chama onBack', async () => {
-    const useCase = { listConflicts: jest.fn().mockRejectedValue(new Error('x')) } as unknown as ResolveConflictUseCase;
+    const useCase = { listConflicts: jest.fn().mockRejectedValue(new Error('x')) } as unknown as ResolveSyncConflictUseCase;
     const onBack = jest.fn();
     const { findByTestId, getByTestId } = await render(<ConflictReviewScreen useCase={useCase} onBack={onBack} />);
     expect(await findByTestId('conflicts-feedback')).toBeTruthy();

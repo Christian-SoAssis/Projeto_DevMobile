@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ConflictReviewScreen } from '../../src/adapters/screens/ConflictReviewScreen';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
-import { ResolveConflictUseCase } from '../../src/application/use-cases/ResolveConflictUseCase';
+import { ResolveSyncConflictUseCase } from '../../src/application/use-cases/ResolveSyncConflictUseCase';
 
 export default function ConflitosRoute() {
   const router = useRouter();
@@ -13,7 +13,7 @@ export default function ConflitosRoute() {
   const useCase = useMemo(
     () =>
       remoteAnimalSource
-        ? new ResolveConflictUseCase(animalRepository, remoteAnimalSource, syncQueueRepository)
+        ? new ResolveSyncConflictUseCase(animalRepository, remoteAnimalSource, syncQueueRepository)
         : null,
     [animalRepository, remoteAnimalSource, syncQueueRepository]
   );

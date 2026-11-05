@@ -6,7 +6,7 @@ import { ToggleFavoriteUseCase } from '../../../src/application/use-cases/Toggle
 import { RegisterAdoptionInterestUseCase } from '../../../src/application/use-cases/RegisterAdoptionInterestUseCase';
 import { UpdateAnimalUseCase } from '../../../src/application/use-cases/UpdateAnimalUseCase';
 import { MarkAnimalAdoptedUseCase } from '../../../src/application/use-cases/MarkAnimalAdoptedUseCase';
-import { ResolveConflictUseCase } from '../../../src/application/use-cases/ResolveConflictUseCase';
+import { ResolveSyncConflictUseCase } from '../../../src/application/use-cases/ResolveSyncConflictUseCase';
 import { ANIMALS_SYNC_KEY } from '../../../src/application/use-cases/PullRemoteAnimalsUseCase';
 import { FakeSupabaseClient, FakeSupabaseDb, seedFakeDb } from '../../../test-support/SupabaseFake';
 import { newUuid } from '../../../src/domain/services/IdGenerator';
@@ -230,7 +230,7 @@ describe('Passo 5 — conflitos (doc §9.4, RF23)', () => {
     db.animals[0] = row({ name: 'Servidor', version: 2, updated_at: '2026-11-02T10:00:00.000Z' });
     await getFullSync(container).execute();
 
-    const resolver = new ResolveConflictUseCase(container.animalRepository, container.remoteAnimalSource!, container.syncQueueRepository);
+    const resolver = new ResolveSyncConflictUseCase(container.animalRepository, container.remoteAnimalSource!, container.syncQueueRepository);
     const [view] = await resolver.listConflicts();
     expect(view.local?.status.value).toBe('ADOPTED');
     expect(view.remote?.name).toBe('Servidor');
@@ -251,7 +251,7 @@ describe('Passo 5 — conflitos (doc §9.4, RF23)', () => {
     db.animals[0] = row({ name: 'Servidor', version: 2, updated_at: '2026-11-02T10:00:00.000Z' });
     await getFullSync(container).execute();
 
-    const resolver = new ResolveConflictUseCase(container.animalRepository, container.remoteAnimalSource!, container.syncQueueRepository);
+    const resolver = new ResolveSyncConflictUseCase(container.animalRepository, container.remoteAnimalSource!, container.syncQueueRepository);
     const [view] = await resolver.listConflicts();
     await resolver.useRemote(view.action.id);
 
@@ -269,7 +269,7 @@ describe('Passo 5 — conflitos (doc §9.4, RF23)', () => {
     const first = await getFullSync(container).execute();
     expect(first.push.conflictCount).toBe(1);
 
-    const resolver = new ResolveConflictUseCase(container.animalRepository, container.remoteAnimalSource!, container.syncQueueRepository);
+    const resolver = new ResolveSyncConflictUseCase(container.animalRepository, container.remoteAnimalSource!, container.syncQueueRepository);
     const [view] = await resolver.listConflicts();
     expect(view.remote).toBeNull();
     await resolver.keepLocal(view.action.id); // recria
@@ -283,7 +283,7 @@ describe('Passo 5 — conflitos (doc §9.4, RF23)', () => {
     await new UpdateAnimalUseCase(c2.animalRepository, c2.syncQueueRepository, c2.unitOfWork).execute(OWNER, ANIMAL, { name: 'X' }, false);
     db2.animals.length = 0;
     await getFullSync(c2).execute();
-    const r2 = new ResolveConflictUseCase(c2.animalRepository, c2.remoteAnimalSource!, c2.syncQueueRepository);
+    const r2 = new ResolveSyncConflictUseCase(c2.animalRepository, c2.remoteAnimalSource!, c2.syncQueueRepository);
     const [v2] = await r2.listConflicts();
     await r2.useRemote(v2.action.id);
     expect(await c2.animalRepository.findById(ANIMAL)).toBeNull();

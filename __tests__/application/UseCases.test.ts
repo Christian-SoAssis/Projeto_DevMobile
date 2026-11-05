@@ -8,7 +8,6 @@ import { MarkAnimalAdoptedUseCase } from '../../src/application/use-cases/MarkAn
 import { ToggleFavoriteUseCase } from '../../src/application/use-cases/ToggleFavoriteUseCase';
 import { RegisterAdoptionInterestUseCase } from '../../src/application/use-cases/RegisterAdoptionInterestUseCase';
 import { ProcessSyncQueueUseCase } from '../../src/application/use-cases/ProcessSyncQueueUseCase';
-import { ResolveSyncConflictUseCase } from '../../src/application/use-cases/ResolveSyncConflictUseCase';
 import { AuthenticateUserUseCase } from '../../src/application/use-cases/AuthenticateUserUseCase';
 import { GerarPdfUseCase } from '../../src/application/use-cases/GerarPdfUseCase';
 
@@ -151,15 +150,6 @@ describe('Application Use Cases with In-Memory Fakes', () => {
 
     const pendingAfter = await syncQueueRepo.listPending();
     expect(pendingAfter.length).toBe(0);
-  });
-
-  it('ResolveSyncConflictUseCase: deve avaliar divergência de versão', () => {
-    const local = new Animal({ id: 'a1', ownerId: 'u1', name: 'Luna Local', characteristics: dummyChar, location: dummyLoc, version: 1 });
-    const remote = new Animal({ id: 'a1', ownerId: 'u1', name: 'Luna Remoto', characteristics: dummyChar, location: dummyLoc, version: 2 });
-
-    const useCase = new ResolveSyncConflictUseCase();
-    const result = useCase.execute(local, remote);
-    expect(result.needsReview).toBe(false);
   });
 
   it('AuthenticateUserUseCase & AcessarViaTokenUseCase: devem autenticar usuário e manter sessão segura', async () => {

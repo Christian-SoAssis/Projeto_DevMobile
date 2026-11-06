@@ -1,6 +1,10 @@
 import { InMemorySqliteDriver } from '../../../src/infrastructure/database/sqlite/DatabaseDriver';
 import { INITIAL_SCHEMA_SQL } from '../../../src/infrastructure/database/sqlite/migrations/schema.sql';
-import { SqlitePhotoStorage } from '../../../src/infrastructure/database/sqlite/repositories/SqlitePhotoStorage';
+import {
+  SqlitePhotoStorage,
+  PhotoCopyError,
+  type FileSystemLike,
+} from '../../../src/infrastructure/database/sqlite/repositories/SqlitePhotoStorage';
 import { AnimalPhoto } from '../../../src/domain/entities/AnimalPhoto';
 import { SyncState } from '../../../src/domain/value-objects/SyncState';
 
@@ -77,6 +81,57 @@ describe('SqlitePhotoStorage — imagens locais registradas no SQLite (Fase 2)',
     expect(all).toHaveLength(1);
     expect(all[0].id).toBe('p9');
     expect(all[0].localPath).toBeTruthy();
+  });
+
+  /**
+   * MID-02 (ordem 5 — checklist: erro explícito na falha de cópia): em
+   * device o arquivo de câmera/galeria morre ao encerrar o app; registrar
+   * o endereço de origem após falha de cópia deixa o cache apontando para
+   * um arquivo condenado (perda silenciosa futura). A falha DEVE ser
+   * explícita: `PhotoCopyError` e nenhuma linha em `local_images`.
+   */
+  describe('falha explícita de cópia (MID-02)', () => {
+    const brokenFileSystem = (): FileSystemLike => ({
+      documentDirectory: 'file:///documents/',
+      getInfoAsync: jest.fn(async () => ({ exists: true })),
+      makeDirectoryAsync: jest.fn(async () => undefined as never),
+      copyAsync: jest.fn(async () => {
+        throw new Error('disco cheio');
+      }),
+    });
+
+    it('falha de cópia com FileSystem operante lança PhotoCopyError e NÃO registra linha', async () => {
+      const storageComCopia = new SqlitePhotoStorage(db, true, brokenFileSystem());
+      const photo = new AnimalPhoto({
+        id: 'p10',
+        animalId: 'a10',
+        localPath: 'file://caches/tmp_p10.jpg',
+      });
+
+      await expect(storageComCopia.persistLocal(photo)).rejects.toThrow(PhotoCopyError);
+      expect(await rows()).toHaveLength(0); // sem linha apontando para cache condenado
+    });
+
+    it('cópia bem-sucedida registra o endereço definitivo (não a URI temporária)', async () => {
+      const fileSystem = brokenFileSystem();
+      (fileSystem.copyAsync as unknown as jest.Mock).mockResolvedValue(undefined);
+      const storageComCopia = new SqlitePhotoStorage(db, true, fileSystem);
+      const photo = new AnimalPhoto({
+        id: 'p11',
+        animalId: 'a11',
+        localPath: 'file://caches/tmp_p11.jpg',
+      });
+
+      const persistida = await storageComCopia.persistLocal(photo);
+
+      expect(fileSystem.copyAsync).toHaveBeenCalledWith({
+        from: 'file://caches/tmp_p11.jpg',
+        to: 'file:///documents/animal_photos/p11.jpg',
+      });
+      expect(persistida.localPath).toBe('file:///documents/animal_photos/p11.jpg');
+      const raw = await rows();
+      expect(raw[0].local_path).toBe('file:///documents/animal_photos/p11.jpg');
+    });
   });
 
   it('listPendingUpload: lista apenas fotos PENDING e FAILED (suporte a retry, RF21)', async () => {

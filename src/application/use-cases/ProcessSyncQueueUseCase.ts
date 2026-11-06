@@ -7,6 +7,7 @@ import { InterestRemoteGateway } from '../../domain/ports/InterestRemoteGateway'
 import { Animal } from '../../domain/entities/Animal';
 import { SyncAction } from '../../domain/entities/SyncAction';
 import { SincronizacaoService } from '../../domain/services/SincronizacaoService';
+import { PermanentSyncError } from '../../domain/services/SincronizacaoService';
 import { ConflictResolutionService } from '../../domain/services/ConflictResolutionService';
 
 export interface SyncProcessResult {
@@ -43,7 +44,9 @@ export class ProcessSyncQueueUseCase {
      * imagens sobem ANTES da gravação do anúncio (doc §14.1 passos 5–6).
      */
     private remotePhotoStorage?: PhotoStorage,
-    private extras: ProcessSyncExtras = {}
+    private extras: ProcessSyncExtras = {},
+    /** Relógio injetável (testes determinísticos do backoff). */
+    private nowMs: () => number = () => Date.now()
   ) {}
 
   async execute(): Promise<SyncProcessResult> {
@@ -65,9 +68,23 @@ export class ProcessSyncQueueUseCase {
           conflictCount += 1;
           continue;
         }
-        if (action.status.isFailed() && !SincronizacaoService.shouldRetry(action, this.maxAttempts)) {
-          failedCount += 1;
-          continue;
+        if (action.status.isFailed()) {
+          // OFF-05/DAT-11 (ordem 7): falha PERMANENTE nunca é reenviada —
+          // retry não resolve e tentar é custo certo no resto da fila.
+          if (SincronizacaoService.isPermanente(action.lastError)) {
+            failedCount += 1;
+            continue;
+          }
+          // Tentativas esgotadas: falha reconhecida, sem novo envio.
+          if (!action.canRetry(this.maxAttempts)) {
+            failedCount += 1;
+            continue;
+          }
+          // Espaçamento do backoff (2s, 4s … cap 30s desde a ÚLTIMA falha):
+          // antes de vencer a espera, a ação fica parada sem novo envio.
+          if (!SincronizacaoService.retryIsDue(action, this.maxAttempts, this.nowMs())) {
+            continue;
+          }
         }
 
         action.markSyncing();
@@ -79,11 +96,20 @@ export class ProcessSyncQueueUseCase {
           await this.syncQueueRepository.update(action);
           successCount += 1;
         } catch (err: any) {
+          // A falha é um "change": o timestamp da ÚLTIMA falha baseia o
+          // backoff do próximo ciclo (OFF-05). Relógio injetável para
+          // testes determinísticos.
+          const failureAt = new Date(this.nowMs()).toISOString();
           if (err instanceof NeedsReviewError) {
             action.markConflict(err.message);
             conflictCount += 1;
+          } else if (err instanceof PermanentSyncError) {
+            // DAT-11: erro lógico — retry não resolve; parado com marca
+            // que sobrevive a reinícios (doc §9.4 RF23 para o conflito).
+            action.markFailedPermanently(err.message, failureAt);
+            failedCount += 1;
           } else {
-            action.markFailed(err?.message || 'Erro ao sincronizar item.');
+            action.markFailed(err?.message || 'Erro ao sincronizar item.', failureAt);
             failedCount += 1;
           }
           await this.syncQueueRepository.update(action);
@@ -130,7 +156,7 @@ export class ProcessSyncQueueUseCase {
       case 'interest':
         return this.applyInterestAction(action);
       default:
-        throw new Error(
+        throw new PermanentSyncError(
           `Sincronização remota de ${action.entityType} ainda não está disponível.`
         );
     }
@@ -162,14 +188,14 @@ export class ProcessSyncQueueUseCase {
         await this.animalRepository.deleteLocal(action.entityId);
         return;
       default:
-        throw new Error(`Operação de sincronização não suportada: ${action.operation}`);
+        throw new PermanentSyncError(`Operação de sincronização não suportada: ${action.operation}`);
     }
   }
 
   private async requireLocalAnimal(action: SyncAction): Promise<Animal> {
     const animal = await this.animalRepository.findById(action.entityId);
     if (!animal) {
-      throw new Error('Registro local do anúncio não encontrado para sincronizar.');
+      throw new PermanentSyncError('Registro local do anúncio não encontrado para sincronizar.');
     }
     return animal;
   }
@@ -203,24 +229,24 @@ export class ProcessSyncQueueUseCase {
 
   private async applyFavoriteAction(action: SyncAction): Promise<void> {
     const gateway = this.extras.favorites;
-    if (!gateway) throw new Error('Sincronização de favoritos indisponível sem backend.');
+    if (!gateway) throw new PermanentSyncError('Sincronização de favoritos indisponível sem backend.');
     const userId = String(action.payload.userId ?? '');
     const animalId = String(action.payload.animalId ?? '');
-    if (!userId || !animalId) throw new Error('Favorito sem usuário ou animal.');
+    if (!userId || !animalId) throw new PermanentSyncError('Favorito sem usuário ou animal.');
     if (action.operation === 'CREATE') {
       await gateway.addRemote(userId, animalId);
     } else if (action.operation === 'DELETE') {
       await gateway.removeRemote(userId, animalId);
     } else {
-      throw new Error(`Operação de sincronização não suportada: ${action.operation}`);
+      throw new PermanentSyncError(`Operação de sincronização não suportada: ${action.operation}`);
     }
   }
 
   private async applyInterestAction(action: SyncAction): Promise<void> {
     const gateway = this.extras.interests;
-    if (!gateway) throw new Error('Sincronização de interesses indisponível sem backend.');
+    if (!gateway) throw new PermanentSyncError('Sincronização de interesses indisponível sem backend.');
     if (action.operation !== 'CREATE') {
-      throw new Error(`Operação de sincronização não suportada: ${action.operation}`);
+      throw new PermanentSyncError(`Operação de sincronização não suportada: ${action.operation}`);
     }
     const p = action.payload;
     await gateway.createRemote({

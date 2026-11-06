@@ -111,6 +111,29 @@ describe('SqliteSyncQueueRepository', () => {
     expect(conflictPreserved?.isConflict).toBe(true);
   });
 
+  it('update: persiste o changed_at ATRÁS do momento da falha (backoff sobrevive a reinício)', async () => {
+    const fixture = '2100-01-01T00:00:00.000Z'; // futuro de propósito
+    const action = new SyncAction({
+      id: 'act_changed_at',
+      operation: 'UPDATE',
+      entityType: 'animal',
+      entityId: 'a1',
+      payload: {},
+      changedAt: fixture,
+    });
+    action.markSyncing();
+    await repository.enqueue(action);
+    // Falha AGORA: changedAt passa a ~Date.now() real — a espera do backoff
+    // (OFF-05, ordem 7) conta do último insucesso, não do enfileiramento.
+    action.markFailed('conexão instável');
+    await repository.update(action);
+
+    const reloaded = await repository.findById('act_changed_at');
+    expect(reloaded?.changedAt).toBe(action.changedAt);
+    expect(Date.parse(reloaded!.changedAt) >= Date.parse('2020-01-01T00:00:00.000Z')).toBe(true);
+    expect(Date.parse(reloaded!.changedAt) < Date.parse(fixture)).toBe(true);
+  });
+
   it('remove ação individual e limpa concluídas', async () => {    const act1 = new SyncAction({ id: 'act_1', operation: 'CREATE', entityType: 'animal', entityId: 'a1', payload: {} });
     const act2 = new SyncAction({ id: 'act_2', operation: 'UPDATE', entityType: 'animal', entityId: 'a2', payload: {} });
 

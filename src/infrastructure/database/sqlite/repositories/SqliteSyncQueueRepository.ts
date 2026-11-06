@@ -89,9 +89,9 @@ export class SqliteSyncQueueRepository implements SyncQueueRepository {
   async update(action: SyncAction): Promise<void> {
     await this.db.runAsync(
       `UPDATE sync_queue SET
-        attempts = ?, status = ?, last_error = ?
+        attempts = ?, status = ?, last_error = ?, changed_at = ?
        WHERE id = ?`,
-      [action.attempts, action.status.value, action.lastError || null, action.id]
+      [action.attempts, action.status.value, action.lastError || null, action.changedAt, action.id]
     );
   }
 

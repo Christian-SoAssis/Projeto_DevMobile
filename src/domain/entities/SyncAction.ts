@@ -18,13 +18,22 @@ export interface SyncActionProps {
 /** Prefixo gravado em `lastError` quando a ação exige revisão manual do responsável (RF23). */
 export const SYNC_CONFLICT_MARKER = '[CONFLITO]';
 
+/**
+ * Prefixo gravado em `lastError` quando a falha é PERMANENTE (OFF-05,
+ * DAT-11): tentar de novo nunca mudará o resultado (ex.: operação não
+ * suportada, anúncio apagado enquanto a fila esperava). Persiste na
+ * própria `last_error` — sem coluna nova e sobrevive a reinícios, mesmo
+ * padrão do marcador de conflito.
+ */
+export const PERMANENT_SYNC_FAILURE_MARKER = '[ERRO PERMANENTE]';
+
 export class SyncAction {
   readonly id: string;
   readonly operation: SyncOperation;
   readonly entityType: SyncEntityType;
   readonly entityId: string;
   readonly payload: Record<string, unknown>;
-  readonly changedAt: string;
+  private _changedAt: string;
   private _attempts: number;
   private _status: SyncState;
   private _lastError?: string;
@@ -40,7 +49,7 @@ export class SyncAction {
     this.entityType = props.entityType;
     this.entityId = props.entityId;
     this.payload = props.payload || {};
-    this.changedAt = props.changedAt || new Date().toISOString();
+    this._changedAt = props.changedAt || new Date().toISOString();
     this._attempts = props.attempts || 0;
     this._status = props.status || SyncState.pending();
     this._lastError = props.lastError;
@@ -48,6 +57,15 @@ export class SyncAction {
 
   get attempts(): number {
     return this._attempts;
+  }
+
+  /**
+   * Momento da última alteração (criação, envio, falha). O `markFailed`
+   * regrava — o ESPEÇAMENTO de retry (OFF-05) conta a partir da ÚLTIMA
+   * falha, não da criação da ação.
+   */
+  get changedAt(): string {
+    return this._changedAt;
   }
 
   get status(): SyncState {
@@ -67,10 +85,20 @@ export class SyncAction {
     this._lastError = undefined;
   }
 
-  markFailed(error: string): void {
+  markFailed(error: string, at?: string): void {
     this._attempts += 1;
     this._lastError = error;
     this._status = SyncState.failed();
+    this._changedAt = at ?? new Date().toISOString();
+  }
+
+  /**
+   * OFF-05/DAT-11: falha PERMANENTE (retry não resolve) marcada com
+   * prefixo para sobreviver a reinícios (sem coluna nova: fica na
+   * `last_error`, como o marcador de conflito RF23).
+   */
+  markFailedPermanently(error: string, at?: string): void {
+    this.markFailed(`${PERMANENT_SYNC_FAILURE_MARKER} ${error}`, at);
   }
 
   /** Conflito com risco de perda: nunca é reenviado sozinho, só após revisão (doc §9.4). */

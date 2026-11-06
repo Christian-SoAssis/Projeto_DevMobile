@@ -95,19 +95,24 @@
 
 ## §4 — Ordem de execução (adaptando §10 do checklist)
 
+> **Legenda de status (atualizada a cada sessão):**
+> ✅ implementado · 🔒 **Aguardando decisão do responsável** — não implementar sem a escolha · ⏳ pendente de implementação (sem bloqueio) · 🌐 pendente de ambiente real (projeto Supabase + aparelho)
+
 | Ordem | Tarefa | Regras | Escopo do código | Bloqueio |
 |---|---|---|---|---|
-| 0 | **Decidir política DAT-10** (preservar vs limpar dados de A na troca de conta) | DAT-10 | somente doc | decisão de produto |
-| 1 | Reenvio de CREATE reconhecido (animals + favoritos + interesses) | OFF-05, DAT-08 | `SupabaseAnimalRepository.ts`, `SupabaseUserDataGateways.ts`, `SupabaseFake.ts` | — |
-| 2 | Worker ignora ações de outra conta (tag de dono + filtro por sessão) | DAT-10 | `ProcessSyncQueueUseCase.ts`, `SyncAction.ts` | item 0 |
-| 3 | Supersede de UPDATE pendente + teste T07 | OFF-07, DAT-09 | `UpdateAnimalUseCase.ts` (enqueue), `ProcessSyncQueueUseCase.ts` | — |
-| 4 | Re-consulta de listas após pull | OFF-02 | `RunFullSyncUseCase.ts`, `SearchScreen.tsx`, contexto | — |
-| 5 | Erro explícito na falha de cópia em device | MID-02 | `SqlitePhotoStorage.ts:150-154` | — |
-| 6 | Decidir OFF-06 snapshot registrada como decisão (não implementar cursor delta sem necessidade) | OFF-06 | doc | decisão de produto leve |
-| 7 | Backoff com espaçamento entre tentativas + classificação permanente/transitória | OFF-05, DAT-11 | `ProcessSyncQueueUseCase.ts`, `SincronizacaoService.ts` | — |
-| 8 | Validações de ambiente real (init.sql + EXPO_PUBLIC_* + device: T10/T18/T20/T22) | PER-03, DAT-05..07, MID-01/07 | ambiente | projeto Supabase + aparelho |
+| 0 🔒 | **Decidir política DAT-10** (preservar vs limpar dados de A na troca de conta) | DAT-10 | somente doc | **🔒 decisão de produto — escolher:** (a) preservar e retomar no novo login de A, ou (b) limpar com aviso no logout |
+| 1 ✅ | Reenvio de CREATE reconhecido (animals + favoritos + interesses) | OFF-05, DAT-08 | `SupabaseAnimalRepository.ts`, `SupabaseUserDataGateways.ts`, `SupabaseFake.ts` | — |
+| 2 🔒 | Worker ignora ações de outra conta (tag de dono + filtro por sessão) | DAT-10 | `ProcessSyncQueueUseCase.ts`, `SyncAction.ts` | **🔒 depende da ordem 0** (a política define o que fazer com o item: pausar vs limpar) |
+| 3 ✅ | Supersede de UPDATE pendente + teste T07 | OFF-07, DAT-09 | `UpdateAnimalUseCase.ts` (enqueue), `ProcessSyncQueueUseCase.ts` | — |
+| 4 ⏳ | Re-consulta de listas após pull | OFF-02 | `RunFullSyncUseCase.ts`, `SearchScreen.tsx`, contexto | — |
+| 5 ⏳ | Erro explícito na falha de cópia em device | MID-02 | `SqlitePhotoStorage.ts:150-154` | — |
+| 6 🔒 | Documentar decisão OFF-06 (snapshot integral em vez de cursor delta) | OFF-06 | doc | **🔒 decisão de produto leve — confirmar:** snapshot integral é aceitável para o escopo (não implementar cursor/delta sem necessidade demonstrada) |
+| 7 ⏳ | Backoff com espaçamento entre tentativas + classificação permanente/transitória | OFF-05, DAT-11 | `ProcessSyncQueueUseCase.ts`, `SincronizacaoService.ts` | — |
+| 8 🌐 | Validações de ambiente real (init.sql + EXPO_PUBLIC_* + device: T10/T18/T20/T22) | PER-03, DAT-05..07, MID-01/07 | ambiente | **🌐 requer:** criar projeto Supabase + aparelho físico (ação fora do código) |
 
 **Itens 1–5** são tarefas incrementais independentes: cada um é commitável por conta própria, com suíte verde. Não promover refatoração única.
+
+> **Progresso:** ordem 1 ✅ e ordem 3 ✅ implementadas (registrar commits em §7). Próximas sem decisão: 4 → 5 → 7. Itens 🔒 (0, 2, 6) aguardam decisão; item 🌐 (8) aguarda ambiente.
 
 ---
 
@@ -137,7 +142,10 @@
 
 ## §7 — Encerramento da revisão
 
-- **Corrigido com evidência:** itens do §4 ordens 1–5 (registrar aqui o commit e o teste com cada entrega).
-- **Explicitamente pendente:** ordens 6–8 (decisão de produto + ambiente real).
+- **Corrigido com evidência:**
+  - ✅ **Ordem 1** — commit `73e3eec`: `createRemote` converte 23505 do próprio id (re-leitura segura pela RLS) e `SupabaseFake` simula a violação de PK; favoritos/interesses já eram idempotentes e têm confirmação por testes. Testes: reenvio T04 (2 casos) em `SupabaseAnimalRepository.test.ts`.
+  - ✅ **Ordem 3** — commit `73e3eec`: port `enqueueAnimalUpdate` (supersede de UPDATE/MARK_ADOPTED do mesmo animal; conflito e CREATE preservados), usado por `UpdateAnimalUseCase` e `MarkAnimalAdoptedUseCase`; filtro em TypeScript para comportamento idêntico em todos os drivers. Testes: `UpdateSupersede.test.ts` (4 casos, incluindo T07 e preservação de conflito) + teste SQL do branch (`SqliteSyncQueueRepository.test.ts`).
+  - Estado da suíte após as ordens 1+3: **412/412 verdes (63 suítes)**, typecheck 0 erros.
+- **Explicitamente pendente:** ordens 🔒 (0, 2, 6 — decisão do responsável), ordens ⏳ (4, 5, 7) e 🌐 (8 — ambiente real).
 - **Limitações registradas:** políticas RLS não aplicadas a servidor real; EXIF não inspecionado; permissões não testadas em build próprio; nenhum cenário de device executado.
 - Atualizar este arquivo a cada correção (o que foi comprovado, o que mudou e o que permanece NV) — o checklist 06 continua sendo o registro por regra.

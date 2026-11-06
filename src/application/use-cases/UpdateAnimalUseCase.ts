@@ -41,7 +41,9 @@ export class UpdateAnimalUseCase {
 
     await this.unitOfWork.run(async () => {
       await this.animalRepository.saveLocal(animal);
-      await this.syncQueueRepository.enqueue(action);
+      // Supersede (OFF-07/T07): a revisão mais recente substitui UPDATEs
+      // pendentes do mesmo animal — a fila mantém uma única revisão.
+      await this.syncQueueRepository.enqueueAnimalUpdate(action);
     });
 
     if (isOnline) {

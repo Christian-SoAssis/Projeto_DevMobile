@@ -23,7 +23,9 @@ export class MarkAnimalAdoptedUseCase {
 
     await this.unitOfWork.run(async () => {
       await this.animalRepository.saveLocal(animal);
-      await this.syncQueueRepository.enqueue(action);
+      // Supersede (OFF-07/T07): MARK_ADOPTED substitui UPDATE/pendências do
+      // mesmo animal — a fila fica com um único estado do animal.
+      await this.syncQueueRepository.enqueueAnimalUpdate(action);
     });
 
     if (isOnline) {

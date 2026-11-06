@@ -58,8 +58,60 @@ describe('SqliteSyncQueueRepository', () => {
     expect(updated?.status.isFailed()).toBe(true);
   });
 
-  it('remove ação individual e limpa concluídas', async () => {
-    const act1 = new SyncAction({ id: 'act_1', operation: 'CREATE', entityType: 'animal', entityId: 'a1', payload: {} });
+  /**
+   * OFF-07/T07: `enqueueAnimalUpdate` substitui UPDATEs/MARK_ADOPTED
+   * pendentes do MESMO animal pela revisão nova. Regras do filtro SQL:
+   * itens EM CONFLITO (`last_error [CONFLITO]%`, doc §9.4) e CREATE são
+   * preservados; SYNCING não é tocado (não está em PENDING/FAILED).
+   */
+  it('enqueueAnimalUpdate: supersede preserva conflito e CREATE, remove UPDATEs pendentes do animal', async () => {
+    const setup = (props: {
+      id: string;
+      operation: 'UPDATE' | 'MARK_ADOPTED' | 'CREATE';
+      entityId: string;
+      conflict?: boolean;
+    }) => {
+      const a = new SyncAction({
+        id: props.id,
+        operation: props.operation,
+        entityType: 'animal',
+        entityId: props.entityId,
+        payload: { version: 2 },
+      });
+      if (props.conflict) a.markConflict('situação divergente pede revisão');
+      repository.enqueue(a);
+      return a;
+    };
+
+    setup({ id: 'sync_update_a1_v2', operation: 'UPDATE', entityId: 'a1' }); // supersede → via
+    setup({ id: 'sync_adopted_a1', operation: 'MARK_ADOPTED', entityId: 'a1' }); // supersede → via
+    setup({ id: 'sync_update_a3_v2_conflict', operation: 'UPDATE', entityId: 'a3', conflict: true }); // preservado
+    setup({ id: 'sync_create_a1', operation: 'CREATE', entityId: 'a1' }); // preservado (pai)
+    // UPDATE de OUTRO animal: não é superseded pela edição de a1.
+    setup({ id: 'sync_update_a2_v1', operation: 'UPDATE', entityId: 'a2' });
+
+    await repository.enqueueAnimalUpdate(
+      new SyncAction({
+        id: 'sync_update_a1_v3',
+        operation: 'UPDATE',
+        entityType: 'animal',
+        entityId: 'a1',
+        payload: { version: 3 },
+      })
+    );
+
+    const ids = (await repository.listPending()).map((a) => a.id).sort();
+    expect(ids).toEqual([
+      'sync_create_a1',
+      'sync_update_a1_v3',
+      'sync_update_a2_v1',
+      'sync_update_a3_v2_conflict',
+    ]);
+    const conflictPreserved = await repository.findById('sync_update_a3_v2_conflict');
+    expect(conflictPreserved?.isConflict).toBe(true);
+  });
+
+  it('remove ação individual e limpa concluídas', async () => {    const act1 = new SyncAction({ id: 'act_1', operation: 'CREATE', entityType: 'animal', entityId: 'a1', payload: {} });
     const act2 = new SyncAction({ id: 'act_2', operation: 'UPDATE', entityType: 'animal', entityId: 'a2', payload: {} });
 
     await repository.enqueue(act1);

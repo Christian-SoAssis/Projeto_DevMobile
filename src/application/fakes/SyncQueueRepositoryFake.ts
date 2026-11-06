@@ -8,6 +8,21 @@ export class SyncQueueRepositoryFake implements SyncQueueRepository {
     this.queue.set(action.id, action);
   }
 
+  /** Supersede (OFF-07/T07): a edição mais nova vence; conflito e CREATE preservados. */
+  async enqueueAnimalUpdate(action: SyncAction): Promise<void> {
+    Array.from(this.queue.entries()).forEach(([id, pending]) => {
+      if (
+        pending.entityType === 'animal' &&
+        pending.entityId === action.entityId &&
+        (pending.operation === 'UPDATE' || pending.operation === 'MARK_ADOPTED') &&
+        !pending.isConflict
+      ) {
+        this.queue.delete(id);
+      }
+    });
+    this.queue.set(action.id, action);
+  }
+
   async listPending(): Promise<SyncAction[]> {
     return Array.from(this.queue.values()).filter(
       (a) => a.status.isPending() || a.status.isFailed()

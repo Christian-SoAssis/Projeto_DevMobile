@@ -16,6 +16,9 @@ import { AdoptionStatus } from '../../../domain/value-objects/AdoptionStatus';
 import { SupabaseClientLike, AnimalRow, AnimalPhotoRow } from '../types';
 import { PHOTO_BUCKET } from '../storage/SupabasePhotoStorage';
 
+/** Código do Postgres para violação de unicidade (PK/unique) — reenvio idempotente. */
+const UNIQUE_VIOLATION = '23505';
+
 export class StaleVersionError extends Error {
   constructor(message = 'Atualização remota rejeitada: versão defasada, registro ausente ou bloqueada pela RLS.') {
     super(message);
@@ -100,12 +103,35 @@ export class SupabaseAnimalRepository implements AnimalRepository, RemoteAnimalS
       .select();
 
     if (error) {
+      // OFF-05/DAT-08 (cenário T04): confirmação perdida após o servidor
+      // gravar → o reenvio da mesma ação CREATE chega como violação de
+      // unicidade. O id local é ESTÁVEL (UUID compartilhado), então só é
+      // sucesso se a linha conflitante for o próprio anúncio — a re-leitura
+      // pela RLS devolve vazia para linha de terceiro (defesa em
+      // profundidade: erro de verdade, sem acesso indevido).
+      if (error.code === UNIQUE_VIOLATION) {
+        const reused = await this.findByRemoteId(animal.id);
+        if (reused && reused.owner_id === animal.ownerId) {
+          await this.syncPhotos(animal);
+          return SupabaseAnimalRepository.rowToAnimal(reused);
+        }
+      }
       throw new RemoteSupabaseError(`Falha ao criar o anúncio remotamente: ${error.message}`);
     }
     const row = (data ?? [])[0];
     if (!row) throw new RemoteSupabaseError('Criação remota não retornou o registro do anúncio.');
     await this.syncPhotos(animal);
     return SupabaseAnimalRepository.rowToAnimal(row);
+  }
+
+  /** Leitura remota por id — só devolve o que a RLS deixa ver (público/dono/admin). */
+  private async findByRemoteId(id: string): Promise<AnimalRow | null> {
+    const { data, error } = await this.client
+      .from<AnimalRow>('animals')
+      .select()
+      .eq('id', id);
+    if (error) return null;
+    return (data ?? [])[0] ?? null;
   }
 
   async updateRemote(animal: Animal): Promise<Animal> {

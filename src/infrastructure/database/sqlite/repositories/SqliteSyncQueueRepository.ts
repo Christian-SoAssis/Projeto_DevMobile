@@ -46,6 +46,29 @@ export class SqliteSyncQueueRepository implements SyncQueueRepository {
     );
   }
 
+  async enqueueAnimalUpdate(action: SyncAction): Promise<void> {
+    // Supersede (OFF-07/T07): remove edições anteriores pendentes do MESMO
+    // animal — a revisão mais nova contém todo o estado atual, reenviar a
+    // antiga é redundante e sua "confirmação" corresponderia a conteúdo
+    // nunca enviado. Preserva itens EM CONFLITO (aguardam revisão manual,
+    // doc §9.4) e CREATE (o pai precisa subir). SYNCING não está em
+    // `listPending` (PENDING/FAILED) e não é tocado. O filtro é feito na
+    // aplicação (e não em SQL avançado) para o comportamento ser idêntico
+    // em todos os drivers (real e in-memory).
+    const pending = await this.listPending();
+    for (const existing of pending) {
+      if (
+        existing.entityType === 'animal' &&
+        existing.entityId === action.entityId &&
+        (existing.operation === 'UPDATE' || existing.operation === 'MARK_ADOPTED') &&
+        !existing.isConflict
+      ) {
+        await this.delete(existing.id);
+      }
+    }
+    await this.enqueue(action);
+  }
+
   async listPending(): Promise<SyncAction[]> {
     const rows = await this.db.getAllAsync<SyncQueueRow>(
       `SELECT * FROM sync_queue WHERE status = 'PENDING' OR status = 'FAILED' ORDER BY changed_at ASC`

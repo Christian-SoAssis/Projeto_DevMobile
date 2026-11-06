@@ -171,6 +171,23 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
           }
         }
       }
+      // PK `id` de animals: uma reenvio de CREATE com confirmação perdida
+      // (cenário T04) chega como violação de chave primária — o mesmo código
+      // 23505 que o Postgres real devolve.
+      if (table === 'animals') {
+        for (const row of toInsert) {
+          const dup = rows.some((r: FakeRow) => r.id === row.id);
+          if (dup) {
+            return {
+              data: null,
+              error: {
+                code: '23505',
+                message: 'duplicate key value violates unique constraint "animals_pkey"',
+              },
+            };
+          }
+        }
+      }
       for (const row of toInsert) {
         if (!canWriteRow(row)) {
           // RLS: qualquer tabela exige usuário autenticado e linha própria

@@ -12,16 +12,21 @@ import { Animal } from '../../domain/entities/Animal';
 import { AnimalFilterOptions, AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { AnimalMap } from '../map/AnimalMap';
 import { SearchAnimalsUseCase } from '../../application/use-cases/SearchAnimalsUseCase';
+import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
+import { getActiveUserId } from '../sync/activeSession';
 import { onPullCompleted } from '../sync/pullEvents';
 
 export interface SearchScreenProps {
   animalRepository: AnimalRepository;
+  /** DAT-10: com a fila, rascunhos (CREATE pendente) de outra conta não aparecem. */
+  syncQueueRepository?: SyncQueueRepository;
   onSelectAnimal?: (animal: Animal) => void;
   isOnlineInitial?: boolean;
 }
 
 export const SearchScreen: React.FC<SearchScreenProps> = ({
   animalRepository,
+  syncQueueRepository,
   onSelectAnimal,
   isOnlineInitial = true,
 }) => {
@@ -52,7 +57,10 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
         sex: selectedSex || undefined,
         approximateAge: ageQuery || undefined,
       };
-      const useCase = new SearchAnimalsUseCase(animalRepository);
+      const useCase = new SearchAnimalsUseCase(
+        animalRepository,
+        syncQueueRepository ? { syncQueueRepository, currentUserId: getActiveUserId } : undefined
+      );
       const res = await useCase.execute(
         filters,
         onlineOverride !== undefined ? onlineOverride : !isOffline

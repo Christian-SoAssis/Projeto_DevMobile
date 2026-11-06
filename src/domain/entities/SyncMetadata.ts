@@ -3,6 +3,11 @@ export interface SyncMetadataProps {
   lastSyncAt?: string;
   lastSuccessAt?: string;
   version?: number;
+  /**
+   * Cursor opaco do pull incremental (OFF-06, ordem 6) — serializado pelo
+   * caso de uso que o usa; o repositório só o persiste.
+   */
+  cursor?: string;
 }
 
 export class SyncMetadata {
@@ -10,6 +15,7 @@ export class SyncMetadata {
   private _lastSyncAt?: string;
   private _lastSuccessAt?: string;
   private _version: number;
+  private _cursor?: string;
 
   constructor(props: SyncMetadataProps) {
     if (!props.key) throw new Error('Chave do estado de sincronização é obrigatória.');
@@ -18,6 +24,15 @@ export class SyncMetadata {
     this._lastSyncAt = props.lastSyncAt;
     this._lastSuccessAt = props.lastSuccessAt;
     this._version = props.version || 0;
+    this._cursor = props.cursor;
+  }
+
+  get cursor(): string | undefined {
+    return this._cursor;
+  }
+
+  setCursor(cursor: string | undefined): void {
+    this._cursor = cursor;
   }
 
   get lastSyncAt(): string | undefined {

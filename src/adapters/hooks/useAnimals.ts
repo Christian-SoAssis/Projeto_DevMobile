@@ -5,6 +5,7 @@ import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
 import { SearchAnimalsUseCase } from '../../application/use-cases/SearchAnimalsUseCase';
 import { CreateAnimalUseCase } from '../../application/use-cases/CreateAnimalUseCase';
 import { MarkAnimalAdoptedUseCase } from '../../application/use-cases/MarkAnimalAdoptedUseCase';
+import { getActiveUserId } from '../sync/activeSession';
 import { AnimalRepositoryFake } from '../../application/fakes/AnimalRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
 
@@ -22,7 +23,10 @@ export function useAnimals(
       setLoading(true);
       setError(null);
       try {
-        const useCase = new SearchAnimalsUseCase(animalRepository);
+        const useCase = new SearchAnimalsUseCase(animalRepository, {
+          syncQueueRepository,
+          currentUserId: getActiveUserId,
+        });
         const result = await useCase.execute(filters, online);
         setAnimals(result.animals);
         setIsOffline(result.isOffline);

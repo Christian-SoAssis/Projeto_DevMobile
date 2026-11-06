@@ -67,6 +67,7 @@ export class UpdateAnimalUseCase {
       entityType: 'animal',
       entityId: animal.id,
       payload: {
+        ownerId: animal.ownerId,
         name: animal.name,
         version: animal.version,
         updatedAt: animal.updatedAt,

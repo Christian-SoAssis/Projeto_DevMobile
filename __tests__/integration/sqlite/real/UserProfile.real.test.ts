@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 import { BetterSqliteDriver } from '../../../../test-support/BetterSqliteDriver';
-import { applyMigrations, getSchemaVersion } from '../../../../src/infrastructure/database/sqlite/migrations';
+import { applyMigrations, getSchemaVersion, LATEST_SCHEMA_VERSION } from '../../../../src/infrastructure/database/sqlite/migrations';
 import { SqliteUserRepository } from '../../../../src/infrastructure/database/sqlite/repositories/SqliteUserRepository';
 import { User } from '../../../../src/domain/entities/User';
 import { ContactInfo } from '../../../../src/domain/value-objects/ContactInfo';
@@ -20,7 +20,7 @@ describe('Perfil do usuário no SQLite real (migração 2)', () => {
     new User({ id: 'u1', name: 'Ana', contactInfo: new ContactInfo('ana@x.com', '11999'), ...extra });
 
   it('a migração 2 cria as colunas de perfil', async () => {
-    expect(await getSchemaVersion(driver)).toBe(2);
+    expect(await getSchemaVersion(driver)).toBe(LATEST_SCHEMA_VERSION);
     const cols = await driver.getAllAsync<{ name: string }>('PRAGMA table_info(users)');
     expect(cols.map((c) => c.name)).toEqual(expect.arrayContaining(['bio', 'avatar_uri', 'interests']));
   });
@@ -65,7 +65,7 @@ describe('Perfil do usuário no SQLite real (migração 2)', () => {
     );
     await legacy.execAsync('PRAGMA user_version = 1');
     await applyMigrations(legacy);
-    expect(await getSchemaVersion(legacy)).toBe(2);
+    expect(await getSchemaVersion(legacy)).toBe(LATEST_SCHEMA_VERSION);
     const user = await new SqliteUserRepository(legacy).findById('old');
     expect(user?.name).toBe('Velho');
     expect(user?.interests).toEqual([]);

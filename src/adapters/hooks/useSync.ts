@@ -4,6 +4,7 @@ import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
 import { PhotoStorage } from '../../domain/ports/PhotoStorage';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { ProcessSyncQueueUseCase } from '../../application/use-cases/ProcessSyncQueueUseCase';
+import { getActiveUserId, isVisibleToActiveSession } from '../sync/activeSession';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
 import { AnimalRepositoryFake } from '../../application/fakes/AnimalRepositoryFake';
 
@@ -17,7 +18,8 @@ export function useSync(
 
   const loadPending = useCallback(async () => {
     const pending = await syncQueueRepository.listPending();
-    setPendingItems(pending);
+    // DAT-10: pendências de outra conta ficam na fila, mas não aparecem.
+    setPendingItems(pending.filter(isVisibleToActiveSession));
   }, [syncQueueRepository]);
 
   const triggerSync = async () => {
@@ -27,7 +29,8 @@ export function useSync(
         syncQueueRepository,
         animalRepository,
         undefined,
-        remotePhotoStorage
+        remotePhotoStorage,
+        { currentUserId: getActiveUserId }
       );
       const res = await useCase.execute();
       await loadPending();

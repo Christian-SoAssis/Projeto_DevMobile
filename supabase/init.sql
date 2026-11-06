@@ -75,9 +75,12 @@ begin
   return new;
 end; $$;
 
+-- INSERT também (OFF-06, ordem 6): o app envia `updated_at` do aparelho na
+-- criação; o pull incremental exige o relógio do SERVIDOR, senão um aparelho
+-- com relógio atrasado criaria anúncios que nenhum cursor alcança.
 drop trigger if exists trg_animals_updated_at on public.animals;
 create trigger trg_animals_updated_at
-  before update on public.animals
+  before insert or update on public.animals
   for each row execute function public.set_updated_at();
 
 -- ----------------------------------------------------------------------------
@@ -227,6 +230,97 @@ create policy favorites_owner_all on public.favorites
 drop policy if exists interests_owner_all on public.adoption_interests;
 create policy interests_owner_all on public.adoption_interests
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ============================================================================
+-- Pull incremental (OFF-06 — decisão da ordem 6: cursor/delta, não snapshot)
+--
+-- O app guarda o cursor (updated_at, id) da última linha recebida e pede só
+-- o que mudou depois dele (keyset, ordem updated_at,id). `updated_at` é
+-- sempre o relógio do SERVIDOR (trigger trg_animals_updated_at) — o relógio
+-- do aparelho nunca entra na comparação. Exclusões e ocultações não
+-- "chegam" como linha alterada, então viram TOMBSTONES próprios.
+-- ============================================================================
+
+-- Delta por keyset: (updated_at, id) indexado.
+create index if not exists idx_animals_updated_at_id on public.animals (updated_at, id);
+
+-- Mudança de foto conta como mudança do anúncio (o pull traz as fotos junto).
+create or replace function public.touch_animal_from_photo()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.animals
+     set updated_at = now()
+   where id = coalesce(new.animal_id, old.animal_id);
+  return null;
+end;
+$$;
+
+drop trigger if exists trg_animal_photos_touch_animal on public.animal_photos;
+create trigger trg_animal_photos_touch_animal
+  after insert or update or delete on public.animal_photos
+  for each row execute function public.touch_animal_from_photo();
+
+-- Tombstones: anúncio que SAIU da leitura pública (apagado ou ocultado pela
+-- moderação). Só ids e motivo — nenhum dado pessoal; leitura pública.
+create table if not exists public.animal_tombstones (
+  animal_id uuid primary key,
+  reason text not null check (reason in ('DELETED', 'HIDDEN')),
+  removed_at timestamptz not null default now()
+);
+
+create index if not exists idx_animal_tombstones_removed_at_id
+  on public.animal_tombstones (removed_at, animal_id);
+
+alter table public.animal_tombstones enable row level security;
+
+drop policy if exists tombstones_read_public on public.animal_tombstones;
+create policy tombstones_read_public on public.animal_tombstones
+  for select using (true);
+-- Sem política de escrita: só os triggers abaixo (security definer) gravam.
+
+create or replace function public.track_animal_tombstone()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'DELETE' then
+    insert into public.animal_tombstones (animal_id, reason, removed_at)
+    values (old.id, 'DELETED', now())
+    on conflict (animal_id) do update
+      set reason = excluded.reason, removed_at = excluded.removed_at;
+    return old;
+  end if;
+
+  if tg_op = 'INSERT' then
+    -- Recriado (ex.: "manter minha versão" num conflito de anúncio apagado).
+    delete from public.animal_tombstones where animal_id = new.id;
+    return new;
+  end if;
+
+  -- UPDATE: só transições de moderação importam.
+  if new.moderation_status = 'HIDDEN' and old.moderation_status is distinct from 'HIDDEN' then
+    insert into public.animal_tombstones (animal_id, reason, removed_at)
+    values (new.id, 'HIDDEN', now())
+    on conflict (animal_id) do update
+      set reason = excluded.reason, removed_at = excluded.removed_at;
+  elsif new.moderation_status <> 'HIDDEN' and old.moderation_status = 'HIDDEN' then
+    -- Reexibido: o tombstone sai e o updated_at novo traz a linha no delta.
+    delete from public.animal_tombstones where animal_id = new.id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_animals_tombstone on public.animals;
+create trigger trg_animals_tombstone
+  after insert or update or delete on public.animals
+  for each row execute function public.track_animal_tombstone();
 
 -- ============================================================================
 -- Cadastro: cria public.users quando nasce um usuário em auth.users.

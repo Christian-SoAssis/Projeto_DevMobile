@@ -45,6 +45,13 @@ export type AnimalRow = {
   moderation_status?: string;
 };
 
+/** Tombstone de anúncio que saiu da leitura pública (OFF-06, ordem 6). */
+export interface AnimalTombstoneRow {
+  animal_id: string;
+  reason: string;
+  removed_at: string;
+}
+
 export interface AnimalPhotoRow {
   id: string;
   animal_id: string;
@@ -88,6 +95,13 @@ export interface SupabaseFilter<TRow> extends PromiseLike<PostgrestResult<TRow[]
   eq(column: string, value: unknown): this;
   neq(column: string, value: unknown): this;
   in(column: string, values: unknown[]): this;
+  /** Comparação estrita (`col > valor`). */
+  gt(column: string, value: unknown): this;
+  /**
+   * Disjunção PostgREST (`or=(…)`): usada no keyset do pull incremental
+   * (OFF-06) — `col.gt."v",and(col.eq."v",id.gt.x)`.
+   */
+  or(filters: string): this;
   /** Limita/ordenadores usados só na leitura pública de cache remoto. */
   order(column: string, options?: { ascending?: boolean }): this;
   limit(count: number): this;

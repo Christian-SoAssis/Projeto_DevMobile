@@ -20,7 +20,7 @@ export class DeleteAnimalUseCase {
       throw new Error('Somente o responsável pelo anúncio pode excluí-lo.');
     }
 
-    const action = this.buildDeleteAction(animalId);
+    const action = this.buildDeleteAction(animalId, animal.ownerId);
     await this.unitOfWork.run(async () => {
       await this.animalRepository.deleteLocal(animalId);
       await this.syncQueueRepository.enqueue(action);
@@ -36,13 +36,14 @@ export class DeleteAnimalUseCase {
     }
   }
 
-  private buildDeleteAction(animalId: string): SyncAction {
+  private buildDeleteAction(animalId: string, ownerId: string): SyncAction {
     return new SyncAction({
       id: `sync_delete_${animalId}`,
       operation: 'DELETE',
       entityType: 'animal',
       entityId: animalId,
-      payload: { animalId },
+      // DAT-10: o anúncio local some junto — o dono precisa viajar na ação.
+      payload: { animalId, ownerId },
     });
   }
 }

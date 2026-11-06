@@ -66,14 +66,14 @@ Referência: [01 - Offline-first](01-offline-first.md). A origem e os complement
 | OFF-03 | Identificadores globais e metadados de sync permitem reconhecer o mesmo registro no reenvio? | NV | A preencher |
 | OFF-04 | Dado e operação pendente são persistidos atomicamente, com dependências respeitadas? | NV | A preencher |
 | OFF-05 | O servidor reconhece reenvios e há retry adequado, sem duplicação? | NV | A preencher |
-| OFF-06 | Lote e cursor são consistentes, ou há estratégia de recebimento equivalente justificada? | NV | A preencher |
+| OFF-06 | Lote e cursor são consistentes, ou há estratégia de recebimento equivalente justificada? | PA | **Decisão da ordem 6 (06/11/2026): cursor/delta.** Keyset `(updated_at, id)` com o carimbo do SERVIDOR (trigger também no INSERT), páginas de 200 e sobreposição de 60 s ao retomar. O cursor só é gravado ao fim do pull completo e nunca recua. Teste executado com backend simulado: `PullDelta.test.ts` (paginação, empate de carimbo, transação atrasada, relógio do aparelho atrasado, falha sem avanço do cursor — T05). **Lacuna:** triggers e índice do `init.sql` não foram aplicados num servidor real (ordem 8). |
 | OFF-07 | Conflitos e edições durante envio têm regra, sem confirmação indevida de revisão nova? | NV | A preencher |
-| OFF-08 | Exclusões propagam e tombstones não são removidos cedo demais? | NV | A preencher |
+| OFF-08 | Exclusões propagam e tombstones não são removidos cedo demais? | PA | Tabela `animal_tombstones` (DELETED/HIDDEN) mantida por trigger e lida por cursor próprio. O cliente remove do cache, exceto quando há ação pendente ou o anúncio é próprio e foi ocultado. O tombstone sai só quando o anúncio é recriado ou reexibido, e não há expurgo automático (nunca é removido cedo). Teste executado com backend simulado: `PullDelta.test.ts`. **Lacuna:** SQL não aplicado em servidor real (ordem 8). Exclusões anteriores à criação da tabela não geram tombstone. |
 | OFF-09 | Gatilhos são coordenados e falhas não deixam o worker travado? | NV | A preencher |
 | OFF-10 | A UI distingue salvo localmente, pendente, sincronizado e erro? | NV | A preencher |
 | OFF-11 | CRUD, localização e mídia usam estratégias adequadas, sem impor rastreamento ou vídeo desnecessários? | NV | A preencher |
 
-Se OFF-06 usar snapshot em lugar de delta, registrar a justificativa e verificar completude/reconciliação. NA só é adequado quando a condição realmente não existe; não deve ocultar um requisito de atualização remota do produto.
+Se OFF-06 usar snapshot em lugar de delta, registrar a justificativa e verificar completude/reconciliação. *(Enlace: a ordem 6 decidiu por delta — ver linha OFF-06.)* NA só é adequado quando a condição realmente não existe; não deve ocultar um requisito de atualização remota do produto.
 
 ## 4. Permissões e seleção
 
@@ -137,7 +137,7 @@ Referência: [05 - SQLite, Supabase e segurança](05-sqlite-supabase-e-seguranca
 | DAT-07 | Referência estável é separada da URL; acesso privado e renovação de URL são tratados? | NV | A preencher |
 | DAT-08 | Upload tem identidade estável, corpo/formato compatíveis e reenvio sem duplicação? | NV | A preencher |
 | DAT-09 | Sucessos parciais são retomados; só a revisão completamente enviada é confirmada? | NV | A preencher |
-| DAT-10 | Troca de conta isola rascunhos, arquivos privados e pendências? | NV | A preencher |
+| DAT-10 | Troca de conta isola rascunhos, arquivos privados e pendências? | AT (teste executado; device NV) | **Decisão da ordem 0: preservar e pausar.** O dono vai no payload (`SyncAction.ownerId`), e o worker pausa as ações de outra conta ou de quando não há sessão (ordem 2). A tela de Sync esconde pendências alheias, e a busca esconde rascunhos (CREATE pendente) de outra conta. Favoritos e interesses locais já eram filtrados por `user_id`. Testes: `AccountIsolation.test.ts` (T19). Item legado sem dono no payload: atribuído pelo anúncio local; um DELETE legado sem dono segue o fluxo antigo (RLS protege). |
 | DAT-11 | Worker, listeners, dependências e classificação de erros permitem novas tentativas? | NV | A preencher |
 | DAT-12 | Exclusões e limpeza coordenam linha/arquivo sem ressuscitar ou apagar mídia ainda referenciada? | NV | A preencher |
 

@@ -16,7 +16,18 @@ export interface SyncProcessResult {
   failedCount: number;
   /** Ações paradas à espera de revisão do responsável (RF23). */
   conflictCount?: number;
+  /**
+   * DAT-10 (ordens 0/2): ações de OUTRA conta deixadas na fila, sem envio.
+   * Retomam quando o dono entrar de novo neste aparelho.
+   */
+  pausedCount?: number;
 }
+
+/**
+ * Conta da sessão ativa (DAT-10). `null` = ninguém logado (toda ação com
+ * dono fica pausada); `undefined` = o chamador não informa sessão (sem filtro).
+ */
+export type CurrentUserIdProvider = () => string | null | undefined;
 
 /** Dependências remotas opcionais: só existem com backend configurado. */
 export interface ProcessSyncExtras {
@@ -24,6 +35,13 @@ export interface ProcessSyncExtras {
   remoteAnimals?: RemoteAnimalSource;
   favorites?: FavoriteRemoteGateway;
   interests?: InterestRemoteGateway;
+  /**
+   * DAT-10 — política decidida na ordem 0: PRESERVAR e PAUSAR. O worker só
+   * envia ações cujo dono é a conta da sessão ativa; as de outra conta
+   * continuam persistidas e voltam a subir quando o dono entrar de novo.
+   * Sem provedor (testes/legado), nenhuma ação é filtrada.
+   */
+  currentUserId?: CurrentUserIdProvider;
 }
 
 /** O servidor recusou o `UPDATE` porque a versão remota avançou (bloqueio otimista, doc §14.3). */
@@ -52,7 +70,7 @@ export class ProcessSyncQueueUseCase {
   async execute(): Promise<SyncProcessResult> {
     // Evita duas execuções concorrentes da mesma fila (doc §14.1 passo 2).
     if (this.isRunning) {
-      return { processedCount: 0, successCount: 0, failedCount: 0, conflictCount: 0 };
+      return { processedCount: 0, successCount: 0, failedCount: 0, conflictCount: 0, pausedCount: 0 };
     }
 
     this.isRunning = true;
@@ -61,8 +79,18 @@ export class ProcessSyncQueueUseCase {
       let successCount = 0;
       let failedCount = 0;
       let conflictCount = 0;
+      let pausedCount = 0;
+      // Lido uma vez por ciclo: a troca de conta no meio do ciclo não
+      // mistura donos dentro da mesma execução.
+      const sessionUserId = this.extras.currentUserId?.();
 
       for (const action of pending) {
+        if (sessionUserId !== undefined && !(await this.belongsToSession(action, sessionUserId))) {
+          // DAT-10: ação de outra conta (ou sem sessão) fica intacta na
+          // fila — sem envio, sem tentativa contada, sem marca de falha.
+          pausedCount += 1;
+          continue;
+        }
         if (action.isConflict) {
           // Aguarda revisão manual: nunca é reenviada sozinha.
           conflictCount += 1;
@@ -119,14 +147,30 @@ export class ProcessSyncQueueUseCase {
       await this.syncQueueRepository.clearCompleted();
 
       return {
-        processedCount: pending.length,
+        processedCount: pending.length - pausedCount,
         successCount,
         failedCount,
         conflictCount,
+        pausedCount,
       };
     } finally {
       this.isRunning = false;
     }
+  }
+
+  /**
+   * Dono da ação = dono gravado no payload; itens legados (enfileirados
+   * antes da ordem 2) de anúncio caem no `ownerId` do anúncio local. Sem
+   * dono identificável, a ação segue o fluxo antigo — a RLS do servidor
+   * continua barrando escrita em linha alheia.
+   */
+  private async belongsToSession(action: SyncAction, sessionUserId: string | null): Promise<boolean> {
+    let owner = action.ownerId;
+    if (!owner && action.entityType === 'animal') {
+      owner = (await this.animalRepository.findById(action.entityId))?.ownerId;
+    }
+    if (!owner) return true;
+    return sessionUserId !== null && owner === sessionUserId;
   }
 
   /**

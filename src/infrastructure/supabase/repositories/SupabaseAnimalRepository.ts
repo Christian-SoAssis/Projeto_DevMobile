@@ -5,7 +5,12 @@ import {
 import { Animal } from '../../../domain/entities/Animal';
 import { AnimalPhoto } from '../../../domain/entities/AnimalPhoto';
 import { PhotoStorage } from '../../../domain/ports/PhotoStorage';
-import { RemoteAnimalSource } from '../../../domain/ports/RemoteAnimalSource';
+import {
+  ChangeCursor,
+  RemoteAnimalPage,
+  RemoteAnimalSource,
+  RemoteRemovalPage,
+} from '../../../domain/ports/RemoteAnimalSource';
 import {
   AnimalCharacteristics,
 } from '../../../domain/value-objects/AnimalCharacteristics';
@@ -13,7 +18,7 @@ import {
   ApproximateLocation,
 } from '../../../domain/value-objects/ApproximateLocation';
 import { AdoptionStatus } from '../../../domain/value-objects/AdoptionStatus';
-import { SupabaseClientLike, AnimalRow, AnimalPhotoRow } from '../types';
+import { SupabaseClientLike, AnimalRow, AnimalPhotoRow, AnimalTombstoneRow } from '../types';
 import { PHOTO_BUCKET } from '../storage/SupabasePhotoStorage';
 
 /** Código do Postgres para violação de unicidade (PK/unique) — reenvio idempotente. */
@@ -261,23 +266,66 @@ export class SupabaseAnimalRepository implements AnimalRepository, RemoteAnimalS
   }
 
   /**
-   * Anúncios visíveis (não ocultados pela moderação) em qualquer situação,
-   * com as fotos já enviadas — insumo da reconciliação local (doc §14.1).
-   * A RLS `animals_read_public` já esconde os ocultados de quem não é dono.
+   * Delta de anúncios visíveis (OFF-06, ordem 6), em keyset `(updated_at, id)`
+   * crescente: só o que mudou DEPOIS do cursor, com as fotos já enviadas —
+   * insumo da reconciliação local (doc §14.1). A RLS `animals_read_public`
+   * já esconde os ocultados de quem não é dono; o filtro explícito mantém
+   * o dono/admin no mesmo corte público (ocultados chegam como tombstone).
    */
-  async listVisibleRemote(): Promise<Animal[]> {
-    const { data, error } = await this.client
+  async listVisibleChangedAfter(after: ChangeCursor | null, limit: number): Promise<RemoteAnimalPage> {
+    let query = this.client
       .from<AnimalRow>('animals')
       .select('*')
-      .eq('moderation_status', 'NONE')
-      .order('updated_at', { ascending: false })
-      .limit(200);
+      .eq('moderation_status', 'NONE');
+    if (after) query = query.or(SupabaseAnimalRepository.keysetAfter('updated_at', 'id', after));
+    const { data, error } = await query
+      .order('updated_at', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(limit);
     if (error) {
       throw new RemoteSupabaseError(`Falha ao ler anúncios do servidor: ${error.message}`);
     }
     const rows = data ?? [];
     const photos = await this.loadRemotePhotos(rows.map((r) => r.id));
-    return rows.map((row) => SupabaseAnimalRepository.rowToAnimal(row, photos.get(row.id) ?? []));
+    const last = rows[rows.length - 1];
+    return {
+      animals: rows.map((row) => SupabaseAnimalRepository.rowToAnimal(row, photos.get(row.id) ?? [])),
+      next: last ? { at: last.updated_at, id: last.id } : null,
+    };
+  }
+
+  /** Tombstones (apagados/ocultados) depois do cursor, em keyset `(removed_at, animal_id)`. */
+  async listRemovedAfter(after: ChangeCursor | null, limit: number): Promise<RemoteRemovalPage> {
+    let query = this.client.from<AnimalTombstoneRow>('animal_tombstones').select('*');
+    if (after) query = query.or(SupabaseAnimalRepository.keysetAfter('removed_at', 'animal_id', after));
+    const { data, error } = await query
+      .order('removed_at', { ascending: true })
+      .order('animal_id', { ascending: true })
+      .limit(limit);
+    if (error) {
+      throw new RemoteSupabaseError(`Falha ao ler anúncios removidos do servidor: ${error.message}`);
+    }
+    const rows = data ?? [];
+    const last = rows[rows.length - 1];
+    return {
+      removals: rows.map((row) => ({
+        animalId: row.animal_id,
+        reason: row.reason === 'HIDDEN' ? 'HIDDEN' : 'DELETED',
+      })),
+      next: last ? { at: last.removed_at, id: last.animal_id } : null,
+    };
+  }
+
+  /**
+   * `(ts, id) > (cursor.at, cursor.id)` em sintaxe PostgREST. Valores entre
+   * aspas: o carimbo traz `:`/`.`/`+` (reservados no `or=`). O carimbo é
+   * repassado CRU (microssegundos do Postgres) — truncar para milissegundos
+   * faria o `gt` reler a mesma página para sempre.
+   */
+  static keysetAfter(tsColumn: string, idColumn: string, after: ChangeCursor): string {
+    const at = `"${after.at.replace(/"/g, '')}"`;
+    const id = `"${after.id.replace(/"/g, '')}"`;
+    return `${tsColumn}.gt.${at},and(${tsColumn}.eq.${at},${idColumn}.gt.${id})`;
   }
 
   async findRemoteById(id: string): Promise<Animal | null> {

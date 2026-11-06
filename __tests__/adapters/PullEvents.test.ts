@@ -47,7 +47,11 @@ describe('pullEvents (ordem 4 — evento de pull concluído)', () => {
   it('getFullSync notifica o evento quando o pull do servidor completa (T28)', async () => {
     const animais = new AnimalRepositoryFake();
     const source = {
-      listVisibleRemote: jest.fn(async () => [makeAnimal('a2', 'Bob')]),
+      listVisibleChangedAfter: jest.fn(async () => ({
+        animals: [makeAnimal('a2', 'Bob')],
+        next: { at: '2026-01-01T00:00:00.000Z', id: 'a2' },
+      })),
+      listRemovedAfter: jest.fn(async () => ({ removals: [], next: null })),
       findRemoteById: jest.fn(async () => null),
     };
     const container = {
@@ -70,9 +74,10 @@ describe('pullEvents (ordem 4 — evento de pull concluído)', () => {
       animalRepository: new AnimalRepositoryFake(),
       syncQueueRepository: new SyncQueueRepositoryFake(),
       remoteAnimalSource: {
-        listVisibleRemote: jest.fn(async () => {
+        listVisibleChangedAfter: jest.fn(async () => {
           throw new Error('sem rede');
         }),
+        listRemovedAfter: jest.fn(async () => ({ removals: [], next: null })),
         findRemoteById: jest.fn(async () => null),
       },
     } as unknown as AppContainer;

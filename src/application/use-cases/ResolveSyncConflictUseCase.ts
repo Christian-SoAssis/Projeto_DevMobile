@@ -60,7 +60,7 @@ export class ResolveSyncConflictUseCase {
           operation: 'CREATE',
           entityType: 'animal',
           entityId: local.id,
-          payload: {},
+          payload: { ownerId: local.ownerId },
         })
       );
       return;

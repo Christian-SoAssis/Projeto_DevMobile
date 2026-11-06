@@ -8,6 +8,8 @@ import {
   LATEST_SCHEMA_VERSION,
 } from '../../../../src/infrastructure/database/sqlite/migrations';
 import { INITIAL_SCHEMA_SQL } from '../../../../src/infrastructure/database/sqlite/migrations/schema.sql';
+import { SqliteSyncMetadataRepository } from '../../../../src/infrastructure/database/sqlite/repositories/SqliteSyncMetadataRepository';
+import { SyncMetadata } from '../../../../src/domain/entities/SyncMetadata';
 
 describe('Migrations SQLite reais', () => {
   let driver: BetterSqliteDriver;
@@ -90,5 +92,33 @@ describe('Migrations SQLite reais', () => {
       ['user_legado']
     );
     expect(row).toEqual({ user_id: 'user_legado', species: 'Gato' });
+  });
+
+  it('migração 3 (OFF-06): banco v2 ganha o cursor do pull sem perder o estado', async () => {
+    await driver.execAsync(INITIAL_SCHEMA_SQL);
+    await driver.runAsync(
+      `INSERT INTO sync_state (key, last_sync_at, last_success_at) VALUES ('animals', 'x', 'y')`
+    );
+    await driver.execAsync(
+      `ALTER TABLE users ADD COLUMN bio TEXT;
+       ALTER TABLE users ADD COLUMN avatar_uri TEXT;
+       ALTER TABLE users ADD COLUMN interests TEXT;`
+    );
+    await driver.execAsync('PRAGMA user_version = 2');
+
+    await applyMigrations(driver);
+
+    expect(await getSchemaVersion(driver)).toBe(LATEST_SCHEMA_VERSION);
+    const repo = new SqliteSyncMetadataRepository(driver);
+    const antigo = await repo.findByKey('animals');
+    expect(antigo?.lastSuccessAt).toBe('y');
+    expect(antigo?.cursor).toBeUndefined(); // sem cursor → 1ª sincronização baixa tudo
+
+    const meta = new SyncMetadata({ key: 'animals', lastSuccessAt: 'z' });
+    meta.setCursor('{"animals":{"at":"2026-11-01T10:00:00.000001+00:00","id":"a"}}');
+    await repo.save(meta);
+    expect((await repo.findByKey('animals'))?.cursor).toBe(
+      '{"animals":{"at":"2026-11-01T10:00:00.000001+00:00","id":"a"}}'
+    );
   });
 });

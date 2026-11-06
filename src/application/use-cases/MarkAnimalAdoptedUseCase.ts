@@ -46,7 +46,12 @@ export class MarkAnimalAdoptedUseCase {
       operation: 'MARK_ADOPTED',
       entityType: 'animal',
       entityId: animal.id,
-      payload: { animalId: animal.id, status: animal.status.value, version: animal.version },
+      payload: {
+        animalId: animal.id,
+        ownerId: animal.ownerId,
+        status: animal.status.value,
+        version: animal.version,
+      },
     });
   }
 }

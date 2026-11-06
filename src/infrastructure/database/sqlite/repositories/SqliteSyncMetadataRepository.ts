@@ -6,6 +6,7 @@ interface SyncStateRow {
   key: string;
   last_sync_at: string | null;
   last_success_at: string | null;
+  cursor?: string | null;
 }
 
 export class SqliteSyncMetadataRepository implements SyncMetadataRepository {
@@ -22,16 +23,18 @@ export class SqliteSyncMetadataRepository implements SyncMetadataRepository {
       key: row.key,
       lastSyncAt: row.last_sync_at || undefined,
       lastSuccessAt: row.last_success_at || undefined,
+      cursor: row.cursor || undefined,
     });
   }
 
   async save(metadata: SyncMetadata): Promise<void> {
     await this.db.runAsync(
-      `INSERT INTO sync_state (key, last_sync_at, last_success_at) VALUES (?, ?, ?)
+      `INSERT INTO sync_state (key, last_sync_at, last_success_at, cursor) VALUES (?, ?, ?, ?)
        ON CONFLICT(key) DO UPDATE SET
          last_sync_at = excluded.last_sync_at,
-         last_success_at = excluded.last_success_at`,
-      [metadata.key, metadata.lastSyncAt || null, metadata.lastSuccessAt || null]
+         last_success_at = excluded.last_success_at,
+         cursor = excluded.cursor`,
+      [metadata.key, metadata.lastSyncAt || null, metadata.lastSuccessAt || null, metadata.cursor || null]
     );
   }
 }

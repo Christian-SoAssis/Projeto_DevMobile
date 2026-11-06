@@ -7,7 +7,7 @@ import { INITIAL_SCHEMA_SQL } from './schema.sql';
  * A migração 001 é o schema inicial da Fase 2. Ela usa `IF NOT EXISTS` para
  * também ser segura em bancos criados antes do controle de versão existir.
  */
-export const LATEST_SCHEMA_VERSION = 2;
+export const LATEST_SCHEMA_VERSION = 3;
 
 interface UserVersionRow {
   user_version: number;
@@ -34,6 +34,27 @@ const MIGRATIONS: Migration[] = [
          ALTER TABLE users ADD COLUMN avatar_uri TEXT;
          ALTER TABLE users ADD COLUMN interests TEXT;`
       );
+    },
+  },
+  {
+    // Pull incremental (OFF-06, ordem 6): cursor (updated_at, id) do servidor.
+    // Banco existente começa sem cursor → a 1ª sincronização baixa tudo.
+    version: 3,
+    up: async (db) => {
+      // Defensivo: bancos parciais (sem `sync_state`) ganham a tabela já com
+      // a coluna; os demais só recebem a coluna se ainda não a tiverem.
+      await db.execAsync(
+        `CREATE TABLE IF NOT EXISTS sync_state (
+           key TEXT PRIMARY KEY NOT NULL,
+           last_sync_at TEXT,
+           last_success_at TEXT,
+           cursor TEXT
+         );`
+      );
+      const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(sync_state)');
+      if (!cols.some((c) => c.name === 'cursor')) {
+        await db.execAsync(`ALTER TABLE sync_state ADD COLUMN cursor TEXT;`);
+      }
     },
   },
 ];

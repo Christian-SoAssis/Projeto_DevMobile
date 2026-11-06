@@ -5,6 +5,7 @@ import { ProcessSyncQueueUseCase } from '../../application/use-cases/ProcessSync
 import { PullRemoteAnimalsUseCase } from '../../application/use-cases/PullRemoteAnimalsUseCase';
 import { RunFullSyncUseCase, FullSyncResult } from '../../application/use-cases/RunFullSyncUseCase';
 import { notifyPullCompleted } from '../sync/pullEvents';
+import { getActiveUserId } from '../sync/activeSession';
 
 /**
  * Uma única instância do ciclo de sincronização por container: a trava
@@ -40,6 +41,8 @@ export function getFullSync(container: AppContainer): RunFullSyncUseCase {
       remoteAnimals: container.remoteAnimalSource,
       favorites: container.remoteFavorites,
       interests: container.remoteInterests,
+      // DAT-10 (ordens 0/2): só sobem as ações da conta logada.
+      currentUserId: getActiveUserId,
     }
   );
   const pull = container.remoteAnimalSource
@@ -47,7 +50,10 @@ export function getFullSync(container: AppContainer): RunFullSyncUseCase {
         container.remoteAnimalSource,
         container.animalRepository,
         container.syncQueueRepository,
-        container.syncMetadataRepository
+        container.syncMetadataRepository,
+        undefined,
+        // Anúncio próprio ocultado pela moderação continua no aparelho do dono.
+        { currentUserId: getActiveUserId }
       )
     : undefined;
   const cycle = new PullNotifyingFullSync(push, pull);

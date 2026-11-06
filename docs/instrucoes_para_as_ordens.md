@@ -11,6 +11,19 @@
 
 ---
 
+## ✅ Decisões registradas (06/11/2026, pelo responsável)
+
+| Ordem | Decisão | Consequência implementada |
+|---|---|---|
+| **0** | **Opção (a) — preservar e pausar.** Trocar de conta não apaga nada; as pendências de cada conta ficam paradas enquanto outra conta está logada e voltam a subir quando o dono entra de novo. Sem aviso no logout (nada é descartado). | Base da ordem 2. |
+| **2** | Implementada conforme a ordem 0 (pausar, não limpar). | O dono de cada ação vai no payload (`ownerId`/`userId`), e o worker só envia as ações da sessão ativa. A tela de Sync e a busca escondem pendências e rascunhos de outra conta. |
+| **6** | **Cursor/delta** (e não a confirmação do snapshot). | Keyset `(updated_at, id)` com relógio do servidor, mais a tabela `animal_tombstones` para anúncios apagados ou ocultados. A 1ª sincronização baixa tudo; as seguintes baixam só o que mudou. |
+
+Detalhes de implementação, testes e limitações: `nextsteps_arquitetura.md` §7.
+O texto abaixo é mantido como registro das opções que foram avaliadas.
+
+---
+
 ## 🔒 Ordem 0 — Política de troca de conta (regra DAT-10)
 
 **Cenário:** o usuário desloga da conta B e entra na conta A no mesmo aparelho.

@@ -12,6 +12,7 @@ import { AuthGatewayFake } from '../../application/fakes/AuthGatewayFake';
 import { UserRepositoryFake } from '../../application/fakes/UserRepositoryFake';
 import { SessionStorageFake } from '../../application/fakes/SessionStorageFake';
 import { useRepositories } from './RepositoriesContext';
+import { publishActiveUserId, resetActiveUserId } from '../sync/activeSession';
 
 export interface AuthContextType {
   user: User | null;
@@ -53,6 +54,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // DAT-10 (ordens 0/2): a sincronização só envia ações da conta logada.
+  // Publicado no RENDER (não em efeito): efeitos dos filhos — o AutoSync —
+  // rodam antes dos do pai, e um ciclo no boot veria "sessão desconhecida"
+  // (sem filtro). `null` enquanto a sessão carrega: nenhuma ação com dono
+  // sobe antes de se saber quem está logado. Escrita idempotente.
+  publishActiveUserId(user?.id ?? null);
+  useEffect(() => () => resetActiveUserId(), []);
 
   const authenticateUseCase = new AuthenticateUserUseCase(authGateway, sessionStorage);
   const tokenUseCase = new AcessarViaTokenUseCase(authGateway, sessionStorage);

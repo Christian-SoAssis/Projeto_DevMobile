@@ -100,19 +100,19 @@
 
 | Ordem | Tarefa | Regras | Escopo do código | Bloqueio |
 |---|---|---|---|---|
-| 0 🔒 | **Decidir política DAT-10** (preservar vs limpar dados de A na troca de conta) | DAT-10 | somente doc | **🔒 decisão de produto — escolher:** (a) preservar e retomar no novo login de A, ou (b) limpar com aviso no logout |
+| 0 ✅ | **Política DAT-10 decidida: (a) preservar e pausar** (06/11/2026) | DAT-10 | somente doc | — |
 | 1 ✅ | Reenvio de CREATE reconhecido (animals + favoritos + interesses) | OFF-05, DAT-08 | `SupabaseAnimalRepository.ts`, `SupabaseUserDataGateways.ts`, `SupabaseFake.ts` | — |
-| 2 🔒 | Worker ignora ações de outra conta (tag de dono + filtro por sessão) | DAT-10 | `ProcessSyncQueueUseCase.ts`, `SyncAction.ts` | **🔒 depende da ordem 0** (a política define o que fazer com o item: pausar vs limpar) |
+| 2 ✅ | Worker ignora ações de outra conta (dono no payload + filtro por sessão) | DAT-10 | `ProcessSyncQueueUseCase.ts`, `SyncAction.ts`, `activeSession.ts`, `SearchAnimalsUseCase.ts` | — |
 | 3 ✅ | Supersede de UPDATE pendente + teste T07 | OFF-07, DAT-09 | `UpdateAnimalUseCase.ts` (enqueue), `ProcessSyncQueueUseCase.ts` | — |
 | 4 ✅ | Re-consulta de listas após pull | OFF-02 | `RunFullSyncUseCase.ts`, `SearchScreen.tsx`, contexto | — |
 | 5 ✅ | Erro explícito na falha de cópia em device | MID-02 | `SqlitePhotoStorage.ts:150-154` | — |
-| 6 🔒 | Documentar decisão OFF-06 (snapshot integral em vez de cursor delta) | OFF-06 | doc | **🔒 decisão de produto leve — confirmar:** snapshot integral é aceitável para o escopo (não implementar cursor/delta sem necessidade demonstrada) |
+| 6 ✅ | **OFF-06 decidido: cursor/delta** (keyset `(updated_at, id)` do servidor + tombstones) | OFF-06, OFF-08 | `PullRemoteAnimalsUseCase.ts`, `SupabaseAnimalRepository.ts`, `supabase/init.sql`, migração SQLite 3 | — |
 | 7 ✅ | Backoff com espaçamento entre tentativas + classificação permanente/transitória | OFF-05, DAT-11 | `ProcessSyncQueueUseCase.ts`, `SincronizacaoService.ts` | — |
 | 8 🌐 | Validações de ambiente real (init.sql + EXPO_PUBLIC_* + device: T10/T18/T20/T22) | PER-03, DAT-05..07, MID-01/07 | ambiente | **🌐 requer:** criar projeto Supabase + aparelho físico (ação fora do código) |
 
 **Itens 1–5** são tarefas incrementais independentes: cada um é commitável por conta própria, com suíte verde. Não promover refatoração única.
 
-> **Progresso:** **TODAS as ordens sem decisão de produto foram implementadas** (1, 3, 4, 5, 7 ✅). Itens 🔒 (0, 2, 6) aguardam decisão do responsável; item 🌐 (8) aguarda ambiente real (projeto Supabase + aparelho).
+> **Progresso:** ordens 0–7 concluídas ✅ (0 e 6 decididas pelo responsável em 06/11/2026). Resta apenas o item 🌐 (8), que aguarda ambiente real (projeto Supabase + aparelho) — e que agora também precisa aplicar o novo trecho de `init.sql` (tombstones e triggers do pull incremental).
 
 ---
 
@@ -122,7 +122,7 @@
 |---|---|---|
 | T01, T03, T04*, T06, T09, T11, T12*, T13, T15* | coberto parcialmente por testes com fake/TDD | confirmar os marcados * depois da correção (T04 no achado 1; T15 no achado 5) |
 | T02 | **AT** (migrações testadas) | device: revisar com banco v1 → v2 |
-| T05, T07, T16, T19, T28 | **sem teste** | corrigir primeiro (achados 1, 2, 3, 4), depois escrever o teste |
+| T05, T07, T16, T19, T28 | **sem teste** → T07 (ordem 3), T28 (ordem 4), **T19 (ordem 2: `AccountIsolation.test.ts`)** e **T05 (ordem 6: `PullDelta.test.ts`, falha sem avanço do cursor)** cobertos; T16 segue sem teste | — |
 | T08 | **AT** (delete idempotente + fila) | ambiente real ancora em T08 remoto |
 | T10, T14, T17, T18, T20, T21, T22 | **NV** | device + projeto Supabase real (ordem 8) |
 | T23–T26 | **NA** | vídeo/QR/galeria/IA fora de escopo |
@@ -151,6 +151,10 @@
   - Estado da suíte após as ordens 1–5 (exceto 7): **419/419 verdes (65 suítes)**, typecheck 0 erros.
   - ✅ **Ordem 7** — commit `5266da0`: falha TRANSITÓRIA (rede) NÃO reenvia no ciclo seguinte — espera o backoff crescente (2s, 4s … cap 30s, contado da ÚLTIMA falha: `changedAt` é regravado em `markFailed` e persistido pelo `update` do repositório SQLite). Falha PERMANENTE (operação não suportada, anúncio apagado localmente, sem backend) NUNCA reenvia — marcada com prefixo `[ERRO PERMANENTE]` em `last_error` (sobrevive a reinício sem coluna nova; mesmo padrão do marcador `[CONFLITO]` RF23). Testes: `SyncRetrySpacing.test.ts` (8 casos: backoff/retryIsDue, permanente sem reenvio após 1 min, tentativas esgotadas) + `changed_at` persistido (`SqliteSyncQueueRepository.test.ts`).
   - Estado final da suíte (ordens sem decisão concluídas): **428/428 verdes (66 suítes)**, typecheck 0 erros.
-- **Explicitamente pendente:** ordens 🔒 (0, 2, 6 — decisão do responsável) e 🌐 (8 — ambiente real).
+  - ✅ **Ordem 0** — decidida pelo responsável em 06/11/2026: **(a) preservar e pausar** (registro em `instrucoes_para_as_ordens.md`).
+  - ✅ **Ordem 2** — DAT-10/T19: `SyncAction.ownerId` (dono no payload: `ownerId` de anúncios — agora também em UPDATE/MARK_ADOPTED/DELETE e no CREATE de recriação — ou `userId` de favoritos/interesses; sem coluna nova). `ProcessSyncQueueUseCase` recebe `currentUserId` e **pausa** as ações de outra conta ou de quando ninguém está logado: elas ficam intactas, sem tentativa contada e sem marca de falha, e o resultado traz `pausedCount`. Um item legado sem dono é atribuído pelo anúncio local. A sessão é publicada pelo `AuthProvider` em `src/adapters/sync/activeSession.ts` durante o render, para que nenhum ciclo do boot rode sem filtro. A tela de Sync esconde pendências alheias, e o `SearchAnimalsUseCase` esconde rascunhos (CREATE pendente) de outra conta. Testes: `AccountIsolation.test.ts`.
+  - ✅ **Ordem 6** — decidida em 06/11/2026: **cursor/delta** (OFF-06/OFF-08). Servidor (`supabase/init.sql`): o trigger de `updated_at` passa a valer também no INSERT (o app envia o relógio do aparelho), índice `(updated_at, id)`, trigger que marca o anúncio quando uma foto muda, e tabela `animal_tombstones` (DELETED/HIDDEN) com leitura pública e escrita só por trigger. App: `RemoteAnimalSource.listVisibleChangedAfter` / `listRemovedAfter` (keyset PostgREST `or=`, carimbo cru com microssegundos). `PullRemoteAnimalsUseCase` pagina (200 × até 50 páginas), retoma com 60 s de sobreposição, reconcilia por `version`, remove por tombstone (exceto com ação pendente ou anúncio próprio ocultado) e grava o cursor só no fim. SQLite: migração 3 (`sync_state.cursor`). Fake do Supabase com `gt`/`or`/`order`/`limit` reais, tombstones e `serverClock` opcional. Testes: `PullDelta.test.ts`, mais a migração 3 em `Migrations.real.test.ts`.
+  - **Limitações das ordens 2/6:** (1) o novo SQL **não foi aplicado num Supabase real**; precisa ser rodado na ordem 8, junto com o resto do `init.sql`. (2) Exclusões feitas antes da criação de `animal_tombstones` não geram tombstone, e um anúncio já apagado nesse período continua em caches antigos. (3) Tombstones não têm expurgo, o que é aceitável no volume atual. (4) Um DELETE legado sem dono no payload não é atribuível e segue o fluxo antigo (a RLS do servidor protege).
+- **Explicitamente pendente:** ordem 🌐 (8 — ambiente real), que agora inclui aplicar e conferir o SQL do pull incremental.
 - **Limitações registradas:** políticas RLS não aplicadas a servidor real; EXIF não inspecionado; permissões não testadas em build próprio; nenhum cenário de device executado.
 - Atualizar este arquivo a cada correção (o que foi comprovado, o que mudou e o que permanece NV) — o checklist 06 continua sendo o registro por regra.

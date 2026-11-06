@@ -55,6 +55,17 @@ export class SyncAction {
     this._lastError = props.lastError;
   }
 
+  /**
+   * DAT-10 (ordens 0/2): conta dona da ação — `ownerId` (anúncios) ou
+   * `userId` (favoritos/interesses) do payload. Sem coluna nova: o dono
+   * viaja no `payload_json`. `undefined` = item legado sem dono gravado
+   * (o worker resolve pelo anúncio local quando possível).
+   */
+  get ownerId(): string | undefined {
+    const raw = this.payload.ownerId ?? this.payload.userId;
+    return typeof raw === 'string' && raw ? raw : undefined;
+  }
+
   get attempts(): number {
     return this._attempts;
   }

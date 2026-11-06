@@ -39,6 +39,13 @@ export interface FakeSupabaseContext {
   currentUserId: string | null;
   /** Papel ADMIN simulado (bypass das políticas de dono). */
   isAdmin: boolean;
+  /**
+   * Relógio do SERVIDOR (opcional): quando presente, simula os triggers
+   * `trg_animals_updated_at` (insert/update) e `trg_animal_photos_touch_animal`
+   * do `init.sql` — `updated_at` passa a ser o carimbo do servidor, não o
+   * enviado pelo app. Ausente, as linhas guardam o que o app mandou.
+   */
+  serverClock?: () => string;
 }
 
 export interface FakeSupabaseOptions {
@@ -48,8 +55,88 @@ export interface FakeSupabaseOptions {
 export interface FakeSupabaseAuthHandlers extends Partial<SupabaseAuthApi> {}
 
 type FilterPair =
-  | { column: string; op: 'eq' | 'neq'; value: unknown }
-  | { column: string; op: 'in'; value: unknown[] };
+  | { column: string; op: 'eq' | 'neq' | 'gt'; value: unknown }
+  | { column: string; op: 'in'; value: unknown[] }
+  | { column: string; op: 'or'; value: OrNode[] };
+
+/** Árvore mínima da sintaxe `or=(…)` do PostgREST (só o que os adapters usam). */
+type OrNode =
+  | { kind: 'and'; children: OrNode[] }
+  | { kind: 'cmp'; column: string; op: 'eq' | 'neq' | 'gt'; value: string };
+
+/** Divide no nível 0 de parênteses/aspas. */
+function splitTopLevel(input: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quoted = false;
+  let current = '';
+  for (const ch of input) {
+    if (ch === '"') quoted = !quoted;
+    if (!quoted && ch === '(') depth += 1;
+    if (!quoted && ch === ')') depth -= 1;
+    if (!quoted && depth === 0 && ch === ',') {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
+function parseOr(input: string): OrNode[] {
+  return splitTopLevel(input).map((term): OrNode => {
+    if (term.startsWith('and(') && term.endsWith(')')) {
+      return { kind: 'and', children: parseOr(term.slice(4, -1)) };
+    }
+    const [column, op, ...rest] = term.split('.');
+    let value = rest.join('.');
+    if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+    if (op !== 'eq' && op !== 'neq' && op !== 'gt') {
+      throw new Error(`SupabaseFake: operador não suportado no or(): ${op}`);
+    }
+    return { kind: 'cmp', column, op, value };
+  });
+}
+
+const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+
+/** Carimbo → microssegundos (o Postgres compara timestamptz com 6 casas). */
+function timestampMicros(value: string): number {
+  const m = value.match(/^(.*T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(.*)$/);
+  if (!m) return Number.NaN;
+  const frac = (m[2] ?? '').padEnd(6, '0').slice(0, 6);
+  const tz = m[3] || 'Z';
+  return Date.parse(`${m[1]}${tz}`) * 1000 + Number(frac);
+}
+
+/** Comparação com a semântica do Postgres para os tipos usados (timestamptz, texto, número). */
+function compareValues(a: unknown, b: unknown): number {
+  if (typeof a === 'string' && typeof b === 'string' && TIMESTAMP.test(a) && TIMESTAMP.test(b)) {
+    return Math.sign(timestampMicros(a) - timestampMicros(b));
+  }
+  if (typeof a === 'number' && typeof b === 'number') return Math.sign(a - b);
+  const sa = String(a);
+  const sb = String(b);
+  return sa < sb ? -1 : sa > sb ? 1 : 0;
+}
+
+function evalCmp(row: FakeRow, column: string, op: 'eq' | 'neq' | 'gt', value: unknown): boolean {
+  const cell = row[column];
+  if (op === 'gt') return cell !== undefined && cell !== null && compareValues(cell, value) > 0;
+  const equal =
+    typeof cell === 'string' && typeof value === 'string' && TIMESTAMP.test(cell) && TIMESTAMP.test(value)
+      ? compareValues(cell, value) === 0
+      : cell === value;
+  return op === 'eq' ? equal : !equal;
+}
+
+function evalOr(row: FakeRow, nodes: OrNode[]): boolean {
+  const evalNode = (node: OrNode): boolean =>
+    node.kind === 'and' ? node.children.every(evalNode) : evalCmp(row, node.column, node.op, node.value);
+  return nodes.some(evalNode);
+}
 
 type TableOp = 'select' | 'insert' | 'update' | 'delete';
 
@@ -59,6 +146,8 @@ interface FakeOperationArgs {
   op: TableOp;
   payload?: Partial<FakeRow> | Partial<FakeRow>[];
   filters: FilterPair[];
+  orderBy?: Array<{ column: string; ascending: boolean }>;
+  limitCount?: number;
 }
 
 class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
@@ -79,12 +168,23 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
     return this;
   }
 
-  // Não usados pelos adapters, mas mantidos para fidelidade da cadeia real.
-  order(): this {
+  gt(column: string, value: unknown): this {
+    this.args.filters.push({ column, op: 'gt', value });
     return this;
   }
 
-  limit(): this {
+  or(filters: string): this {
+    this.args.filters.push({ column: '', op: 'or', value: parseOr(filters) });
+    return this;
+  }
+
+  order(column: string, options?: { ascending?: boolean }): this {
+    (this.args.orderBy ??= []).push({ column, ascending: options?.ascending ?? true });
+    return this;
+  }
+
+  limit(count: number): this {
+    this.args.limitCount = count;
     return this;
   }
 
@@ -109,10 +209,29 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
 
     const matches = (row: FakeRow): boolean =>
       filters.every((f) => {
-        if (f.op === 'eq') return row[f.column] === f.value;
-        if (f.op === 'neq') return row[f.column] !== f.value;
+        if (f.op === 'eq' || f.op === 'neq' || f.op === 'gt') return evalCmp(row, f.column, f.op, f.value);
+        if (f.op === 'or') return evalOr(row, f.value);
         return Array.isArray(f.value) && f.value.map(String).includes(String(row[f.column]));
       });
+
+    // Triggers do init.sql (OFF-06, ordem 6). Tombstones sempre; relógio do
+    // servidor só quando `serverClock` foi configurado no contexto.
+    const serverNow = (): string => ctx.serverClock?.() ?? new Date().toISOString();
+    const tombstones = (): FakeRow[] => ctx.db.animal_tombstones ?? (ctx.db.animal_tombstones = []);
+    const putTombstone = (animalId: unknown, reason: 'DELETED' | 'HIDDEN') => {
+      const list = tombstones();
+      const existing = list.find((t) => t.animal_id === animalId);
+      if (existing) Object.assign(existing, { reason, removed_at: serverNow() });
+      else list.push({ animal_id: animalId, reason, removed_at: serverNow() });
+    };
+    const dropTombstone = (animalId: unknown) => {
+      ctx.db.animal_tombstones = tombstones().filter((t) => t.animal_id !== animalId);
+    };
+    const touchAnimal = (animalId: unknown) => {
+      if (!ctx.serverClock) return;
+      const animal = (ctx.db.animals ?? []).find((a: FakeRow) => a.id === animalId);
+      if (animal) animal.updated_at = serverNow();
+    };
 
     // ------------------------------------------------------------------
     // RLS simulada (§15.1):
@@ -151,7 +270,19 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
     };
 
     if (op === 'select') {
-      return { data: rows.filter((r: FakeRow) => matches(r) && canSeeRow(r)), error: null };
+      let selected = rows.filter((r: FakeRow) => matches(r) && canSeeRow(r));
+      const orderBy = this.args.orderBy ?? [];
+      if (orderBy.length > 0) {
+        selected = [...selected].sort((a, b) => {
+          for (const o of orderBy) {
+            const c = compareValues(a[o.column], b[o.column]);
+            if (c !== 0) return o.ascending ? c : -c;
+          }
+          return 0;
+        });
+      }
+      if (this.args.limitCount !== undefined) selected = selected.slice(0, this.args.limitCount);
+      return { data: selected, error: null };
     }
 
     if (op === 'insert') {
@@ -200,7 +331,14 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
           };
         }
       }
+      if (table === 'animals') {
+        for (const row of toInsert) {
+          if (ctx.serverClock) row.updated_at = serverNow();
+          dropTombstone(row.id); // recriado
+        }
+      }
       rows.push(...toInsert);
+      if (table === 'animal_photos') toInsert.forEach((r) => touchAnimal(r.animal_id));
       return { data: toInsert, error: null };
     }
 
@@ -208,7 +346,15 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
       const target = rows.filter((r: FakeRow) => matches(r));
       const allowed = target.filter(canWriteRow); // RLS filtra as linhas alheias
       for (const row of allowed) {
+        const wasHidden = row.moderation_status === 'HIDDEN';
         Object.assign(row, this.args.payload as FakeRow);
+        if (table === 'animals') {
+          if (ctx.serverClock) row.updated_at = serverNow();
+          const isHidden = row.moderation_status === 'HIDDEN';
+          if (isHidden && !wasHidden) putTombstone(row.id, 'HIDDEN');
+          if (!isHidden && wasHidden) dropTombstone(row.id);
+        }
+        if (table === 'animal_photos') touchAnimal(row.animal_id);
       }
       return { data: allowed, error: null }; // rejeitadas → zero linhas
     }
@@ -218,6 +364,8 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
     if (ctx.db[table]) {
       ctx.db[table] = rows.filter((r: FakeRow) => !target.includes(r));
     }
+    if (table === 'animals') target.forEach((r) => putTombstone(r.id, 'DELETED'));
+    if (table === 'animal_photos') target.forEach((r) => touchAnimal(r.animal_id));
     return { data: target, error: null };
   }
 }

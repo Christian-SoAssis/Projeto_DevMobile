@@ -6,6 +6,7 @@ import { PhotoStorage } from '../../domain/ports/PhotoStorage';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { FullSyncResult } from '../../application/use-cases/RunFullSyncUseCase';
 import { ProcessSyncQueueUseCase } from '../../application/use-cases/ProcessSyncQueueUseCase';
+import { getActiveUserId, isVisibleToActiveSession } from '../sync/activeSession';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
 import { AnimalRepositoryFake } from '../../application/fakes/AnimalRepositoryFake';
 import {
@@ -38,7 +39,8 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
 
   const loadPending = async () => {
     const items = await syncQueueRepository.listPending();
-    setPending(items);
+    // DAT-10: pendências de outra conta ficam na fila, mas não aparecem.
+    setPending(items.filter(isVisibleToActiveSession));
   };
 
   useEffect(() => {
@@ -56,7 +58,8 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
           syncQueueRepository,
           animalRepository,
           undefined,
-          remotePhotoStorage
+          remotePhotoStorage,
+          { currentUserId: getActiveUserId }
         );
         res = { push: await useCase.execute() };
       }

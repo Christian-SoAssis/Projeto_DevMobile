@@ -4,7 +4,7 @@
 
 Produza um guia técnico completo para implementar a interface do Enlace a partir das duas pranchas geradas para o redesign do Enlace, das documentações principais e do código disponíveis na pasta de trabalho do projeto.
 
-**Entregável esperado:** `docs/ui/UI_IMPLEMENTATION_GUIDE.md`.
+**Entregável esperado:** `docs/ui/docs/refatoracao_ui.md`.
 
 Este arquivo contém as instruções para elaborar esse guia. Ele não substitui a inspeção do repositório, o inventário de assets nem a especificação de cada tela.
 
@@ -33,7 +33,12 @@ O agente DEVE localizar e registrar os caminhos reais das entradas abaixo. NÃO 
 | Requisitos e instruções do repositório | Escopo e restrições funcionais e técnicas |
 | Documentação em `docs/arquitetura/`, se presente | Contratos de persistência, mídia, autenticação e sincronização |
 
-O agente já está trabalhando dentro do repositório. DEVE usar a pasta de trabalho atual para inspecionar código, assets e documentação. As referências visuais deste documento são exclusivamente as duas pranchas geradas para o redesign do Enlace, disponibilizadas ao agente. Cores e tipografia têm sua base explícita na regra UI-03.
+O agente já está trabalhando dentro do repositório. DEVE usar a pasta de trabalho atual para inspecionar código, assets e documentação. As referências visuais deste documento são exclusivamente as duas pranchas geradas para o redesign do Enlace, disponibilizadas ao agente:
+
+- Prancha 01/02 (V01–V08): `docs/ui/images/Painel Enlace com logos de pets-2.png`
+- Prancha 02/02 (V09–V16): `docs/ui/images/Reparo do emblema Enlace em telas móveis-1.png`
+
+Observação: o número no nome do arquivo NÃO corresponde à numeração interna (o arquivo sufixado `-2` contém a prancha 01/02 e o `-1` contém 02/02); a identificação é pelo conteúdo. Cores e tipografia têm sua base explícita na regra UI-03.
 
 ### Resolução de divergências
 
@@ -78,6 +83,7 @@ Esta revisão autoriza a correção documental das divergências comprovadas; n�
 - O agente NÃO DEVE redesenhar a logo por tela, substituí-la por ícone de pata, deformar sua proporção, recortar o contorno ou modificar suas cores.
 - O guia DEVE definir dimensões por variante, proporção, área livre e comportamento de redimensionamento.
 - Se o asset isolado e corrigido ainda não existir, o agente DEVE registrar essa dependência. Uma miniatura recortada de uma prancha NÃO DEVE ser declarada asset final de marca sem verificar resolução e integridade.
+- Nota de inspeção (06/11/2026): o asset isolado da logo NÃO existe no repositório (pasta `assets/` inexistente). O guia DEVE registrar essa PENDÊNCIA com ação de entrega e fallback textual da marca enquanto o asset não for fornecido.
 
 **Aceitação:** todas as ocorrências usam o mesmo asset, sem distorção, corte ou falha de contorno.
 
@@ -102,6 +108,7 @@ Paleta de referência identificada para o redesign:
 - O agente DEVE verificar quais arquivos de fonte estão disponíveis e especificar carregamento, pesos, tamanhos, alturas de linha e fallback.
 - O agente NÃO DEVE assumir que declarar o nome da fonte garante sua disponibilidade em Android e iOS.
 - Qualquer substituição DEVE ser identificada e justificada; NÃO DEVE ser apresentada como a fonte especificada acima quando for diferente.
+- Nota de inspeção (06/11/2026): não há arquivos de fonte nem a pasta `assets/` no repositório. Enquanto os arquivos não forem entregues, usar fallback tipográfico do sistema (pesos e `letterSpacing` explícitos) e manter a entrega das fontes como PENDÊNCIA.
 
 **Aceitação:** nenhuma definição final depende apenas de expressões como “laranja parecido”, “fonte arredondada” ou “texto grande”.
 
@@ -127,7 +134,7 @@ Paleta de referência identificada para o redesign:
 
 ### UI-06 - Mapear telas, rotas e variantes sem inventar navegação
 
-O inventário visual de referência possui 16 visualizações, correspondentes a 12 rotas na inspeção anterior. O agente DEVE revalidar o código atual; esses números não são uma restrição para mudanças posteriores legítimas do projeto.
+O inventário visual de referência possui 16 visualizações, correspondentes a 12 telas na inspeção anterior. Reinspeção de 06/11/2026: 16 arquivos em `app/` — 13 rotas (12 telas + 1 redirect raiz `app/index.tsx` → `/(tabs)`) + 3 layouts (`_layout` raiz, `(tabs)/_layout`, `(protected)/_layout`). O agente DEVE revalidar o código atual; esses números não são uma restrição para mudanças posteriores legítimas do projeto.
 
 | Identificador | Visualização | Classificação a verificar |
 | --- | --- | --- |
@@ -151,6 +158,7 @@ O inventário visual de referência possui 16 visualizações, correspondentes a
 - O guia DEVE associar cada identificador à rota e ao componente reais, informando onde há compartilhamento.
 - Uma variante visual NÃO DEVE virar uma nova rota sem necessidade de navegação demonstrada.
 - Fluxos nativos, como câmera ou seletor do sistema, NÃO DEVEM ser apresentados como telas próprias já existentes sem evidência.
+- Verificado (06/11/2026): câmera/galeria são gatilhos `ImagePicker` via `src/infrastructure/device/camera/ImagePickerCameraAdapter.ts`, não telas próprias.
 
 **Aceitação:** todas as visualizações e todas as rotas relevantes do inventário atual estão mapeadas, inclusive diferenças em relação às pranchas.
 
@@ -165,7 +173,7 @@ O inventário visual de referência possui 16 visualizações, correspondentes a
 
 ### UI-08 - Respeitar papéis e privacidade
 
-- Controles DEVERÃO seguir as regras reais de visitante, usuário autenticado, responsável e administrador.
+- Controles DEVERÃO seguir as regras reais de visitante, usuário autenticado, responsável e administrador, conforme áreas (PUBLIC/AUTHENTICATED/ADMIN) e papéis (VISITOR/USER/RESPONSIBLE/INTERESTED/ADMIN) de `src/domain/services/AccessPolicy.ts`; `RESPONSIBLE` e `INTERESTED` são especializações do usuário autenticado, não barreiras de acesso.
 - Ações de gestão do anúncio DEVERÃO estar vinculadas ao usuário autorizado; moderação DEVERÁ permanecer restrita ao administrador.
 - Contatos de interessados NÃO DEVEM aparecer na visualização pública quando destinados ao responsável.
 - A localização pública DEVE respeitar o contrato de localização aproximada do Enlace.
@@ -220,7 +228,7 @@ O inventário visual de referência possui 16 visualizações, correspondentes a
 - Listas extensas DEVEM usar renderização adequada ao volume real e não carregar indiscriminadamente originais grandes.
 - Efeitos claymorphism DEVEM ser reutilizáveis e testados nas plataformas-alvo.
 - O agente NÃO DEVE declarar desempenho adequado sem execução ou medição; resultados não observados DEVEM ficar como pendência de validação.
-- O guia DEVE fixar o cenário e o orçamento numérico adotado para avaliar carregamento/rolagem, identificando-os como decisões de implementação.
+- O guia DEVE fixar o cenário e o orçamento numérico adotado para avaliar carregamento/rolagem, identificando-os como decisões de implementação. Orçamento registrado no guia (DECISÃO): lista com ~50 anúncios, foto 4:3 com lado maior ≤ 1280px em `thumbnail`, alvo de rolagem 60fps (FlatList `windowSize 7`); a medição em aparelho físico permanece pendente (ordem 8).
 
 **Aceitação:** o plano de validação de desempenho informa aparelho/ambiente, volume de dados, métrica, limite esperado e resultado a registrar.
 
@@ -237,7 +245,7 @@ O inventário visual de referência possui 16 visualizações, correspondentes a
 
 ## 5. Estrutura obrigatória do guia a produzir
 
-O arquivo `docs/ui/UI_IMPLEMENTATION_GUIDE.md` DEVE conter:
+O arquivo `docs/ui/docs/refatoracao_ui.md` DEVE conter:
 
 1. Escopo, referências e versão do código inspecionado.
 2. Inventário de telas, rotas, variantes e papéis.
@@ -292,18 +300,22 @@ O agente DEVE resolver escolhas rotineiras de implementação e documentá-las. 
 
 A documentação está completa quando:
 
-- [ ] Este arquivo foi comparado com as documentações principais anteriores do projeto e as divergências comprovadas foram corrigidas.
-- [ ] As correções possuem justificativa e referência à documentação local correspondente.
-- [ ] As referências visuais se limitam às duas pranchas geradas para o redesign.
-- [ ] Todas as referências disponíveis foram identificadas e as ausentes estão registradas.
-- [ ] Todas as rotas e variantes relevantes do inventário atual foram mapeadas.
-- [ ] A logo canônica e a disponibilidade das fontes estão identificadas ou registradas como dependências concretas.
-- [ ] Tokens possuem valores e unidades; decisões estimadas estão rotuladas.
-- [ ] Componentes têm variantes, estados e contratos documentados.
-- [ ] Cada tela possui os campos exigidos no modelo da seção 5.
-- [ ] Papéis, privacidade, offline e preservação de funcionalidades foram considerados.
-- [ ] Existe plano incremental e plano de validação com critérios verificáveis.
-- [ ] Nenhuma execução de teste ou implementação foi declarada sem ter ocorrido.
-- [ ] Pendências que impedem implementar uma parte estão explicitamente identificadas.
+- [x] Este arquivo foi comparado com as documentações principais anteriores do projeto e as divergências comprovadas foram corrigidas.
+- [x] As correções possuem justificativa e referência à documentação local correspondente.
+- [x] As referências visuais se limitam às duas pranchas geradas para o redesign.
+- [x] Todas as referências disponíveis foram identificadas e as ausentes estão registradas.
+- [x] Todas as rotas e variantes relevantes do inventário atual foram mapeadas.
+- [x] A logo canônica e a disponibilidade das fontes estão identificadas ou registradas como dependências concretas.
+- [x] Tokens possuem valores e unidades; decisões estimadas estão rotuladas.
+- [x] Componentes têm variantes, estados e contratos documentados.
+- [x] Cada tela possui os campos exigidos no modelo da seção 5.
+- [x] Papéis, privacidade, offline e preservação de funcionalidades foram considerados.
+- [x] Existe plano incremental e plano de validação com critérios verificáveis.
+- [x] Nenhuma execução de teste ou implementação foi declarada sem ter ocorrido.
+- [x] Pendências que impedem implementar uma parte estão explicitamente identificadas.
 
 **Regra final:** quando uma referência não fornecer uma medida, comportamento ou decisão, registrar uma escolha explícita e consistente ou uma pendência concreta. Nunca inventar silenciosamente nem apresentar uma suposição como requisito existente.
+
+### Revisão registrada (06/11/2026)
+
+Este arquivo foi revisado conforme a revisão obrigatória da seção 3. Correções aplicadas: caminho do entregável (§1 e §5), caminhos/nomeação das pranchas (§3), assets logo e fontes inexistentes (UI-02/UI-03), contagem `app/` = 16 arquivos: 13 rotas + 3 layouts (UI-06), câmera/galeria como gatilhos `ImagePicker` (UI-06), papéis conforme `AccessPolicy.ts` (UI-08) e orçamento numérico de desempenho (UI-13). Comentário/detalhamento completo em `docs/ui/docs/refatoracao_ui.md` §12.1 (guia commitado como `a33c9de`).

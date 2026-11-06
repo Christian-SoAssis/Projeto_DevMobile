@@ -39,7 +39,8 @@ como funcionando (UI-14).
   **`docs/ui/docs/refatoracao_ui.md`**.
 - Pela regra de resolução de divergências (instruções §3, item 1: "Instruções
   explícitas do usuário definem o escopo"), prevalece o caminho do usuário.
-  As correções ao arquivo de instruções mantidas em aberto estão na seção 12.
+  As correções ao arquivo de instruções foram aplicadas após autorização
+  explícita (seção 12.1).
 
 ### 1.3 O que este guia é e não é
 
@@ -631,10 +632,12 @@ typecheck + commit por fase).
 
 ## 12. Registro de decisões, divergências e correções
 
-### 12.1 Correções propostas a `instrucoes_iniciais.md` (arquivo NÃO editado — aguarda autorização)
+### 12.1 Correções aplicadas a `instrucoes_iniciais.md` (autorizadas pelo usuário em 06/11/2026)
 
-As correções abaixo foram constatadas na revisão obrigatória (instruções §3) e
-**aplicadas no guia**, com a fonte local que as fundamenta:
+As correções abaixo foram constatadas na revisão obrigatória (instruções §3),
+aplicadas **no guia e no próprio `instrucoes_iniciais.md`** (com nota de
+inspeção datada em cada regra e seção "Revisão registrada" ao final), com a
+fonte local que as fundamenta:
 
 | # | Divergência no arquivo | Correção aplicada | Fonte local |
 | --- | --- | --- | --- |

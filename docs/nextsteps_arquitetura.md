@@ -107,12 +107,12 @@
 | 4 ✅ | Re-consulta de listas após pull | OFF-02 | `RunFullSyncUseCase.ts`, `SearchScreen.tsx`, contexto | — |
 | 5 ✅ | Erro explícito na falha de cópia em device | MID-02 | `SqlitePhotoStorage.ts:150-154` | — |
 | 6 🔒 | Documentar decisão OFF-06 (snapshot integral em vez de cursor delta) | OFF-06 | doc | **🔒 decisão de produto leve — confirmar:** snapshot integral é aceitável para o escopo (não implementar cursor/delta sem necessidade demonstrada) |
-| 7 ⏳ | Backoff com espaçamento entre tentativas + classificação permanente/transitória | OFF-05, DAT-11 | `ProcessSyncQueueUseCase.ts`, `SincronizacaoService.ts` | — |
+| 7 ✅ | Backoff com espaçamento entre tentativas + classificação permanente/transitória | OFF-05, DAT-11 | `ProcessSyncQueueUseCase.ts`, `SincronizacaoService.ts` | — |
 | 8 🌐 | Validações de ambiente real (init.sql + EXPO_PUBLIC_* + device: T10/T18/T20/T22) | PER-03, DAT-05..07, MID-01/07 | ambiente | **🌐 requer:** criar projeto Supabase + aparelho físico (ação fora do código) |
 
 **Itens 1–5** são tarefas incrementais independentes: cada um é commitável por conta própria, com suíte verde. Não promover refatoração única.
 
-> **Progresso:** ordens 1 ✅, 3 ✅, 4 ✅ e 5 ✅ implementadas. Próxima sem decisão: **7**. Itens 🔒 (0, 2, 6) aguardam decisão; item 🌐 (8) aguarda ambiente.
+> **Progresso:** **TODAS as ordens sem decisão de produto foram implementadas** (1, 3, 4, 5, 7 ✅). Itens 🔒 (0, 2, 6) aguardam decisão do responsável; item 🌐 (8) aguarda ambiente real (projeto Supabase + aparelho).
 
 ---
 
@@ -149,6 +149,8 @@
   - ✅ **Ordem 4** — commit `280924d`: evento leve de adapters (`src/adapters/sync/pullEvents.ts`); `PullNotifyingFullSync` (in `useFullSync.ts`) notifica quando o pull conclui — falha de pull e modo honesto (sem backend) não notificam; `SearchScreen` refaz a última consulta via pulso no `useEffect` (sem stale closure). A camada application permanece pura. Testes: `PullEvents.test.ts` (4 casos, T28 no ciclo) + `SearchScreenSyncRefresh.test.tsx` (T28 na tela).
   - ✅ **Ordem 5** — commit `3242c42`: com FileSystem operante (device), falha de cópia lança `PhotoCopyError` e **nenhuma** linha entra em `local_images` (antes: URI temporária da câmera/galeria registrada em silêncio → cache offline apontando para arquivo condenado). Degradação segura mantida onde não há armazenamento operante (testes/demo headless). Testes: `SqlitePhotoStorage.test.ts` (2 casos; teste pre-existente de degradação intacto).
   - Estado da suíte após as ordens 1–5 (exceto 7): **419/419 verdes (65 suítes)**, typecheck 0 erros.
-- **Explicitamente pendente:** ordem ⏳ (7 — backoff + classificação de erro), ordens 🔒 (0, 2, 6 — decisão do responsável) e 🌐 (8 — ambiente real).
+  - ✅ **Ordem 7** — commit `5266da0`: falha TRANSITÓRIA (rede) NÃO reenvia no ciclo seguinte — espera o backoff crescente (2s, 4s … cap 30s, contado da ÚLTIMA falha: `changedAt` é regravado em `markFailed` e persistido pelo `update` do repositório SQLite). Falha PERMANENTE (operação não suportada, anúncio apagado localmente, sem backend) NUNCA reenvia — marcada com prefixo `[ERRO PERMANENTE]` em `last_error` (sobrevive a reinício sem coluna nova; mesmo padrão do marcador `[CONFLITO]` RF23). Testes: `SyncRetrySpacing.test.ts` (8 casos: backoff/retryIsDue, permanente sem reenvio após 1 min, tentativas esgotadas) + `changed_at` persistido (`SqliteSyncQueueRepository.test.ts`).
+  - Estado final da suíte (ordens sem decisão concluídas): **428/428 verdes (66 suítes)**, typecheck 0 erros.
+- **Explicitamente pendente:** ordens 🔒 (0, 2, 6 — decisão do responsável) e 🌐 (8 — ambiente real).
 - **Limitações registradas:** políticas RLS não aplicadas a servidor real; EXIF não inspecionado; permissões não testadas em build próprio; nenhum cenário de device executado.
 - Atualizar este arquivo a cada correção (o que foi comprovado, o que mudou e o que permanece NV) — o checklist 06 continua sendo o registro por regra.

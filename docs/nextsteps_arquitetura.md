@@ -143,8 +143,8 @@
 ## §7 — Encerramento da revisão
 
 - **Corrigido com evidência:**
-  - ✅ **Ordem 1** — commit `73e3eec`: `createRemote` converte 23505 do próprio id (re-leitura segura pela RLS) e `SupabaseFake` simula a violação de PK; favoritos/interesses já eram idempotentes e têm confirmação por testes. Testes: reenvio T04 (2 casos) em `SupabaseAnimalRepository.test.ts`.
-  - ✅ **Ordem 3** — commit `73e3eec`: port `enqueueAnimalUpdate` (supersede de UPDATE/MARK_ADOPTED do mesmo animal; conflito e CREATE preservados), usado por `UpdateAnimalUseCase` e `MarkAnimalAdoptedUseCase`; filtro em TypeScript para comportamento idêntico em todos os drivers. Testes: `UpdateSupersede.test.ts` (4 casos, incluindo T07 e preservação de conflito) + teste SQL do branch (`SqliteSyncQueueRepository.test.ts`).
+  - ✅ **Ordem 1** — commit `f7caf44`: `createRemote` converte 23505 do próprio id (re-leitura segura pela RLS) e `SupabaseFake` simula a violação de PK; favoritos/interesses já eram idempotentes e têm confirmação por testes. Testes: reenvio T04 (2 casos) em `SupabaseAnimalRepository.test.ts`.
+  - ✅ **Ordem 3** — commit `f7caf44`: port `enqueueAnimalUpdate` (supersede de UPDATE/MARK_ADOPTED do mesmo animal; conflito e CREATE preservados), usado por `UpdateAnimalUseCase` e `MarkAnimalAdoptedUseCase`; filtro em TypeScript para comportamento idêntico em todos os drivers. Testes: `UpdateSupersede.test.ts` (4 casos, incluindo T07 e preservação de conflito) + teste SQL do branch (`SqliteSyncQueueRepository.test.ts`).
   - Estado da suíte após as ordens 1+3: **412/412 verdes (63 suítes)**, typecheck 0 erros.
 - **Explicitamente pendente:** ordens 🔒 (0, 2, 6 — decisão do responsável), ordens ⏳ (4, 5, 7) e 🌐 (8 — ambiente real).
 - **Limitações registradas:** políticas RLS não aplicadas a servidor real; EXIF não inspecionado; permissões não testadas em build próprio; nenhum cenário de device executado.

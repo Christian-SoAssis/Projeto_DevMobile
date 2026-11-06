@@ -33,6 +33,7 @@ O **Enlace** é um aplicativo mobile (React Native + Expo Router) que conecta qu
 - **Offline-first**: cadastro e edição funcionam sem rede. Pendências vão para a fila `sync_queue` e são reenviadas depois, sem perda silenciosa.
 - **Privacidade por design**: o endereço exato nunca é exposto. O app mostra só bairro, cidade e coordenadas aproximadas.
 - **Segurança**: apenas o dono do anúncio pode editá-lo ou marcá-lo como adotado.
+- **Limites de produto decididos**: **até 4 fotos por anúncio** (RF09), **raio máximo de pesquisa de 10 km** (RF04) e conflitos de sincronização por **last-write wins** (revisão manual apenas quando a situação de adoção diverge — RF23).
 
 ### Fluxo principal
 

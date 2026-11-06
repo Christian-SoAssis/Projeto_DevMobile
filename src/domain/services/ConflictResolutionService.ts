@@ -11,8 +11,11 @@ export class ConflictResolutionService {
    * `UPDATE` recusado por versão defasada: o servidor avançou enquanto a
    * edição local estava pendente, então HÁ conflito mesmo que os números de
    * versão coincidam (as duas pontas partiram da mesma base e cada uma
-   * somou 1). Regras do doc §9.4: mesma situação do animal → vence a edição
-   * mais recente; situação divergente → revisão manual (risco de perda).
+   * somou 1). Política DEFINITIVA de conflito (decisão de produto §19):
+   * **last-write wins** — a edição com `updatedAt` mais recente vence
+   * automaticamente; só quando a SITUAÇÃO do animal diverge (ex.: marcado
+   * "Adotado" num lado) o conflito vai à revisão manual (RF23/RNF03),
+   * porque o last-write-wins descartaria silenciosamente essa perda.
    */
   static evaluateStaleUpdate(local: Animal, remote: Animal): ConflictEvaluationResult {
     if (local.status.value !== remote.status.value) {

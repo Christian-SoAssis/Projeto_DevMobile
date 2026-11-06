@@ -201,9 +201,10 @@ export class ProcessSyncQueueUseCase {
   }
 
   /**
-   * Doc §9.4: conflito simples (mesma situação do animal) → vence a versão
-   * mais recente, sem perguntar; risco de perda (situação divergente) →
-   * revisão manual do responsável (`NeedsReviewError`).
+   * Política DEFINITIVA de conflito (decisão de produto): last-write wins —
+   * mesma situação do animal → vence a versão mais recente, sem perguntar;
+   * situação divergente → revisão manual do responsável (`NeedsReviewError`),
+   * pois há risco de perda relevante (RF23/RNF03).
    */
   private async resolveStaleUpdate(local: Animal): Promise<void> {
     const source = this.extras.remoteAnimals;

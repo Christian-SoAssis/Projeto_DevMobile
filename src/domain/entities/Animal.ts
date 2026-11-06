@@ -16,6 +16,12 @@ export interface AnimalProps {
   version?: number;
 }
 
+/**
+ * Decisão de produto (§19): cada anúncio aceita NO MÁXIMO 4 fotos.
+ * Enforce no agregado — nem a UI nem os adaptadores podem passar disso.
+ */
+export const MAX_PHOTOS_PER_ANIMAL = 4;
+
 export class Animal {
   readonly id: string;
   readonly ownerId: string;
@@ -42,6 +48,9 @@ export class Animal {
     this._characteristics = props.characteristics;
     this._status = props.status || AdoptionStatus.available();
     this._location = props.location;
+    if (props.photos && props.photos.length > MAX_PHOTOS_PER_ANIMAL) {
+      throw new Error(`Máximo de ${MAX_PHOTOS_PER_ANIMAL} fotos por anúncio.`);
+    }
     this._photos = props.photos || [];
     this.createdAt = props.createdAt || new Date().toISOString();
     this._updatedAt = props.updatedAt || this.createdAt;
@@ -126,21 +135,34 @@ export class Animal {
     if (photo.animalId !== this.id) {
       throw new Error('Foto não pertence a este animal.');
     }
+    if (this._photos.length >= MAX_PHOTOS_PER_ANIMAL) {
+      throw new Error(`Máximo de ${MAX_PHOTOS_PER_ANIMAL} fotos por anúncio.`);
+    }
     this._photos.push(photo);
     this.touch();
   }
 
-  /** Troca a(s) foto(s) do anúncio pela nova (edição do anúncio). */
-  replacePhotos(requestorId: string, photo: AnimalPhoto, touch: boolean = true): void {
+  /** Substitui TODAS as fotos do anúncio (edição), validando pertença e limite. */
+  setPhotos(requestorId: string, photos: AnimalPhoto[], touch: boolean = true): void {
     if (!this.isOwner(requestorId)) {
       throw new Error('Somente o responsável pode alterar as fotos.');
     }
-    if (photo.animalId !== this.id) {
-      throw new Error('Foto não pertence a este animal.');
+    if (photos.length > MAX_PHOTOS_PER_ANIMAL) {
+      throw new Error(`Máximo de ${MAX_PHOTOS_PER_ANIMAL} fotos por anúncio.`);
     }
-    this._photos = [photo];
+    for (const photo of photos) {
+      if (photo.animalId !== this.id) {
+        throw new Error('Foto não pertence a este animal.');
+      }
+    }
+    this._photos = [...photos];
     // Quem já está registrando uma edição (updateData) passa `touch=false` e bumpa a versão uma vez só.
     if (touch) this.touch();
+  }
+
+  /** Troca a(s) foto(s) do anúncio pela nova (edição do anúncio). */
+  replacePhotos(requestorId: string, photo: AnimalPhoto, touch: boolean = true): void {
+    this.setPhotos(requestorId, [photo], touch);
   }
 
   removePhoto(photoId: string, requestorId: string): void {

@@ -43,12 +43,12 @@ O aplicativo foi concebido como **offline-first**: dados previamente carregados 
 | RF01 | O sistema deve permitir consultar publicamente os animais disponíveis para adoção. | Alta | Visitante |
 | RF02 | O sistema deve apresentar animais disponíveis e anúncios recentes na tela inicial. | Média | Visitante |
 | RF03 | O sistema deve permitir pesquisar anúncios por nome ou localização. | Alta | Visitante |
-| RF04 | O sistema deve permitir filtrar anúncios por espécie, porte, idade aproximada, sexo e distância. | Alta | Visitante |
+| RF04 | O sistema deve permitir filtrar anúncios por espécie, porte, idade aproximada, sexo e distância. **Decisão de produto: raio máximo de pesquisa = 10 km** (validado por `SearchRadius`; preferências com raio fora de 0–10 km são recusadas). | Alta | Visitante |
 | RF05 | O sistema deve permitir alternar os resultados entre visualização em lista e mapa. | Alta | Visitante |
 | RF06 | O sistema deve permitir visualizar detalhes do animal, incluindo fotos, características, cuidados especiais, localização aproximada, situação da adoção e contato. | Alta | Visitante |
 | RF07 | O sistema deve permitir cadastro, login e manutenção da sessão do usuário. | Alta | Usuário |
 | RF08 | O sistema deve permitir que usuários autenticados criem anúncios de adoção. | Alta | Responsável |
-| RF09 | O sistema deve permitir adicionar uma ou mais fotos a um anúncio usando câmera ou galeria. | Alta | Responsável |
+| RF09 | O sistema deve permitir adicionar uma ou mais fotos a um anúncio usando câmera ou galeria. **Decisão de produto: máximo de 4 fotos por anúncio** (`MAX_PHOTOS_PER_ANIMAL`; a 5ª é recusada na UI e no domínio). | Alta | Responsável |
 | RF10 | O sistema deve permitir que o responsável edite apenas os próprios anúncios. | Alta | Responsável |
 | RF11 | O sistema deve permitir que o responsável exclua apenas os próprios anúncios. | Média | Responsável |
 | RF12 | O sistema deve permitir que somente o responsável marque o animal como adotado. | Alta | Responsável |
@@ -320,7 +320,7 @@ flowchart LR
 
 **Fluxos alternativos**
 - A1 — Falha transitória: incrementa `attempts` e mantém item pendente.
-- A2 — Conflito simples: aplica política configurada de versão mais recente.
+- A2 — Conflito simples: aplica **last-write wins** (versão com `updatedAt` mais recente).
 - A3 — Risco de perda: cria estado de conflito e solicita revisão do responsável.
 - A4 — Usuário solicita retry: fila é processada novamente.
 
@@ -1091,13 +1091,13 @@ type SyncAction = {
 
 ## 14.3 Conflitos
 
-Regra já prevista no projeto:
+Política DEFINITIVA de conflito (decisão de produto — **last-write wins**):
 
 - cada anúncio possui `created_at`, `updated_at` e `version`;
-- conflito simples pode usar a versão mais recente;
-- quando a decisão puder descartar informação relevante, o responsável deve revisar.
+- **conflito simples** (mesma situação do animal): aplica-se **last-write wins** — vence automaticamente a versão com `updatedAt` mais recente, sem perguntar (`ConflictResolutionService`);
+- quando a última escrita poderia descartar informação relevante — os dois lados mudaram a SITUAÇÃO do animal de forma divergente (ex.: um marca "Adotado") — o conflito vai à **revisão manual do responsável** (RF23/RNF03), porque o win da última escrita seria perda silenciosa.
 
-Para implementação, recomenda-se que o servidor rejeite `UPDATE` com `version` antiga e retorne a versão atual, evitando que dois clientes sobrescrevam alterações silenciosamente.
+Para implementação, o servidor rejeita `UPDATE` com `version` antiga (bloqueio otimista, §14.3 do fluxo sync) e retorna a versão atual, evitando que dois clientes sobrescrevam alterações silenciosamente.
 
 ---
 
@@ -1257,6 +1257,9 @@ Ciclo recomendado para cada regra:
 10. **Use cases não conhecem SDKs externos**.
 11. **Adapters locais e remotos implementam as mesmas interfaces de acesso ao domínio**.
 12. **A UI informa explicitamente o estado de conectividade e sincronização**.
+13. **Limite de fotos = 4 por anúncio** (RF09): enforce no agregado (`MAX_PHOTOS_PER_ANIMAL`) e na UI.
+14. **Raio máximo de pesquisa = 10 km** (RF04): validado pelo VO `SearchRadius` na persistência de preferências.
+15. **Conflito: last-write wins** — versão com `updatedAt` mais recente vence automaticamente; revisão manual só quando a SITUAÇÃO do animal diverge (risco de perda relevante, RF23/RNF03).
 
 ---
 
@@ -1268,14 +1271,17 @@ Os itens abaixo não devem ser inventados na implementação sem decisão de pro
 - campos obrigatórios e limites de tamanho de cada formulário;
 - regras de exclusão de anúncio já adotado;
 - possibilidade de reabrir um animal de “Adotado” para “Disponível”;
-- tipos de ação de moderação administrativa;
+- tipo de ação de moderação administrativa além do mínimo (HIDE/UNHIDE);
 - visibilidade exata dos dados de contato;
 - política de retenção de manifestações de interesse;
-- limite de fotos por anúncio;
-- raio máximo de pesquisa;
 - precisão exata usada para arredondar/anonimizar coordenadas;
-- política definitiva para conflito simples versus conflito que exige revisão;
 - quais mutações de favoritos/interesses terão suporte offline completo.
+
+**Decididos a partir da especificação original (registados na seção 18):**
+
+- ~~limite de fotos por anúncio~~ → **4 fotos** (decisão 13);
+- ~~raio máximo de pesquisa~~ → **10 km** (decisão 14);
+- ~~política definitiva de conflito simples versus revisão~~ → **last-write wins + revisão para divergência de status** (decisão 15).
 
 ---
 

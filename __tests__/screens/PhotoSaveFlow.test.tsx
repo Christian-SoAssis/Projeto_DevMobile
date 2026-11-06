@@ -163,7 +163,7 @@ describe('AnimalFormScreen — foto capturada pode ser salva no banco local de f
     expect(saved.photos).toHaveLength(0);
   });
 
-  it('edição: foto nova é persistida (WebP) antes de substituir a atual do anúncio', async () => {
+  it('edição: foto nova é persistida (WebP) e é ACRESCENTADA (limite de 4 por anúncio)', async () => {
     const existing = makeAnimal({ photos: [makePhoto({ id: 'old' })] });
     const repo = new AnimalRepositoryFake([existing]);
     const storage = new PersistingStorageSpy();
@@ -184,9 +184,10 @@ describe('AnimalFormScreen — foto capturada pode ser salva no banco local de f
 
     await waitFor(async () => {
       const saved = await repo.findById('animal_1');
-      expect(saved?.photos).toHaveLength(1);
-      expect(saved?.photos[0].id).not.toBe('old');
-      expect(saved?.photos[0].localPath).toContain(PERSISTED_PREFIX);
+      expect(saved?.photos).toHaveLength(2);
+      // A foto atual é mantida; a nova entra com o destino persistido.
+      expect(saved?.photos.map((p) => p.id)).toContain('old');
+      expect(saved?.photos.some((p) => p.localPath && p.localPath.includes(PERSISTED_PREFIX))).toBe(true);
     });
     expect(storage.calls).toHaveLength(1);
     expect(storage.calls[0].animalId).toBe('animal_1');

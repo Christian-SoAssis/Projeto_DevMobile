@@ -18,6 +18,7 @@ import { PhotoStorageFake } from '../../application/fakes/PhotoStorageFake';
 import { UnitOfWork } from '../../application/ports/UnitOfWork';
 import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
 import { AnimalPhotoView } from '../components/AnimalPhotoView';
+import { MAX_PHOTOS_PER_ANIMAL } from '../../domain/entities/Animal';
 
 export interface AnimalFormScreenProps {
   ownerId?: string;
@@ -30,6 +31,13 @@ export interface AnimalFormScreenProps {
   unitOfWork?: UnitOfWork;
   onSuccess?: () => void;
   isOnline?: boolean;
+}
+
+interface PhotoDraft {
+  /** URI (local da câmera/galeria ou destino persistido) para pré-visualização. */
+  uri: string;
+  /** Presente quando a foto já pertence ao anúncio (modo edição) — não é reenviada. */
+  existingId?: string;
 }
 
 export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
@@ -52,32 +60,74 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
   const [sex, setSex] = useState(initialAnimal?.characteristics.sex ?? 'Macho');
   const [city, setCity] = useState(initialAnimal?.location.city ?? 'Varginha');
   const [neighborhood, setNeighborhood] = useState(initialAnimal?.location.neighborhood ?? 'Centro');
-  const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
+  /**
+   * RF09 + decisão de produto: o anúncio aceita até `MAX_PHOTOS_PER_ANIMAL`
+   * (4) fotos. Em edição, a lista começa com as fotos atuais; novas capturas
+   * são acrescentadas e a ordem/remoção é definida aqui antes de salvar.
+   */
+  const [photoList, setPhotoList] = useState<PhotoDraft[]>(
+    (initialAnimal?.photos ?? []).map((p) => ({ uri: p.displayUrl, existingId: p.id }))
+  );
   const [locationStatus, setLocationStatus] = useState<string>('Não capturada');
   const [feedback, setFeedback] = useState<string | null>(null);
   const [latitude, setLatitude] = useState<number>(initialAnimal?.location.latitude ?? -21.554);
   const [longitude, setLongitude] = useState<number>(initialAnimal?.location.longitude ?? -45.435);
 
+  const photosFull = photoList.length >= MAX_PHOTOS_PER_ANIMAL;
+
+  const appendPhoto = async (photo: { uri: string } | null, origem: 'câmera' | 'galeria') => {
+    if (!photo) {
+      setFeedback(
+        origem === 'câmera'
+          ? 'Nenhuma foto capturada. Conceda a permissão da câmera ou salve o anúncio sem foto.'
+          : 'Nenhuma foto selecionada. Conceda a permissão da galeria ou salve o anúncio sem foto.'
+      );
+      return;
+    }
+    if (photoList.length >= MAX_PHOTOS_PER_ANIMAL) {
+      setFeedback(`Máximo de ${MAX_PHOTOS_PER_ANIMAL} fotos por anúncio (RF09).`);
+      return;
+    }
+    setPhotoList((prev) => [...prev, { uri: photo.uri }]);
+    setFeedback(origem === 'câmera' ? 'Foto capturada com sucesso!' : 'Foto escolhida da galeria!');
+  };
+
   const handleCapturePhoto = async () => {
     const photo = await cameraGateway.capturePhoto();
-    if (photo) {
-      setCapturedPhotoUri(photo.uri);
-      setFeedback('Foto capturada com sucesso!');
-    } else {
-      setFeedback('Nenhuma foto capturada. Conceda a permissão da câmera ou salve o anúncio sem foto.');
-    }
+    await appendPhoto(photo, 'câmera');
   };
 
   // RF09: a foto pode vir da câmera OU da galeria — mesmo fluxo de
   // persistência (WebP + cópia) e mesmo preview dos dois caminhos.
   const handlePickGallery = async () => {
     const photo = await cameraGateway.pickImageFromGallery();
-    if (photo) {
-      setCapturedPhotoUri(photo.uri);
-      setFeedback('Foto escolhida da galeria!');
-    } else {
-      setFeedback('Nenhuma foto selecionada. Conceda a permissão da galeria ou salve o anúncio sem foto.');
+    await appendPhoto(photo, 'galeria');
+  };
+
+  const handleRemovePhoto = async (index: number) => {
+    const item = photoList[index];
+    if (!item) return;
+    setPhotoList((prev) => prev.filter((_, i) => i !== index));
+    // Foto que já existia no anúncio: a cópia física sai do armazenamento
+    // (best-effort) e o registro sai do agregado ao salvar a edição.
+    if (initialAnimal && item.existingId) {
+      try {
+        await photoStorage.remove(item.existingId);
+      } catch {
+        // Falha na limpeza física não impede a edição do anúncio.
+      }
     }
+  };
+
+  const handleMovePhoto = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= photoList.length) return;
+    setPhotoList((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.splice(target, 0, moved);
+      return next;
+    });
   };
 
   const handleCaptureLocation = async () => {
@@ -128,16 +178,36 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           syncQueueRepository,
           unitOfWork
         );
-        // Foto nova: persistida (e convertida para WebP) ANTES de anexar, como no cadastro.
-        const photo = capturedPhotoUri
-          ? await photoStorage.persistLocal(
-              new AnimalPhoto({ id: newUuid(), animalId: initialAnimal.id, localPath: capturedPhotoUri })
-            )
-          : undefined;
+        // Fotos novas são persistidas (e convertidas para WebP) ANTES de
+        // entrar no agregado; fotos já existentes são reenvidadas/ordenadas
+        // sem tocar no armazenamento. `photos` só é passado quando a lista
+        // mudou — editar só o texto não regrava as fotos.
+        const photosChanged =
+          photoList.length !== initialAnimal.photos.length ||
+          photoList.some((item, i) => item.uri !== initialAnimal.photos[i]?.displayUrl);
+        let photos: AnimalPhoto[] | undefined;
+        if (photosChanged) {
+          photos = [];
+          for (const item of photoList) {
+            if (item.existingId) {
+              const existing = initialAnimal.photos.find((p) => p.id === item.existingId);
+              if (existing) {
+                photos.push(existing);
+                continue;
+              }
+            }
+            const captured = new AnimalPhoto({
+              id: newUuid(),
+              animalId: initialAnimal.id,
+              localPath: item.uri,
+            });
+            photos.push(await photoStorage.persistLocal(captured));
+          }
+        }
         await useCase.execute(
           ownerId,
           initialAnimal.id,
-          { name, characteristics, location, photo },
+          { name, characteristics, location, photos },
           isOnline
         );
         setFeedback('Anúncio atualizado com sucesso!');
@@ -167,17 +237,19 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         location,
       });
 
-      if (capturedPhotoUri) {
-        // Doc §5.1/§14.1: a foto vai para o armazenamento seguro (cópia física
-        // + registro em `local_images`) ANTES de anexar; a foto no agregado
-        // leva o destino definitivo — a URI temporária da câmera morre quando
-        // o app é encerrado (RNF01/RNF02), o arquivo copiado não.
-        const captured = new AnimalPhoto({
-          id: newUuid(),
-          animalId,
-          localPath: capturedPhotoUri,
-        });
-        animal.addPhoto(await photoStorage.persistLocal(captured));
+      if (photoList.length > 0) {
+        // Doc §5.1/§14.1: cada foto vai para o armazenamento seguro (cópia
+        // física + registro em `local_images`) ANTES de anexar; a foto no
+        // agregado leva o destino definitivo — a URI temporária da câmera
+        // morre quando o app é encerrado (RNF01/RNF02), o arquivo copiado não.
+        for (const item of photoList) {
+          const captured = new AnimalPhoto({
+            id: newUuid(),
+            animalId,
+            localPath: item.uri,
+          });
+          animal.addPhoto(await photoStorage.persistLocal(captured));
+        }
       }
 
       const useCase = new CreateAnimalUseCase(
@@ -291,17 +363,71 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Pré-visualização (RF09): mostra a foto recém-capturada; em edição,
-            começa já com a foto atual do anúncio (só é substituída por nova captura). */}
-        <AnimalPhotoView
-          uri={capturedPhotoUri}
-          photo={capturedPhotoUri ? null : initialAnimal?.photos?.[0] ?? null}
-          testID="form-photo-preview"
-          style={styles.photoPreview}
-        />
-        {capturedPhotoUri && (
+        {/* Pré-visualização (RF09, limite de 4 fotos): em edição, começa com as
+            fotos atuais do anúncio; novas fotos entram no fim da lista e a
+            ordem/remoção são definidas antes de salvar. */}
+        {(photoList.length > 0 ? photoList : [null]).map((item, index) =>
+          item ? (
+            <View key={`${item.uri}-${index}`} style={styles.photoItem}>
+              <AnimalPhotoView
+                uri={item.uri}
+                photo={null}
+                testID={index === 0 ? 'form-photo-preview' : `form-photo-preview-${index + 1}`}
+                style={styles.photoThumb}
+              />
+              {photoList.length > 1 && (
+                <View style={styles.photoNavRow}>
+                  <TouchableOpacity
+                    style={styles.photoNavBtn}
+                    onPress={() => handleMovePhoto(index, -1)}
+                    disabled={index === 0}
+                    testID={`btn-photo-left-${index}`}
+                  >
+                    <Text style={styles.photoNavText}>◀</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.photoIndex} testID={`photo-index-${index}`}>
+                    {index + 1}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.photoNavBtn}
+                    onPress={() => handleMovePhoto(index, 1)}
+                    disabled={index === photoList.length - 1}
+                    testID={`btn-photo-right-${index}`}
+                  >
+                    <Text style={styles.photoNavText}>▶</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              <TouchableOpacity
+                style={styles.removePhotoBtn}
+                onPress={() => handleRemovePhoto(index)}
+                testID={`btn-remove-photo-${index}`}
+              >
+                <Text style={styles.removePhotoText}>✕ Remover foto</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <AnimalPhotoView
+              key="placeholder"
+              uri={undefined}
+              photo={null}
+              testID="form-photo-preview"
+              style={styles.photoPreview}
+            />
+          )
+        )}
+
+        <Text
+          style={[styles.photoCounter, photosFull && styles.photoCounterMax]}
+          testID="photo-count"
+        >
+          {photoList.length}/{MAX_PHOTOS_PER_ANIMAL} fotos
+        </Text>
+        {photoList.length > 0 && (
           <Text style={styles.hwStatus} testID="photo-status">
-            Foto capturada: {capturedPhotoUri}
+            {photoList.length > 1
+              ? `${photoList.length} fotos atreladas ao anúncio (máx. ${MAX_PHOTOS_PER_ANIMAL}).`
+              : 'Foto atrelada ao anúncio (máx. 4).'}
           </Text>
         )}
 
@@ -408,6 +534,55 @@ const styles = StyleSheet.create({
   photoPreview: {
     height: 170,
     marginBottom: 10,
+  },
+  photoItem: {
+    marginBottom: 10,
+  },
+  photoThumb: {
+    height: 130,
+    marginBottom: 6,
+  },
+  photoNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  photoNavBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: '#e5e5ea',
+  },
+  photoNavText: {
+    color: '#1c1c1e',
+    fontWeight: 'bold',
+  },
+  photoIndex: {
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  removePhotoBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: '#ffe5e3',
+    marginBottom: 4,
+  },
+  removePhotoText: {
+    color: '#a30000',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  photoCounter: {
+    fontSize: 12,
+    color: '#555',
+    marginBottom: 8,
+  },
+  photoCounterMax: {
+    color: '#a30000',
+    fontWeight: 'bold',
   },
   hwStatus: {
     fontSize: 12,

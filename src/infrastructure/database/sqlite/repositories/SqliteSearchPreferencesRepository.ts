@@ -2,6 +2,7 @@ import {
   SearchPreferencesData,
   SearchPreferencesRepository,
 } from '../../../../domain/ports/SearchPreferencesRepository';
+import { SearchRadius } from '../../../../domain/value-objects/SearchRadius';
 import { SqliteDatabaseDriver } from '../DatabaseDriver';
 
 interface SearchPreferencesRow {
@@ -19,6 +20,9 @@ export class SqliteSearchPreferencesRepository implements SearchPreferencesRepos
   constructor(private db: SqliteDatabaseDriver) {}
 
   async save(userId: string, prefs: SearchPreferencesData): Promise<void> {
+    // Decisão de produto: o raio informado é validado (0–10 km) ANTES de
+    // persistir — preferência impossível nunca chega ao banco.
+    const radius = SearchRadius.from(prefs.radiusKm) ?? null;
     const updatedAt = new Date().toISOString();
     await this.db.runAsync(
       `INSERT INTO search_preferences (
@@ -39,7 +43,7 @@ export class SqliteSearchPreferencesRepository implements SearchPreferencesRepos
         prefs.approximateAge || null,
         prefs.sex || null,
         prefs.searchQuery || null,
-        prefs.radiusKm ?? null,
+        prefs.radiusKm !== undefined ? radius!.valueKm : null,
         updatedAt,
       ]
     );

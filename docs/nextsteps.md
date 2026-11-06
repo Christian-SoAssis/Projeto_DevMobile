@@ -90,7 +90,7 @@
 - [x] **Amarração do fluxo da foto na UI (robustez, seção 7 da apresentação):** o formulário passa a receber o `PhotoStorage` do container (`AnimalFormScreen` + rotas `novo-anuncio`/`editar-anuncio`): ao salvar, a foto capturada é **persistida antes** de anexar — `persistLocal` copia o arquivo para a área segura do app e registra em `local_images` — e a foto no agregado `Animal` leva o **destino definitivo**, não a URI temporária da câmera (que morre quando o app é encerrado; RNF01/RNF02). Ajuste de contrato (doc §13): `PhotoStorage.persistLocal` agora devolve `Promise<AnimalPhoto>` (a foto com o destino), espelhando o padrão de `uploadPending`. Testes: `__tests__/screens/PhotoSaveFlow.test.tsx` (2 casos: foto → storage → destino copiado chega ao repositório; sem foto → storage nunca é chamado). Obs.: na rota de edição a captura de foto é ignorada pelo fluxo atual (foto só no cadastro) — comportamento anterior mantido.
 - [ ] **Cache:** garantir que o cache local (anúncios + fotos) sobrevive a fechar/reabrir e atualiza sem bloquear a UI (gancho com RNF13, medido no passo de RNFs remanescentes §3). *(Já garantido por `__tests__/integration/sqlite/real/Persistence.real.test.ts` e o seed do container — falta medir em device.)*
 
-**Bloqueadores §4 a decidir antes:** limite de fotos por anúncio; precisão da anonimização de coordenadas.
+**Bloqueadores §4 a decidir antes:** ~~limite de fotos por anúncio~~ (⚠️ **decidido: 4 fotos**, ver §4); precisão da anonimização de coordenadas.
 **Pronto (evidência):** GPS real grava coordenada aproximada no SQLite; nenhuma UI pública mostra endereço exato; fotos locais persistem após reinício.
 
 ### Passo 3 — Supabase: infraestrutura online, comunicação e segurança de acesso
@@ -123,7 +123,7 @@
 - ✅ Foto de perfil sobe ao Storage; a URL fica em `users.avatar_url` (visível em outro aparelho).
 - ✅ Ids de anúncio e foto passaram a UUID (o Supabase usa `uuid` nas chaves; antes a sync real falharia).
 
-**Pendente:** aplicar o SQL no projeto real e testar upload/RLS de verdade; reduzir o limite de 2 MB / decidir limite de fotos por anúncio (§4).
+**Pendente:** aplicar o SQL no projeto real e testar upload/RLS de verdade; reduzir o limite de 2 MB *(limite de fotos por anúncio **decidido: 4** — ver §4*). Código atual: `SqlitePhotoStorage` guarda até 4 fotos por anúncio (validação no agregado `Animal`, `MAX_PHOTOS_PER_ANIMAL`), e o formulário permite adicionar/remover/reordenar até o limite (RF09).
 
 ### Passo 5 — Armazenamento no SQLite sincronizando com o Supabase online
 
@@ -133,13 +133,13 @@
 - ✅ Ciclo completo `RunFullSyncUseCase`: **push** (fila) → **pull** (servidor → cache local) → `last_sync_at` em `sync_state`. O pull nunca sobrescreve anúncio com ação pendente na fila.
 - ✅ Fila para `animal`, `favorite` e `interest` (idempotente: duplicata no servidor não é falha; favoritar+desfavoritar antes de sincronizar se anulam; ids não-UUID da demo ficam fora).
 - ✅ Disparo **automático** ao reconectar, UMA vez por ciclo offline→online (`useAutoSync`/`AutoSync`) e na abertura se já estiver online; botão manual continua na aba Sync.
-- ✅ Conflitos (doc §9.4): `UPDATE` defasado → situação igual = vence a edição mais recente, automático; situação divergente ou anúncio apagado = **revisão** (`ConflictReviewScreen`, rota `/(protected)/conflitos`): manter a minha edição, usar o servidor, recriar ou descartar. Conflito nunca é reenviado sozinho.
+- ✅ Conflitos (política definitiva de §4): **last-write wins** — `UPDATE` defasado → situação igual = vence a edição com `updatedAt` mais recente, automático (sem perguntar); situação divergente ou anúncio apagado = **revisão** (`ConflictReviewScreen`, rota `/(protected)/conflitos`): manter a minha edição, usar o servidor, recriar ou descartar. Conflito nunca é reenviado sozinho.
 - ✅ Moderação admin (UC20): aba **Moderação** (só ADMIN) lista todos os anúncios, oculta e reexibe — `ModerateAnimalUseCase` + RLS `is_admin()`.
 - ✅ Responsável vê os **interessados** recebidos (nome, telefone, e-mail; política `interests_animal_owner_read`).
 - ✅ E2E §16.4 itens 4, 5, 6 e 8 com SQLite em arquivo (fechar/reabrir) — `__tests__/e2e/OfflineSyncFlows.real.test.ts`. Com os 5 anteriores em mock, os 8 fluxos têm teste.
 
 **Pendente:** validar em aparelho e contra o Supabase real; `UPLOAD_PHOTO` como entidade própria da fila (hoje a foto sobe junto da ação do anúncio); retry com backoff entre tentativas.
-**Decisões §4 ainda em aberto (implementadas de forma PROVISÓRIA):** conflito simples vs. revisão (segui o doc §9.4); tipos de moderação (HIDE/UNHIDE); retenção de interesses; favoritos/interesses entrarem na fila.
+**Decisões §4 ainda em aberto (implementadas de forma PROVISÓRIA):** ~~conflito simples vs. revisão~~ (**decidido: last-write wins**, ver §4); tipos de moderação (HIDE/UNHIDE); retenção de interesses; favoritos/interesses entrarem na fila.
 
 ---
 
@@ -147,7 +147,7 @@
 
 - **Rotas Expo Router completas:** ✅ `(tabs)` (Início, Favoritos, Meus anúncios, Sync, Moderação, Conta), `/animal/[id]`, `/(protected)/novo-anuncio`, `/(protected)/editar-anuncio`, `/(protected)/conflitos`, `/login`, `/cadastro`, `/` → `/(tabs)`. Guarda de rotas por perfil (`AccessPolicy` + `RequireAccess`). Deep links via `scheme: "enlace"` ainda precisam ser verificados em aparelho.
 - **Autenticação e perfis:** ✅ login/cadastro por e-mail e senha (cadastro já entra na conta), política de acesso (visitante / autenticado / admin), tela Conta com foto, descrição e interesses.
-- **Mapa (RF05/RF25):** ✅ `react-native-maps` com marcador + círculo de área aproximada (nunca a coordenada exata); na web/Jest cai na lista de pinos. Falta o filtro por distância (RF04) e o raio máximo — dependem do §4. Build próprio no Android precisa da chave do Google Maps (`android.config.googleMaps.apiKey`).
+- **Mapa (RF05/RF25):** ✅ `react-native-maps` com marcador + círculo de área aproximada (nunca a coordenada exata); na web/Jest cai na lista de pinos. **Raio máximo decidido: 10 km (§4)** — validado por `SearchRadius` (persistência em `search_preferences` recusa raio > 10 km); falta o filtro por distância (RF04) aplicado à busca. Build próprio no Android precisa da chave do Google Maps (`android.config.googleMaps.apiKey`).
 - **RNFs de desempenho e escalabilidade (RNF13/14/15):** valores **propostos** na doc §2.2 — abertura de cache ≤ 1 s, operações remotas sem bloquear UI, listagem paginada/limitada no Supabase. **Não medidos**: medir em aparelho real e registrar; se o valor "proposto" for rejeitado, volta ao §4 como bloqueador.
 - **E2E e verificação:** ✅ os 8 fluxos do §16.4 têm teste (5 em mock, 4–6 e 8 com SQLite em arquivo + backend simulado). Dependências realinhadas com `npx expo install --fix` → `expo-doctor` **20/20** (6 pacotes do SDK 58 estavam um patch/minor atrás após a reinstalação do checkout). Validação manual em Expo Go/aparelho continua pendente.
 
@@ -164,10 +164,10 @@ Cada item precisa de decisão explícita antes do passo indicado:
 - [ ] Tipos de ação de moderação (ocultar, remover, suspender…) → antes do **Passo 5** *(HIDE/UNHIDE implementados como mínimo provisório no Passo 3, explícitos no código e aqui)*
 - [x] Visibilidade exata dos dados de contato → **decidido: e-mail + telefone públicos no anúncio** (RF06; mensagem de interesse gravada em `adoption_interests` e visível ao dono — fluxo de tela no Passo 5)
 - [ ] Política de retenção de manifestações de interesse → antes dos **Passos 3/5**
-- [ ] Limite de fotos por anúncio → antes do **Passo 2**
-- [ ] Raio máximo de pesquisa → antes do **Passo 2**
+- [x] Limite de fotos por anúncio → **decidido: 4 fotos por anúncio** (RF09). Enforce no agregado `Animal` (`MAX_PHOTOS_PER_ANIMAL`, constructor/`addPhoto`/`setPhotos` recusam a 5ª) e UI no formulário: adicionar (câmera/galeria), remover e reordenar até o limite. A foto única da edição virou lista de fotos — `UpdateAnimalUseCase` aceita `photos[]`. Testes: `__tests__/domain/PhotoLimit.test.ts`, `__tests__/screens/AnimalFormMultiPhotos.test.tsx`.
+- [x] Raio máximo de pesquisa → **decidido: 10 km** (RF04). VO `SearchRadius` (`src/domain/value-objects/SearchRadius.ts`) com `MIN 0 / MAX 10 km` — `SqliteSearchPreferencesRepository.save` e o fake recusam raio acima do máximo e normalizam para 1 casa decimal. Falta aplicar o raio como filtro de distância na busca. Testes: `__tests__/domain/SearchRadius.test.ts`, `SqliteSearchPreferencesRepository.test.ts`.
 - [ ] Precisão de anonimização de coordenadas → antes do **Passo 2**
-- [ ] Conflito simples vs. conflito com revisão (política definitiva) → antes do **Passo 5**
+- [x] Conflito simples vs. conflito com revisão (política definitiva) → **decidido: last-write wins** para conflito simples (`ConflictResolutionService`: vence a edição com `updatedAt` mais recente, mesmo com versão defasada); **revisão manual mantida** apenas quando a SITUAÇÃO do animal diverge (ex.: "Adotado"), porque o win da última escrita descartaria silenciosamente perda relevante (RF23/RNF03). Fluxo `ConflictReviewScreen` permanece para esses casos. Testes: `__tests__/domain/Services.test.ts` (comportamento já existente — nada mudou no código, só a formalização da política).
 - [ ] Offline completo de favoritos/interesses (quais mutações entram na fila) → antes do **Passo 5**
 - [ ] Validação dos três valores "propostos" (RNF13/14/15) → antes das atividades do §3
 

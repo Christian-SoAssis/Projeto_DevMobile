@@ -24,6 +24,8 @@ export class UpdateAnimalUseCase {
       location?: ApproximateLocation;
       /** Foto nova (já persistida localmente): substitui a atual. */
       photo?: AnimalPhoto;
+      /** Conjunto completo de fotos (limite de 4): substitui todas as atuais. */
+      photos?: AnimalPhoto[];
     },
     isOnline: boolean
   ): Promise<Animal> {
@@ -33,8 +35,8 @@ export class UpdateAnimalUseCase {
     }
 
     // Uma edição = um bump de versão: a troca de foto não conta à parte.
-    if (updates.photo) {
-      animal.replacePhotos(requestorId, updates.photo, false);
+    if (updates.photos || updates.photo) {
+      animal.setPhotos(requestorId, updates.photos ?? [updates.photo!], false);
     }
     animal.updateData(requestorId, updates);
     const action = this.buildUpdateAction(animal);

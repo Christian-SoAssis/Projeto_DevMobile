@@ -17,7 +17,7 @@ describe('SqliteSearchPreferencesRepository', () => {
       species: 'Cão',
       size: 'Pequeno',
       searchQuery: 'Rex',
-      radiusKm: 15,
+      radiusKm: 8,
     });
 
     const prefs = await repository.findByUserId('u1');
@@ -25,6 +25,15 @@ describe('SqliteSearchPreferencesRepository', () => {
     expect(prefs?.species).toBe('Cão');
     expect(prefs?.size).toBe('Pequeno');
     expect(prefs?.searchQuery).toBe('Rex');
-    expect(prefs?.radiusKm).toBe(15);
+    expect(prefs?.radiusKm).toBe(8);
+  });
+
+  it('decisão de produto: raio de pesquisa acima de 10 km é recusado', async () => {
+    await expect(repository.save('u1', { radiusKm: 10.1 })).rejects.toThrow(
+      'O raio de pesquisa deve ficar entre 0 e 10 km.'
+    );
+    await expect(repository.save('u1', { radiusKm: 15 })).rejects.toThrow();
+    // Nada foi gravado com raio inválido.
+    expect(await repository.findByUserId('u1')).toBeNull();
   });
 });

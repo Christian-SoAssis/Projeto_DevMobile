@@ -12,6 +12,7 @@ import { Animal } from '../../domain/entities/Animal';
 import { AnimalFilterOptions, AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { AnimalMap } from '../map/AnimalMap';
 import { SearchAnimalsUseCase } from '../../application/use-cases/SearchAnimalsUseCase';
+import { onPullCompleted } from '../sync/pullEvents';
 
 export interface SearchScreenProps {
   animalRepository: AnimalRepository;
@@ -33,6 +34,13 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(!isOnlineInitial);
+  /**
+   * OFF-02 (ordem 4, checklist T28): quando o pull do servidor completa,
+   * o cache local muda — a tela refaz a última consulta com os dados
+   * novos. O pulso é um contador: o `useEffect` abaixo relê sempre a
+   * `performSearch` fresca do render, sem stale closure das dep de texto.
+   */
+  const [syncPulse, setSyncPulse] = useState(0);
 
   const performSearch = async (onlineOverride?: boolean) => {
     setLoading(true);
@@ -58,10 +66,13 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
     }
   };
 
+  useEffect(() => onPullCompleted(() => setSyncPulse((p) => p + 1)), []);
+
   useEffect(() => {
     performSearch(isOnlineInitial);
-    // Refaz a busca também quando a conectividade muda (Fase 2: NetInfo real).
-  }, [selectedSpecies, selectedSize, selectedSex, isOnlineInitial]);
+    // Refaz a busca também quando a conectividade muda (Fase 2: NetInfo real)
+    // e quando o pull de sincronização traz anúncios novos (ordem 4).
+  }, [selectedSpecies, selectedSize, selectedSex, isOnlineInitial, syncPulse]);
 
   return (
     <View style={styles.container} testID="search-screen">

@@ -4,6 +4,7 @@ import { useRepositories } from '../context/RepositoriesContext';
 import { ProcessSyncQueueUseCase } from '../../application/use-cases/ProcessSyncQueueUseCase';
 import { PullRemoteAnimalsUseCase } from '../../application/use-cases/PullRemoteAnimalsUseCase';
 import { RunFullSyncUseCase, FullSyncResult } from '../../application/use-cases/RunFullSyncUseCase';
+import { notifyPullCompleted } from '../sync/pullEvents';
 
 /**
  * Uma única instância do ciclo de sincronização por container: a trava
@@ -11,6 +12,20 @@ import { RunFullSyncUseCase, FullSyncResult } from '../../application/use-cases/
  * e para o disparo automático ao reconectar.
  */
 const cycles = new WeakMap<AppContainer, RunFullSyncUseCase>();
+
+/**
+ * Observação de adapters (OFF-02, checklist T28): quando o pull completa o
+ * cache local mudou — as telas abertas devem re-consultar a última lista.
+ * O evento vive na camada de adapters; o travamento anti-concorrência
+ * (`running`) fica no caso de uso puro e não é duplicado aqui.
+ */
+class PullNotifyingFullSync extends RunFullSyncUseCase {
+  async execute(): Promise<FullSyncResult> {
+    const result = await super.execute();
+    if (result.pull) notifyPullCompleted();
+    return result;
+  }
+}
 
 export function getFullSync(container: AppContainer): RunFullSyncUseCase {
   const existing = cycles.get(container);
@@ -35,7 +50,7 @@ export function getFullSync(container: AppContainer): RunFullSyncUseCase {
         container.syncMetadataRepository
       )
     : undefined;
-  const cycle = new RunFullSyncUseCase(push, pull);
+  const cycle = new PullNotifyingFullSync(push, pull);
   cycles.set(container, cycle);
   return cycle;
 }

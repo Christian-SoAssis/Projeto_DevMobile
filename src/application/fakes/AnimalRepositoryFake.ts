@@ -48,6 +48,12 @@ export class AnimalRepositoryFake implements AnimalRepository {
           a.location.neighborhood.toLowerCase().includes(q)
       );
     }
+    // RF04: distância — mesma regra do repositório SQLite, matemática no
+    // domínio (haversine). Raio 0 = sem raio ativo; sem origem = sem filtro.
+    if (filters.origin && filters.radiusKm !== undefined && filters.radiusKm > 0) {
+      const radiusKm = filters.radiusKm;
+      result = result.filter((a) => a.location.distanceKmTo(filters.origin!) <= radiusKm);
+    }
 
     return result;
   }

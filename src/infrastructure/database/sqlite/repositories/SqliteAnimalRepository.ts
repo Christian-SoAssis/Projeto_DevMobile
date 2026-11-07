@@ -84,6 +84,21 @@ export class SqliteAnimalRepository implements AnimalRepository {
           r.neighborhood.toLowerCase().includes(q)
       );
     }
+    // RF04: distância — raio em km a partir da origem aproximada. Sem
+    // origem não há o que medir; raio 0 = sem raio ativo (nenhum filtro).
+    // Filtra nas LINHAS, antes de carregar fotos (menos consultas por
+    // anúncio excluído). A matemática fica no domínio (haversine).
+    if (filters.origin && filters.radiusKm !== undefined && filters.radiusKm > 0) {
+      const origin = filters.origin;
+      const radiusKm = filters.radiusKm;
+      filtered = filtered.filter(
+        (r) =>
+          ApproximateLocation.distanceKmBetween(origin, {
+            latitude: r.latitude,
+            longitude: r.longitude,
+          }) <= radiusKm
+      );
+    }
 
     const animals: Animal[] = [];
     for (const r of filtered) {

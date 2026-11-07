@@ -73,6 +73,39 @@ describe('Domain Value Objects', () => {
       const loc2 = new ApproximateLocation({ latitude: 10, longitude: 20, neighborhood: 'A', city: 'B', region: 'C' });
       expect(loc1.equals(loc2)).toBe(true);
     });
+
+    /**
+     * RF04 (distância): separação em km (haversine, raio 6371). Regra
+     * pura do domínio usada pelo filtro de busca dos repositórios.
+     */
+    describe('distanceKmTo', () => {
+      it('mesmo ponto → 0 km', () => {
+        const here = new ApproximateLocation({ latitude: -21.55, longitude: -45.43, neighborhood: 'A', city: 'B', region: 'C' });
+        expect(here.distanceKmTo({ latitude: -21.55, longitude: -45.43 })).toBe(0);
+      });
+
+      it('0,01° de latitude ≈ 1,11 km (~1,1 km do arredondamento para 2 casas)', () => {
+        const here = new ApproximateLocation({ latitude: -21.55, longitude: -45.43, neighborhood: 'A', city: 'B', region: 'C' });
+        expect(here.distanceKmTo({ latitude: -21.56, longitude: -45.43 })).toBeCloseTo(1.112, 2);
+      });
+
+      it('é simétrico', () => {
+        const here = new ApproximateLocation({ latitude: -21.55, longitude: -45.43, neighborhood: 'A', city: 'B', region: 'C' });
+        const elsewhere = { latitude: -23.55, longitude: -46.63 };
+        expect(here.distanceKmTo(elsewhere)).toBeCloseTo(
+          ApproximateLocation.distanceKmBetween(elsewhere, here),
+          6
+        );
+      });
+
+      it('distâncias grandes saneiam o cálculo (Varginha ~ São Paulo)', () => {
+        const varginha = new ApproximateLocation({ latitude: -21.55, longitude: -45.43, neighborhood: 'A', city: 'B', region: 'C' });
+        const saoPaulo = { latitude: -23.55, longitude: -46.63 };
+        const distanceKm = varginha.distanceKmTo(saoPaulo);
+        expect(distanceKm).toBeGreaterThan(250);
+        expect(distanceKm).toBeLessThan(260);
+      });
+    });
   });
 
   describe('AdoptionStatus', () => {

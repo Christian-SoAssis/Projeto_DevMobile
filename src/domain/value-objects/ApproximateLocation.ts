@@ -56,4 +56,27 @@ export class ApproximateLocation {
       this.city === other.city
     );
   }
+
+  /**
+   * RF04 (distância): separação em km entre este ponto e outro, fórmula
+   * de haversine sobre raio terrestre de 6371 km. Pura e determinística
+   * — a regra de filtro mora no domínio; adapters e fakes apenas a aplicam.
+   */
+  distanceKmTo(target: { latitude: number; longitude: number }): number {
+    return ApproximateLocation.distanceKmBetween(this, target);
+  }
+
+  static distanceKmBetween(
+    a: { latitude: number; longitude: number },
+    b: { latitude: number; longitude: number }
+  ): number {
+    const EARTH_RADIUS_KM = 6371;
+    const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+    const deltaLat = toRad(b.latitude - a.latitude);
+    const deltaLon = toRad(b.longitude - a.longitude);
+    const half =
+      Math.sin(deltaLat / 2) ** 2 +
+      Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(deltaLon / 2) ** 2;
+    return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(half)));
+  }
 }

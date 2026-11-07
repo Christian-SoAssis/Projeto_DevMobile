@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Animal } from '../../domain/entities/Animal';
 import { AnimalFilterOptions, AnimalRepository } from '../../domain/ports/AnimalRepository';
+import { LocationGateway } from '../../domain/ports/LocationGateway';
 import { AnimalMap } from '../map/AnimalMap';
 import { SearchAnimalsUseCase } from '../../application/use-cases/SearchAnimalsUseCase';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
@@ -20,6 +21,8 @@ export interface SearchScreenProps {
   animalRepository: AnimalRepository;
   /** DAT-10: com a fila, rascunhos (CREATE pendente) de outra conta não aparecem. */
   syncQueueRepository?: SyncQueueRepository;
+  /** RF04: GPS do aparelho (solicitado sob ação do usuário) fornece a origem do raio. */
+  locationGateway?: LocationGateway;
   onSelectAnimal?: (animal: Animal) => void;
   isOnlineInitial?: boolean;
 }
@@ -27,6 +30,7 @@ export interface SearchScreenProps {
 export const SearchScreen: React.FC<SearchScreenProps> = ({
   animalRepository,
   syncQueueRepository,
+  locationGateway,
   onSelectAnimal,
   isOnlineInitial = true,
 }) => {
@@ -39,6 +43,15 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(!isOnlineInitial);
+  /**
+   * RF04 (distância): raio escolhido pelo usuário (0 = "Sem raio", nenhum
+   * filtro) e a origem aproximada capturada sob ação dele. A permissão
+   * negada/erro de GPS desliga o filtro e avisa (UC01-A3: pesquisar por
+   * outra região) — nunca quebra a busca.
+   */
+  const [radiusKm, setRadiusKm] = useState(0);
+  const [origin, setOrigin] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [radiusFeedback, setRadiusFeedback] = useState<string | null>(null);
   /**
    * OFF-02 (ordem 4, checklist T28): quando o pull do servidor completa,
    * o cache local muda — a tela refaz a última consulta com os dados
@@ -56,6 +69,9 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
         size: selectedSize || undefined,
         sex: selectedSex || undefined,
         approximateAge: ageQuery || undefined,
+        // RF04: distância só entra com raio ativo (> 0) E origem capturada.
+        radiusKm: radiusKm > 0 ? radiusKm : undefined,
+        origin: radiusKm > 0 && origin ? origin : undefined,
       };
       const useCase = new SearchAnimalsUseCase(
         animalRepository,
@@ -76,11 +92,41 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
 
   useEffect(() => onPullCompleted(() => setSyncPulse((p) => p + 1)), []);
 
+  /** RF04: escolha do raio pede a posição atual (ação explícita do usuário). */
+  const handleSelectRadius = async (km: number) => {
+    setRadiusFeedback(null);
+    if (km <= 0) {
+      setRadiusKm(0);
+      setOrigin(null);
+      return; // "Sem raio": filtro desligado, sem pedir o GPS
+    }
+    try {
+      if (!locationGateway) {
+        throw Object.assign(new Error('Localização indisponível neste ambiente.'), {
+          name: 'LocationUnavailableError',
+        });
+      }
+      const loc = await locationGateway.getCurrentLocation();
+      setOrigin({ latitude: loc.latitude, longitude: loc.longitude });
+      setRadiusKm(km);
+    } catch (err: any) {
+      // UC01-A3: sem posição atual, o filtro de distância fica de fora —
+      // o usuário pesquisa por outra região (texto) e todo o resto segue.
+      setOrigin(null);
+      setRadiusKm(0);
+      setRadiusFeedback(
+        err?.name === 'LocationPermissionDeniedError' || err?.name === 'LocationUnavailableError'
+          ? 'Busca por distância indisponível — pesquise por outra região.'
+          : `Não foi possível obter sua localização. ${err?.message || 'Tente novamente.'}`
+      );
+    }
+  };
+
   useEffect(() => {
     performSearch(isOnlineInitial);
     // Refaz a busca também quando a conectividade muda (Fase 2: NetInfo real)
     // e quando o pull de sincronização traz anúncios novos (ordem 4).
-  }, [selectedSpecies, selectedSize, selectedSex, isOnlineInitial, syncPulse]);
+  }, [selectedSpecies, selectedSize, selectedSex, radiusKm, isOnlineInitial, syncPulse]);
 
   return (
     <View style={styles.container} testID="search-screen">
@@ -180,6 +226,29 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
           <Text style={styles.buttonText}>Filtrar</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Distance Filter Pills (RF04) */}
+      <View style={styles.filterRow}>
+        {(['Sem raio', '1 km', '3 km', '5 km', '10 km'] as const).map((label) => {
+          const km = label === 'Sem raio' ? 0 : Number(label.split(' ')[0]);
+          const active = km === 0 ? radiusKm === 0 : radiusKm === km;
+          return (
+            <TouchableOpacity
+              key={label}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => handleSelectRadius(km)}
+              testID={`filter-radius-${km}`}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      {radiusFeedback && (
+        <Text style={styles.radiusFeedback} testID="radius-feedback">
+          {radiusFeedback}
+        </Text>
+      )}
 
       {/* List / Map View Toggle */}
       <View style={styles.toggleRow}>
@@ -338,6 +407,12 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 32,
+  },
+  radiusFeedback: {
+    marginBottom: 12,
+    marginTop: -8,
+    color: '#8a1c1c',
+    fontSize: 12,
   },
   card: {
     backgroundColor: '#fff',

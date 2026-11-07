@@ -83,6 +83,46 @@ describe('SqliteAnimalRepository', () => {
     expect(dogs[0].name).toBe('Rex');
   });
 
+  /** RF04 (distância): raio em km a partir de uma origem aproximada. */
+  it('filtra por distância a partir de uma origem (raio em km)', async () => {
+    const saveAt = (id: string, name: string, latitude: number) =>
+      repository.saveLocal(
+        new Animal({
+          id,
+          ownerId: 'u1',
+          name,
+          characteristics: new AnimalCharacteristics({
+            species: 'Cão',
+            size: 'Grande',
+            approximateAge: '2 anos',
+            sex: 'Macho',
+          }),
+          status: AdoptionStatus.available(),
+          location: new ApproximateLocation({
+            neighborhood: 'Centro',
+            city: 'Varginha',
+            region: 'Sul de Minas',
+            latitude,
+            longitude: -45.43,
+          }),
+        })
+      );
+    await saveAt('perto', 'Rex', -21.56); // 0,01° ao sul do centro ≈ 1,1 km
+    await saveAt('longe', 'Luna', -22.06); // 0,51° ao sul ≈ 56 km
+    const origin = { latitude: -21.55, longitude: -45.43 };
+
+    const radius5 = await repository.search({ origin, radiusKm: 5 });
+    expect(radius5.map((a) => a.id)).toEqual(['perto']);
+
+    // Raio 0 = sem raio ativo: nenhum filtro de distância.
+    const radius0 = await repository.search({ origin, radiusKm: 0 });
+    expect(radius0.map((a) => a.id).sort()).toEqual(['longe', 'perto']);
+
+    // Sem origem não há o que medir.
+    const semOrigem = await repository.search({ radiusKm: 5 });
+    expect(semOrigem).toHaveLength(2);
+  });
+
   it('lista animais de um proprietário específico', async () => {
     const a1 = createSampleAnimal('a1', 'owner_A', 'Bob');
     const a2 = createSampleAnimal('a2', 'owner_A', 'Max');

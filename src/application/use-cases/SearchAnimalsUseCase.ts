@@ -1,6 +1,7 @@
 import { Animal } from '../../domain/entities/Animal';
 import { AnimalFilterOptions, AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
+import { SearchRadius } from '../../domain/value-objects/SearchRadius';
 
 export interface SearchAnimalsOutput {
   animals: Animal[];
@@ -26,7 +27,8 @@ export class SearchAnimalsUseCase {
   ) {}
 
   async execute(filters: AnimalFilterOptions, isOnline: boolean = true): Promise<SearchAnimalsOutput> {
-    const cached = await this.hideForeignDrafts(await this.animalRepository.search(filters));
+    const validated = SearchAnimalsUseCase.withValidatedRadius(filters);
+    const cached = await this.hideForeignDrafts(await this.animalRepository.search(validated));
 
     if (!isOnline) {
       return { animals: cached, isOffline: true };
@@ -52,5 +54,22 @@ export class SearchAnimalsUseCase {
     );
     if (drafts.size === 0) return animals;
     return animals.filter((animal) => !drafts.has(animal.id) || animal.ownerId === session);
+  }
+
+  /**
+   * RF04: o raio informado é normalizado pelo VO da decisão de produto
+   * (`SearchRadius`, 0–10 km). Valor fora da faixa (ex.: linha antiga de
+   * preferências gravada antes da validação) degrada SEM filtro de
+   * distância — a busca do visitante nunca quebra; a recusa dura já
+   * acontece na gravação das preferências, e filtro de consulta não é
+   * mutação (não há perda silenciosa de dado aqui).
+   */
+  static withValidatedRadius(filters: AnimalFilterOptions): AnimalFilterOptions {
+    if (filters.radiusKm === undefined) return filters;
+    try {
+      return { ...filters, radiusKm: SearchRadius.from(filters.radiusKm)?.valueKm };
+    } catch {
+      return { ...filters, radiusKm: undefined };
+    }
   }
 }

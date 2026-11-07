@@ -9,7 +9,8 @@ import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
 export default function HomeTab() {
   const router = useRouter();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
-  const { animalRepository, syncQueueRepository } = useRepositories();
+  // RF04: o GPS do container fornece a origem do filtro por distância.
+  const { animalRepository, syncQueueRepository, locationGateway } = useRepositories();
   // Fase 2: conectividade real (NetInfo) alimenta o estado offline inicial.
   const isOnline = useConnectivity();
 
@@ -18,6 +19,7 @@ export default function HomeTab() {
       <SearchScreen
         animalRepository={animalRepository}
         syncQueueRepository={syncQueueRepository}
+        locationGateway={locationGateway}
         isOnlineInitial={isOnline}
         onSelectAnimal={(animal) =>
           router.push({ pathname: '/animal/[id]', params: { id: animal.id } })

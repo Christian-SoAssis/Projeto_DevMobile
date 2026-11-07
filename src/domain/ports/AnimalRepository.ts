@@ -8,6 +8,17 @@ export interface AnimalFilterOptions {
   searchQuery?: string;
   ownerId?: string;
   status?: string;
+  /**
+   * RF04 (distância): coordenada aproximada que define o CENTRO do raio
+   * de pesquisa — capturada sob ação do usuário (§0.5, RF24). Sem origem
+   * não há o que medir: o filtro de distância não entra.
+   */
+  origin?: { latitude: number; longitude: number };
+  /**
+   * RF04: raio de pesquisa em km, 0–10 (`SearchRadius`). 0 = sem raio
+   * ativo (nenhum filtro de distância).
+   */
+  radiusKm?: number;
 }
 
 export interface AnimalRepository {

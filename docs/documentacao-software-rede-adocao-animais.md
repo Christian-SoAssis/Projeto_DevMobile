@@ -48,7 +48,7 @@ O aplicativo foi concebido como **offline-first**: dados previamente carregados 
 | RF06 | O sistema deve permitir visualizar detalhes do animal, incluindo fotos, características, cuidados especiais, localização aproximada, situação da adoção e contato. | Alta | Visitante |
 | RF07 | O sistema deve permitir cadastro, login e manutenção da sessão do usuário. | Alta | Usuário |
 | RF08 | O sistema deve permitir que usuários autenticados criem anúncios de adoção. | Alta | Responsável |
-| RF09 | O sistema deve permitir adicionar uma ou mais fotos a um anúncio usando câmera ou galeria. **Decisão de produto: máximo de 4 fotos por anúncio** (`MAX_PHOTOS_PER_ANIMAL`; a 5ª é recusada na UI e no domínio). | Alta | Responsável |
+| RF09 | O sistema deve permitir adicionar uma ou mais fotos a um anúncio usando câmera ou galeria. **Decisão de produto: máximo de 4 fotos por anúncio** (`MAX_PHOTOS_PER_ANIMAL`; a 5ª é recusada na UI e no domínio). **Decisão complementar (07/11/2026): todas as fotos do anúncio são visíveis na tela de detalhes e no formulário por carrossel (≥ 2 fotos) e visualizador de tela cheia com zoom (1 foto = foto simples tocável, sem carrossel).** | Alta | Responsável |
 | RF10 | O sistema deve permitir que o responsável edite apenas os próprios anúncios. | Alta | Responsável |
 | RF11 | O sistema deve permitir que o responsável exclua apenas os próprios anúncios. | Média | Responsável |
 | RF12 | O sistema deve permitir que somente o responsável marque o animal como adotado. | Alta | Responsável |
@@ -198,12 +198,15 @@ flowchart LR
 
 **Fluxo principal**
 1. Usuário seleciona um anúncio.
-2. Sistema exibe fotos.
+2. Sistema exibe todas as fotos (carrossel quando há 2 ou mais; foto simples quando há 1) — decisão 16.
 3. Sistema mostra nome, espécie, porte, idade, sexo, comportamento e cuidados.
 4. Sistema mostra situação da adoção.
 5. Sistema apresenta localização aproximada.
 6. Sistema apresenta dados de contato permitidos.
 7. Se autenticado, o usuário pode favoritar ou demonstrar interesse.
+
+**Fluxos alternativos**
+- A1 — Após o passo 2, o usuário abre qualquer foto em tela cheia: visualizador com zoom (pinça 1x–4x), deslizar entre as fotos do anúncio, toque fecha (decisão 16).
 
 ---
 
@@ -1260,6 +1263,8 @@ Ciclo recomendado para cada regra:
 13. **Limite de fotos = 4 por anúncio** (RF09): enforce no agregado (`MAX_PHOTOS_PER_ANIMAL`) e na UI.
 14. **Raio máximo de pesquisa = 10 km** (RF04): validado pelo VO `SearchRadius` na persistência de preferências.
 15. **Conflito: last-write wins** — versão com `updatedAt` mais recente vence automaticamente; revisão manual só quando a SITUAÇÃO do animal diverge (risco de perda relevante, RF23/RNF03).
+16. **Fotos: carrossel + visualizador com zoom** (RF09, decisão 07/11/2026): na tela de detalhes do pet e no formulário, o anúncio com **≥ 2 fotos** exibe todas em **carrossel** (deslizar foto a foto com indicador); **1 foto** aparece como foto simples. Qualquer foto abre em **tela cheia com zoom** (pinça 1x–4x, deslizar entre fotos, toque fecha). Implementação com recursos nativos do React Native (Modal + `ScrollView` de pinça + paginação) — **sem dependência nova**; imagens reutilizam a resolução local-primeiro do `AnimalPhotoView` (RNF01/RNF02, offline).
+17. **Características opcionais no formulário** (07/11/2026): o formulário de anúncio captura também **características, comportamento e cuidados especiais** como campos **opcionais** — espécie, porte, idade e sexo continuam obrigatórios. Domínio (`AnimalCharacteristics`), SQLite (mapeado a `description`/`health_notes`/`special_care`), Supabase (colunas text) e a tela de detalhes (exibição condicional) já suportam; a mudança é a UI de captura.
 
 ---
 

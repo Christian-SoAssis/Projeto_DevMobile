@@ -534,6 +534,8 @@ Regras permanentes:
 | permissão negada | "Permissão da câmera não concedida" | seguir via Galeria |
 | cópia falha no aparelho (ordem 5 — `PhotoCopyError`) | "Não conseguimos salvar a foto no aparelho. Tente de novo ou escolha outra imagem." | tentar novamente ou re-escolher — **nunca registra URI temporária** (comportamento novo já implementado) |
 | cancelamento | volta ao form sem mudança | — |
+| anúncio com ≥ 2 fotos (V06/V16/V10/V11; decisão 16) | carrossel das fotos com indicador "n/total" | deslizar entre fotos; tocar abre o visualizador |
+| visualizador aberto (decisão 16) | tela cheia com fundo escuro e indicação n/total | pinça para zoom (1x–4x), deslizar entre fotos, toque fecha — **sem texto técnico**, funciona offline (local-primeiro) |
 
 ### 8.3 Conexão e sincronização
 | Estado | Onde | SINAL |
@@ -657,6 +659,26 @@ Consolidadas ao longo do texto com o rótulo DECISÃO: paleta derivada (`warn`,
 admin mantendo acesso integral, olho de senha, `FilterSheet`, indicador "Dados
 atualizados" via `pullEvents`, fallback textual da logo, tipografia fallback
 sistema→asset futuro, colunas de conflito empilhadas, orçamento de desempenho.
+
+**DECISÃO (responsável, 07/11/2026 — carrossel + zoom de fotos; decisão 16/17 da
+§18 da doc de software):** as fotos do anúncio devem ser todas visíveis,
+navegáveis e ampliables em `V06/V16` (detalhes) e `V10/V11` (formulário):
+
+- **Carrossel** sempre que o anúncio/novo `photoList` tiver **≥ 2 fotos**
+  (deslizar foto a foto + indicador de posição); **1 foto** = foto simples.
+- Qualquer foto abre no **visualizador de tela cheia com zoom** (pinça 1x–4x,
+  deslizar entre as fotos do anúncio, toque fecha) — estados registrados em 8.2.
+- Implementação **sem dependência nova** (Modal + `ScrollView` de pinça +
+  paginação horizontal nativos do RN); componentes `PhotoCarousel` e
+  `PhotoViewer` em `src/adapters/components/` (era atual), a migrar para
+  `src/adapters/ui/` na fase de redesign reusando `HeroPhoto`/`AnimalCard`.
+- **Características opcionais (decisão 17):** `V10/V11` ganham os campos
+  opcionais características/comportamento/cuidados especiais (ClayField
+  `multiline` no redesign; o `input-*` atual preserva testIDs); obrigatórios
+  continuam espécie/porte/idade/sexo (UI-09 — mensagens de produto).
+- Contrato de testes do RF09 (testIDs `form-photo-preview`/`photo-index-N`/
+  `btn-photo-*`/`btn-remove-photo-N`) preservado sobre a foto ativa do
+  carrossel.
 
 ### 12.3 Pendências globais (impacto concreto)
 

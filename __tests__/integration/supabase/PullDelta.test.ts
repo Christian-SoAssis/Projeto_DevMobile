@@ -75,7 +75,7 @@ async function boot(userId: string | null, db: FakeSupabaseDb, clock: ReturnType
 function pullOf(
   container: AppContainer,
   _client: FakeSupabaseClient,
-  opts: { pageSize?: number; currentUserId?: () => string | null } = {}
+  opts: { pageSize?: number; overlapMs?: number; currentUserId?: () => string | null } = {}
 ) {
   return new PullRemoteAnimalsUseCase(
     container.remoteAnimalSource!,
@@ -126,9 +126,14 @@ describe('OFF-06 — pull incremental por cursor (ordem 6)', () => {
     db.animals[2] = { ...db.animals[2], name: 'Três editado', version: 2, updated_at: clock.tick() };
 
     const served = countServedRows(client);
-    const second = await pullOf(container, client, { pageSize: 2 }).execute();
-    expect(second).toMatchObject({ fetched: 1, added: 0, updated: 1 });
-    expect(served.animals).toBe(1); // nada além do delta trafegou
+    // overlapMs: 0 para isolar o delta puro (a janela de sobreposição de 60 s,
+    // coberta no teste 3 desta suíte, releria as sementes a ~1 ms do cursor).
+    // fetched: 2 — o keyset retoma com id = MIN_ID (seguro contra empate de
+    // carimbo): a PRÓPRIA linha do cursor (o 5, mesma versão) é relida de
+    // forma inofensiva pela reconciliação, junto com o único anúncio alterado.
+    const second = await pullOf(container, client, { pageSize: 2, overlapMs: 0 }).execute();
+    expect(second).toMatchObject({ fetched: 2, added: 0, updated: 1 });
+    expect(served.animals).toBe(2); // nada além do delta (+ releitura do cursor) trafegou
     expect((await container.animalRepository.findById(id(3)))?.name).toBe('Três editado');
   });
 

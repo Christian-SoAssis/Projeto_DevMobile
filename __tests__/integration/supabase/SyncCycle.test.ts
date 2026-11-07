@@ -101,7 +101,15 @@ describe('Passo 5 — pull do servidor (doc §14.1)', () => {
     const original = client.from.bind(client);
     (client as unknown as { from: unknown }).from = (table: string) => {
       if (table === 'animals') {
-        return { select: () => ({ eq: () => ({ order: () => ({ limit: async () => ({ data: null, error: { message: 'boom' } }) }) }) }) };
+        // Cadeia completa da leitura delta (keyset): select → eq → or → order → order → limit.
+        const boom = { message: 'boom' };
+        const step: any = {};
+        step.select = () => step;
+        step.eq = () => step;
+        step.or = () => step;
+        step.order = () => step;
+        step.limit = async () => ({ data: null, error: boom });
+        return step;
       }
       return original(table);
     };

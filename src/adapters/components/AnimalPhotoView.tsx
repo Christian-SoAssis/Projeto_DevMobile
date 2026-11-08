@@ -11,6 +11,13 @@ export interface AnimalPhotoViewProps {
   /** `testID` da imagem; o placeholder recebe `${testID}-placeholder`. */
   testID?: string;
   style?: StyleProp<ViewStyle>;
+  /**
+   * Enquadramento do conteúdo: `'cover'` (corta para preencher o quadro —
+   * padrão do app) ou `'contain'` (mostra a foto inteira, centralizada, com
+   * o fundo do contêiner visível — letterbox do visualizador, decisão do
+   * usuário 07/11/2026). O corte `cover` segue em herói/preview/form.
+   */
+  resizeMode?: 'cover' | 'contain';
 }
 
 /**
@@ -26,7 +33,13 @@ export interface AnimalPhotoViewProps {
  * 2. URL remota (cache local limpo / vazamento depois do reinício);
  * 3. placeholder 🐾 quando não há foto (ou as duas falharam).
  */
-export const AnimalPhotoView: React.FC<AnimalPhotoViewProps> = ({ photo, uri, testID, style }) => {
+export const AnimalPhotoView: React.FC<AnimalPhotoViewProps> = ({
+  photo,
+  uri,
+  testID,
+  style,
+  resizeMode = 'cover',
+}) => {
   const remoteUrl = photo?.remoteUrl ?? null;
   // Prioridade: uri direta > arquivo local > URL remota.
   const primaryUri = uri ?? photo?.localPath ?? remoteUrl;
@@ -63,7 +76,7 @@ export const AnimalPhotoView: React.FC<AnimalPhotoViewProps> = ({ photo, uri, te
       <Image
         source={{ uri: displayUri }}
         style={styles.image}
-        resizeMode="cover"
+        resizeMode={resizeMode}
         testID={testID}
         onError={() => setFailed((prev) => ({ ...prev, [displayUri]: true }))}
       />

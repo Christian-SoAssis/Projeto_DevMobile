@@ -61,6 +61,21 @@ describe('AnimalPhotoView — resolução da URI da foto', () => {
     expect(getByTestId('photo-placeholder')).toBeTruthy();
   });
 
+  it('resizeMode: cover é o padrão; contain é opt-in (visualizador/letterbox)', async () => {
+    const { getByTestId } = await renderView({
+      photo: makePhoto({ localPath: LOCAL_URI }),
+      testID: 'photo',
+    });
+    expect(getByTestId('photo').props.resizeMode).toBe('cover');
+
+    const contain = await renderView({
+      photo: makePhoto({ localPath: LOCAL_URI }),
+      testID: 'photo-contain',
+      resizeMode: 'contain',
+    });
+    expect(contain.getByTestId('photo-contain').props.resizeMode).toBe('contain');
+  });
+
   it('arquivo local falhou no carregamento → tenta a URL remota; se ela falhar → placeholder', async () => {
     const { getByTestId, queryByTestId } = await renderView({
       photo: makePhoto({ localPath: LOCAL_URI, remoteUrl: REMOTE_URL }),

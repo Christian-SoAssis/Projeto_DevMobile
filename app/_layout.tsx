@@ -1,6 +1,7 @@
 import React from 'react';
 import { Slot } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { RepositoriesProvider } from '../src/adapters/context/RepositoriesContext';
 import { AuthProviderBridge } from '../src/adapters/context/AuthContext';
@@ -16,7 +17,11 @@ const AppSessionStorage = new SessionStorageSecureStore();
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
+    // Requisito do react-native-gesture-handler (decisão 16 — pinça do
+    // visualizador de fotos): a raiz do app precisa de um root de gestos
+    // para os GestureDetectors negociarem no nativo.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
       {/* Fase 2: persistência local real (SQLite) + Fase 3: Supabase opcional.
           A ordem dos providers é: container primeiro, auth depois — o
           AuthProviderBridge entrega o SupabaseAuthGateway do container
@@ -28,6 +33,7 @@ export default function RootLayout() {
           <Slot />
         </AuthProviderBridge>
       </RepositoriesProvider>
-    </SafeAreaProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

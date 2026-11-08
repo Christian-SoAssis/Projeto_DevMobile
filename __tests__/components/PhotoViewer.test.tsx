@@ -5,7 +5,6 @@ import {
   clampPan,
   clampZoom,
   PhotoViewer,
-  pinchDistance,
   ZOOM_MAX_SCALE,
   ZOOM_MIN_SCALE,
 } from '../../src/adapters/components/PhotoViewer';
@@ -16,9 +15,11 @@ const VIEWER_WIDTH = Dimensions.get('window').width;
 
 /**
  * RF09 + decisão 16: visualizador em TELA CHEIA com zoom por pinça
- * (1x–4x), deslizar entre as fotos e fechar (✕/voltar). O zoom nativo do
- * ScrollView é iOS-only — a pinça é implementada com PanResponder e os
- * cálculos ficam em helpers puros, testáveis aqui.
+ * (1x–4x — gestos nativos via react-native-gesture-handler), deslizar entre
+ * as fotos e fechar (✕/voltar). O zoom nativo do ScrollView é iOS-only e a
+ * pinça JS perde a disputa contra o scroll nativo no Android, então os
+ * cálculos ficam em helpers puros, testáveis aqui, e os gestos nativos
+ * (dentro do GestureDetector) seguem para QA manual em device.
  */
 
 const PAGE = { width: 400, height: 600 };
@@ -36,16 +37,6 @@ describe('helpers de zoom (pinça 1x–4x)', () => {
     expect(clampZoom(55)).toBe(4);
     expect(clampZoom(0)).toBe(1);
     expect(clampZoom(NaN)).toBe(1);
-  });
-
-  it('pinchDistance mede os dois primeiros toques (0 com menos de 2)', async () => {
-    const touch = (x: number, y: number) => ({ pageX: x, pageY: y, identifier: 0, locationX: x, locationY: y, timestamp: 0, target: 0, force: 0 });
-    const make = (touches: Array<{ x: number; y: number }>) =>
-      ({ nativeEvent: { touches: touches.map((t) => touch(t.x, t.y)) } }) as never;
-
-    expect(pinchDistance(make([]))).toBe(0);
-    expect(pinchDistance(make([{ x: 10, y: 10 }]))).toBe(0);
-    expect(pinchDistance(make([{ x: 0, y: 0 }, { x: 3, y: 4 }]))).toBe(5);
   });
 
   it('clampPan contém o arrasto dentro da foto ampliada', async () => {
@@ -87,6 +78,18 @@ describe('PhotoViewer — visualizador de fotos em tela cheia (decisão 16)', ()
 
     expect(queryByTestId('photo-viewer-scroll')).toBeTruthy();
     expect(queryByTestId('photo-viewer-position')).toBeNull();
+  });
+
+  it('letterbox (decisão do usuário): foto inteira com contain e paginação nasce ligada', async () => {
+    const { getByTestId } = await render(
+      <PhotoViewer visible pages={pages} onClose={jest.fn()} />
+    );
+
+    // A foto do visualizador é desenhada INTEIRA (contain) sobre o fundo
+    // preto — foto em outra proporção ganha barras pretas, sem corte.
+    expect(getByTestId('photo-viewer-photo-0').props.resizeMode).toBe('contain');
+    // Em 1x a paginação entre fotos está ligada (o zoom desliga quando amplia).
+    expect(getByTestId('photo-viewer-scroll').props.scrollEnabled).toBe(true);
   });
 
   it('fechado (visible=false) não renderiza o conteúdo do visualizador', async () => {

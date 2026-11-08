@@ -1,17 +1,20 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
-  GestureResponderEvent,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from 'react-native-gesture-handler';
 import type { ScrollViewInstance } from 'react-native';
 import { AnimalPhoto } from '../../domain/entities/AnimalPhoto';
 import { AnimalPhotoView } from './AnimalPhotoView';
@@ -27,40 +30,37 @@ export interface PhotoViewerProps {
   /** Posição inicial: a foto que abriu o visualizador. */
   initialIndex?: number;
   onClose: () => void;
-  /** Base dos testIDs: `${testID}-close`, `${testID}-photo-N` e `${testID}-position`. */
+  /** Base dos testIDs: `${testID}-close`, `${testID}-photo-N`, `${testID}-scroll` e `${testID}-position`. */
   testID?: string;
   /**
    * RF09 + decisão 16: faixa de zoom da visualização em tela cheia. O zoom
    * nativo do `ScrollView` (`maximumZoomScale`) existe SÓ no iOS — o
-   * `ReactScrollView` do Android não implementa escala — e a decisão de
-   * produto exige pinça 1x–4x nas duas plataformas SEM dependência nova.
-   * A pinça é implementada com `PanResponder` (core do RN) e os cálculos
-   * ficam em helpers puros, testáveis.
-   * Enquanto ampliada, o arrasto 1-dedo desloca a foto; soltar na escala 1
-   * volta ao enquadramento e dispensa o gesto (o carrossel volta a reger).
+   * `ReactScrollView` do Android não implementa escala.
+   * Relatório em device (07/11/2026): a pinça via `PanResponder` (JS) perde a
+   * disputa por toques contra o `ScrollView` horizontal nativo — a pinça
+   * NUNCA chegava ao gesto. Decisão B2 aprovada: **dependência mínima
+   * `react-native-gesture-handler`** — os gestos são negociados no nativo
+   * (`Gesture.Pinch()` + `Gesture.Pan()` simultâneos via `GestureDetector`,
+   * um detector POR PÁGINA: o zoom funciona em cada foto, inclusive depois
+   * de deslizar para outra dentro do visualizador). Enquanto ampliada, o
+   * arrasto 1-dedo desloca a foto e a paginação do `ScrollView` fica
+   * desligada (`scrollEnabled={false}`), evitando a disputa de gestos; soltar
+   * a pinça em 1x reativa a paginação e volta ao enquadramento.
    */
 }
 
 export const ZOOM_MIN_SCALE = 1;
 export const ZOOM_MAX_SCALE = 4;
+/** Soltar a pinça até este valor conta como "voltou ao enquadramento". */
+export const ZOOM_RESET_EPSILON = 0.05;
 
 export function clampZoom(scale: number): number {
   if (!Number.isFinite(scale) || scale <= ZOOM_MIN_SCALE) return ZOOM_MIN_SCALE;
   return Math.min(scale, ZOOM_MAX_SCALE);
 }
 
-/** Distância em px entre os 2 primeiros toques da pinça (0 quando < 2 dedos). */
-export function pinchDistance(event: GestureResponderEvent): number {
-  const touches = event.nativeEvent.touches;
-  if (touches.length < 2) return 0;
-  const [a, b] = [touches[0], touches[1]];
-  const dx = a.pageX - b.pageX;
-  const dy = a.pageY - b.pageY;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
 /**
- * Deslocamento da foto ampliada: a imagem ampla exempla os limites da
+ * Deslocamento da foto ampliada: a imagem amplia os limites da
  * página pelo fator de escala — o arrasto é contido neles ("borda para
  * ir além" evita a foto perdida fora da tela).
  */
@@ -77,107 +77,154 @@ export function clampPan(
   return { x: x === 0 ? 0 : x, y: y === 0 ? 0 : y };
 }
 
+/**
+ * Uma página do visualizador: foto com letterbox (`contain`, fundo preto,
+ * centrada — decisão do usuário 07/11/2026: foto em outra proporção aparece
+ * INTEIRA, sem corte; barras pretas só no visualizador) + gestos de zoom.
+ *
+ * O zoom tem estado local por página: deslizar para outra foto NÃO zera
+ * implicitamente (só o novo `resetToken` — reabrir o visualizador — reseta),
+ * e cada página tem seus próprios gestos, então o zoom vale em cada foto.
+ */
 const ZoomablePhoto: React.FC<{
   page: PhotoViewerPage;
   width: number;
   height: number;
+  /** Incrementa a cada abertura do visualizador: volta o zoom ao enquadramento. */
+  resetToken: number;
+  onZoomChange?: (zoomed: boolean) => void;
   testID?: string;
-}> = ({ page, width, height, testID }) => {
+}> = ({ page, width, height, resetToken, onZoomChange, testID }) => {
   const [zoom, setZoom] = useState({ scale: ZOOM_MIN_SCALE, pan: { x: 0, y: 0 } });
+  // Estado do gesto em ref (os callbacks do gesture-handler não recriam o
+  // gesto a cada update) + `apply()` para refletir na UI.
   const gesture = useRef({
     scale: ZOOM_MIN_SCALE,
     baseScale: ZOOM_MIN_SCALE,
-    baseDistance: 0,
     pan: { x: 0, y: 0 },
+    basePan: { x: 0, y: 0 },
   });
-  const lastTouch = useRef<{ x: number; y: number } | null>(null);
+  const reported = useRef(false);
 
-  const apply = () => setZoom({ scale: gesture.current.scale, pan: gesture.current.pan });
+  const apply = () => setZoom({ scale: gesture.current.scale, pan: { ...gesture.current.pan } });
 
-  const resetZoom = () => {
-    gesture.current.scale = ZOOM_MIN_SCALE;
-    gesture.current.pan = { x: 0, y: 0 };
-    gesture.current.baseDistance = 0;
-    lastTouch.current = null;
-    apply();
+  /** Avisa a tela hospedeira quando cruza a fronteira 1x ↔ ampliado. */
+  const report = () => {
+    const zoomed = gesture.current.scale > ZOOM_MIN_SCALE;
+    if (zoomed !== reported.current) {
+      reported.current = zoomed;
+      onZoomChange?.(zoomed);
+    }
   };
 
-  const handlers = useRef(
-    PanResponder.create({
-      // 1 dedo em 1x: o ScrollView horizontal regula a troca de fotos. O
-      // gesto do zoom só reivindica o responder com 2 dedos (ou arraste
-      // quando a foto já está ampliada).
-      onMoveShouldSetPanResponder: (_e, g) =>
-        g.numberActiveTouches === 2 || gesture.current.scale > ZOOM_MIN_SCALE,
-      onPanResponderGrant: () => {
-        // Arraste com a foto ampliada começa de onde ela já está — os
-        // incrementos vêm de `lastTouch` no `onPanResponderMove`.
-      },
-      onPanResponderMove: (event, g) => {
-        const t0 = event.nativeEvent.touches[0];
-        if (g.numberActiveTouches >= 2) {
-          const distance = pinchDistance(event);
-          const cur = gesture.current;
-          if (cur.baseDistance <= 0) {
-            // 2º dedo chegou no meio do gesto: ancora a base agora.
-            cur.baseDistance = distance;
-            cur.baseScale = cur.scale;
-          } else if (distance > 0) {
-            cur.scale = clampZoom((cur.baseScale * distance) / cur.baseDistance);
+  // Reabrir o visualizador (novo gesto, foto nova) volta o zoom ao início.
+  useEffect(() => {
+    if (reported.current) {
+      reported.current = false;
+      onZoomChange?.(false);
+    }
+    gesture.current.scale = ZOOM_MIN_SCALE;
+    gesture.current.pan = { x: 0, y: 0 };
+    apply();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetToken]);
+
+  const pinch = useMemo(
+    () =>
+      Gesture.Pinch()
+        .onBegin(() => {
+          // Gesto novo parte da escala corrente (ex.: 2x → pinça a partir daí).
+          gesture.current.baseScale = gesture.current.scale;
+        })
+        .onUpdate((event) => {
+          gesture.current.scale = clampZoom(gesture.current.baseScale * event.scale);
+          gesture.current.pan = clampPan(gesture.current.pan, gesture.current.scale, {
+            width,
+            height,
+          });
+          apply();
+          report();
+        })
+        .onEnd(() => {
+          if (gesture.current.scale <= ZOOM_MIN_SCALE + ZOOM_RESET_EPSILON) {
+            // Voltou ao enquadramento: zera também o arrasto (a foto volta a
+            // preencher a página e o carrossel volta a reger a paginação).
+            gesture.current.scale = ZOOM_MIN_SCALE;
+            gesture.current.pan = { x: 0, y: 0 };
+            apply();
+            report();
+          } else {
+            gesture.current.baseScale = gesture.current.scale;
           }
-        } else if (g.numberActiveTouches === 1 && gesture.current.scale > ZOOM_MIN_SCALE && lastTouch.current) {
-          const cur = gesture.current;
-          cur.pan = clampPan(
+        }),
+    // página tem dimensões fixas (janela) — o gesto é estável durante ela
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [width, height]
+  );
+
+  const zoomed = zoom.scale > ZOOM_MIN_SCALE;
+  const pan = useMemo(
+    () =>
+      Gesture.Pan()
+        // Só quando ampliada: em 1x o carrossel horizontal regula a troca de
+        // fotos sem disputa de gesto (sem Pan ativo, o scroll nativo vence).
+        .enabled(zoomed)
+        .onStart(() => {
+          // O arrasto parte de onde a foto já está (gestos encadeados somam).
+          gesture.current.basePan = { ...gesture.current.pan };
+        })
+        .onUpdate((event) => {
+          gesture.current.pan = clampPan(
             {
-              x: cur.pan.x + (t0.pageX - lastTouch.current.x),
-              y: cur.pan.y + (t0.pageY - lastTouch.current.y),
+              x: gesture.current.basePan.x + event.translationX,
+              y: gesture.current.basePan.y + event.translationY,
             },
-            cur.scale,
+            gesture.current.scale,
             { width, height }
           );
-        }
-        lastTouch.current = t0 ? { x: t0.pageX, y: t0.pageY } : null;
-        apply();
-      },
-      onPanResponderRelease: () => {
-        if (gesture.current.scale <= ZOOM_MIN_SCALE + 0.001) resetZoom();
-        else {
-          gesture.current.baseDistance = 0;
-          lastTouch.current = null;
-        }
-        apply();
-      },
-      onPanResponderTerminate: resetZoom,
-    })
-  ).current;
+          apply();
+        }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [zoomed, width, height]
+  );
+
+  const simultaneous = useMemo(() => Gesture.Simultaneous(pinch, pan), [pinch, pan]);
 
   return (
-    <View style={{ width, height }} {...handlers.panHandlers}>
-      <AnimalPhotoView
-        photo={page.photo}
-        uri={page.uri}
-        testID={testID}
-        style={{
-          width,
-          height,
-          borderRadius: 0,
-          transform: [
-            { translateX: zoom.pan.x / zoom.scale },
-            { translateY: zoom.pan.y / zoom.scale },
-            { scale: zoom.scale },
-          ],
-        }}
-      />
-    </View>
+    <GestureDetector gesture={simultaneous}>
+      <View style={{ width, height }}>
+        {/* Letterbox: a foto ocupa a página inteira, mas o conteúdo é
+            'contain' (inteiro, centrado) e o fundo da página é preto — as
+            barras pretas são o fundo visível nas bordas não cobertas. */}
+        <AnimalPhotoView
+          photo={page.photo}
+          uri={page.uri}
+          testID={testID}
+          resizeMode="contain"
+          style={{
+            width,
+            height,
+            borderRadius: 0,
+            backgroundColor: 'transparent',
+            transform: [
+              { translateX: zoom.pan.x / zoom.scale },
+              { translateY: zoom.pan.y / zoom.scale },
+              { scale: zoom.scale },
+            ],
+          }}
+        />
+      </View>
+    </GestureDetector>
   );
 };
 
 /**
  * RF09 + decisão 16: visualizador de fotos do anúncio em TELA CHEIA com
- * zoom por pinça (1x–4x) e deslizar entre as fotos. Fundo escuro, indicação
- * "n/total" e fechar com ✕ (ou botão de voltar no Android, via
- * `onRequestClose`). Sem texto técnico (UI-09); funciona offline — as fotos
- * reutilizam `AnimalPhotoView` (resolução local-primeiro, RNF01/RNF02).
+ * zoom por pinça (1x–4x — gestos nativos) e deslizar entre as fotos. Fundo
+ * preto (letterbox), indicação "n/total" e fechar com ✕ (ou botão de voltar
+ * no Android, via `onRequestClose`). Sem texto técnico (UI-09); funciona
+ * offline — as fotos reutilizam `AnimalPhotoView` (resolução local-primeiro,
+ * RNF01/RNF02).
  */
 export const PhotoViewer: React.FC<PhotoViewerProps> = ({
   visible,
@@ -190,6 +237,7 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
   const lastPage = useRef(initialIndex);
   const [position, setPosition] = useState(initialIndex);
   const { width, height } = Dimensions.get('window');
+  const [zoomed, setZoomed] = useState(false);
 
   // Reabre na foto pedida (ex.: tocar na 2ª do carrossel abre na 2ª).
   useEffect(() => {
@@ -217,7 +265,9 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      {/* O Modal cria uma nova hierarquia nativa — o GestureDetector precisa
+          de um GestureHandlerRootView próprio dentro dele (documentação RNGH). */}
+      <GestureHandlerRootView style={styles.backdrop}>
         <View style={styles.header}>
           {pages.length > 1 && (
             <Text style={styles.counter} testID={`${testID}-position`}>
@@ -235,10 +285,13 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
           </TouchableOpacity>
         </View>
 
+        {/* Paginação entre fotos fica desligada enquanto uma foto está
+            ampliada (o arrasto 1-dedo regula o recorte da foto ampliada). */}
         <ScrollView
           ref={scrollRef}
           horizontal
           pagingEnabled
+          scrollEnabled={!zoomed}
           showsHorizontalScrollIndicator={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
@@ -250,11 +303,13 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
               page={page}
               width={width}
               height={height}
+              resetToken={visible ? 1 : 0}
+              onZoomChange={setZoomed}
               testID={`${testID}-photo-${index}`}
             />
           ))}
         </ScrollView>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 };
@@ -262,7 +317,9 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: '#000000ee',
+    // Fundo PRETO sólido: o letterbox (barras da foto em outra proporção)
+    // depende dele para parecer "cinema".
+    backgroundColor: '#000000',
   },
   header: {
     position: 'absolute',

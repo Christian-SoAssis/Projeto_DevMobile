@@ -1,5 +1,9 @@
 module.exports = {
   preset: 'jest-expo',
+  // Mock do módulo nativo do react-native-gesture-handler (decisão 16 —
+  // pinça do visualizador em gestos nativos): sem isso, o import do pacote
+  // tenta tocar a ponte nativa no ambiente de teste.
+  setupFiles: ['./node_modules/react-native-gesture-handler/jestSetup.js'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   // Máquinas lentas/frio fazem o primeiro teste de cada suíte demorar mais
   // que o default (5s) e falhar por timeout — limite folgado para RNTL.

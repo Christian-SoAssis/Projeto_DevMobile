@@ -535,7 +535,8 @@ Regras permanentes:
 | cópia falha no aparelho (ordem 5 — `PhotoCopyError`) | "Não conseguimos salvar a foto no aparelho. Tente de novo ou escolha outra imagem." | tentar novamente ou re-escolher — **nunca registra URI temporária** (comportamento novo já implementado) |
 | cancelamento | volta ao form sem mudança | — |
 | anúncio com ≥ 2 fotos (V06/V16/V10/V11; decisão 16) | carrossel das fotos com indicador "n/total" | deslizar entre fotos; tocar abre o visualizador |
-| visualizador aberto (decisão 16) | tela cheia com fundo escuro e indicação n/total | pinça para zoom (1x–4x), deslizar entre fotos, toque fecha — **sem texto técnico**, funciona offline (local-primeiro) |
+| visualizador aberto (decisão 16) | tela cheia com **fundo preto** e indicação n/total | pinça para zoom (1x–4x, gesto nativo), deslizar entre fotos, toque fecha — **sem texto técnico**, funciona offline (local-primeiro) |
+| foto em proporção diferente da tela no visualizador (letterbox) | foto **inteira, centrada, fundo preto** — sem corte (`contain`) | foto horizontal = toda a largura + barras pretas acima/abaixo; só no visualizador (herói/preview seguem `cover`) |
 
 ### 8.3 Conexão e sincronização
 | Estado | Onde | SINAL |
@@ -668,9 +669,19 @@ navegáveis e ampliables em `V06/V16` (detalhes) e `V10/V11` (formulário):
   (deslizar foto a foto + indicador de posição); **1 foto** = foto simples.
 - Qualquer foto abre no **visualizador de tela cheia com zoom** (pinça 1x–4x,
   deslizar entre as fotos do anúncio, toque fecha) — estados registrados em 8.2.
-- Implementação **sem dependência nova** (Modal + paginação nativos do RN; **pinça via `PanResponder` do core**, pois o zoom nativo do `ScrollView` é iOS-only — verificação em `ReactScrollView` do Android): componentes `PhotoCarousel` e
-  `PhotoViewer` implementados em `src/adapters/components/` (era atual, mockável/testáveis — helpers de zoom puros: `clampZoom`/`pinchDistance`/`clampPan`), a migrar para
+- Implementação (Modal + paginação nativos do RN): componentes `PhotoCarousel` e
+  `PhotoViewer` em `src/adapters/components/` (era atual, mockável/testáveis — helpers de zoom puros `clampZoom`/`clampPan`), a migrar para
   `src/adapters/ui/` na fase de redesign reusando `HeroPhoto`/`AnimalCard`.
+- **Zoom real (refino 07/11/2026 após teste em device — implementado):** a pinça via `PanResponder`
+  (JS) perde a disputa por toques contra o `ScrollView` horizontal nativo (Android) —
+  **dependência mínima aprovada e instalada: `react-native-gesture-handler` (~3.3.0)**;
+  `Gesture.Pinch()` + `Gesture.Pan()` simultâneos via `GestureDetector`, **um detector por página** (o zoom
+  funciona em cada foto, inclusive depois de deslizar dentro do visualizador); `scrollEnabled={false}`
+  na página ampliada; `GestureHandlerRootView` na raiz do app e dentro do Modal.
+- **Letterbox no visualizador (DECISÃO do usuário 07/11/2026 — implementado):** fotos em proporção
+  diferente da tela (ex.: horizontal) aparecem **inteiras, centradas, fundo preto** —
+  `AnimalPhotoView` ganha prop `resizeMode` (default `'cover'`); o fullscreen usa
+  `'contain'`; herói (V06/V16) e preview do formulário (V10/V11) **continuam `cover`**.
 - **Características opcionais (decisão 17):** `V10/V11` ganham os campos
   opcionais características/comportamento/cuidados especiais (ClayField
   `multiline` no redesign; o `input-*` atual preserva testIDs); obrigatórios

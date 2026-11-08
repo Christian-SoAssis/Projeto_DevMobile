@@ -11,6 +11,8 @@ import { InterestContact, RegisterAdoptionInterestUseCase } from '../../applicat
 import { MarkAnimalAdoptedUseCase } from '../../application/use-cases/MarkAnimalAdoptedUseCase';
 import { GerarPdfUseCase } from '../../application/use-cases/GerarPdfUseCase';
 import { AnimalPhotoView } from '../components/AnimalPhotoView';
+import { PhotoCarousel } from '../components/PhotoCarousel';
+import { PhotoViewer } from '../components/PhotoViewer';
 import { FavoriteRepositoryFake } from '../../application/fakes/FavoriteRepositoryFake';
 import { AdoptionInterestRepositoryFake } from '../../application/fakes/AdoptionInterestRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
@@ -54,6 +56,8 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [received, setReceived] = useState<RemoteInterest[] | null>(null);
   const [receivedError, setReceivedError] = useState<string | null>(null);
+  // Decisão 16: índice da foto aberta no visualizador (null = fechado).
+  const [photoViewerIndex, setPhotoViewerIndex] = useState<number | null>(null);
 
   const isOwner = currentUserId ? animal.isOwner(currentUserId) : false;
 
@@ -165,12 +169,34 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
         </TouchableOpacity>
       )}
 
-      {/* Foto em destaque (RF09): arquivo local primeiro, URL remota se sobrar apenas
-          ela — ver AnimalPhotoView. Placeholder quando o anúncio ainda não tem foto. */}
-      <AnimalPhotoView
-        photo={animal.photos.length > 0 ? animal.photos[0] : null}
-        testID="animal-photo"
-        style={styles.photoHero}
+      {/* Fotos em destaque (RF09/decisão 16): ≥ 1 foto → carrossel com todas
+          (toque abre o visualizador em tela cheia com zoom); 0 fotos →
+          placeholder, como sempre. Resolução local-primeiro (AnimalPhotoView). */}
+      {animal.photos.length > 0 ? (
+        <PhotoCarousel
+          testID="animal-photo-carousel"
+          height={200}
+          pages={animal.photos.map((photo, index) => ({
+            photo,
+            testID: index === 0 ? 'animal-photo' : `animal-photo-${index + 1}`,
+            onPress: () => setPhotoViewerIndex(index),
+          }))}
+        />
+      ) : (
+        <AnimalPhotoView
+          photo={null}
+          testID="animal-photo"
+          style={styles.photoHero}
+        />
+      )}
+
+      {/* Decisão 16: qualquer foto abre em tela cheia com zoom (pinça 1x–4x)
+          e deslizar entre as fotos; ✕/voltar fecha. */}
+      <PhotoViewer
+        visible={photoViewerIndex !== null}
+        initialIndex={photoViewerIndex ?? 0}
+        pages={animal.photos.map((photo) => ({ photo }))}
+        onClose={() => setPhotoViewerIndex(null)}
       />
 
       {feedback && (

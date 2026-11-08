@@ -18,6 +18,8 @@ import { PhotoStorageFake } from '../../application/fakes/PhotoStorageFake';
 import { UnitOfWork } from '../../application/ports/UnitOfWork';
 import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
 import { AnimalPhotoView } from '../components/AnimalPhotoView';
+import { PhotoCarousel } from '../components/PhotoCarousel';
+import { PhotoViewer } from '../components/PhotoViewer';
 import { MAX_PHOTOS_PER_ANIMAL } from '../../domain/entities/Animal';
 
 export interface AnimalFormScreenProps {
@@ -58,6 +60,12 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
   const [size, setSize] = useState(initialAnimal?.characteristics.size ?? 'Médio');
   const [approximateAge, setApproximateAge] = useState(initialAnimal?.characteristics.approximateAge ?? '2 anos');
   const [sex, setSex] = useState(initialAnimal?.characteristics.sex ?? 'Macho');
+  // Decisão 17: características, comportamento e cuidados especiais são
+  // OPCIONAIS — espécie/porte/idade/sexo continuam obrigatórios. Em edição,
+  // vêm pré-preenchidos do agregado.
+  const [characteristics, setCharacteristics] = useState(initialAnimal?.characteristics.characteristics ?? '');
+  const [behavior, setBehavior] = useState(initialAnimal?.characteristics.behavior ?? '');
+  const [specialCare, setSpecialCare] = useState(initialAnimal?.characteristics.specialCare ?? '');
   const [city, setCity] = useState(initialAnimal?.location.city ?? 'Varginha');
   const [neighborhood, setNeighborhood] = useState(initialAnimal?.location.neighborhood ?? 'Centro');
   /**
@@ -72,6 +80,8 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [latitude, setLatitude] = useState<number>(initialAnimal?.location.latitude ?? -21.554);
   const [longitude, setLongitude] = useState<number>(initialAnimal?.location.longitude ?? -45.435);
+  // Decisão 16: índice da foto aberta no visualizador (null = fechado).
+  const [photoViewerIndex, setPhotoViewerIndex] = useState<number | null>(null);
 
   const photosFull = photoList.length >= MAX_PHOTOS_PER_ANIMAL;
 
@@ -166,11 +176,15 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           neighborhood,
           region: 'MG',
         });
-        const characteristics = new AnimalCharacteristics({
+        const traits = new AnimalCharacteristics({
           species,
           size,
           approximateAge,
           sex,
+          // Decisão 17: opcionais — vazios continuam válidos (dado ausente).
+          characteristics: characteristics.trim() || undefined,
+          behavior: behavior.trim() || undefined,
+          specialCare: specialCare.trim() || undefined,
         });
 
         const useCase = new UpdateAnimalUseCase(
@@ -207,7 +221,7 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         await useCase.execute(
           ownerId,
           initialAnimal.id,
-          { name, characteristics, location, photos },
+          { name, characteristics: traits, location, photos },
           isOnline
         );
         setFeedback('Anúncio atualizado com sucesso!');
@@ -222,18 +236,22 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         neighborhood,
         region: 'MG',
       });
-      const characteristics = new AnimalCharacteristics({
+      const traits = new AnimalCharacteristics({
         species,
         size,
         approximateAge,
         sex,
+        // Decisão 17: opcionais — vazios continuam válidos (dado ausente).
+        characteristics: characteristics.trim() || undefined,
+        behavior: behavior.trim() || undefined,
+        specialCare: specialCare.trim() || undefined,
       });
 
       const animal = new Animal({
         id: animalId,
         ownerId,
         name,
-        characteristics,
+        characteristics: traits,
         location,
       });
 
@@ -336,6 +354,39 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
         testID="input-age"
       />
 
+      {/* Decisão 17: caracterizações OPCIONAIS do anúncio (Domínio/SQLite/
+          Supabase/detalhes já suportam; falta era a captura aqui). */}
+      <Text style={styles.label}>Características (opcional)</Text>
+      <TextInput
+        style={[styles.input, styles.inputMultiline]}
+        multiline
+        numberOfLines={3}
+        placeholder="Ex.: Dócil, vacinado e castrado"
+        value={characteristics}
+        onChangeText={setCharacteristics}
+        testID="input-characteristics"
+      />
+      <Text style={styles.label}>Comportamento (opcional)</Text>
+      <TextInput
+        style={[styles.input, styles.inputMultiline]}
+        multiline
+        numberOfLines={3}
+        placeholder="Ex.: Brincalhona e viva com crianças"
+        value={behavior}
+        onChangeText={setBehavior}
+        testID="input-behavior"
+      />
+      <Text style={styles.label}>Cuidados especiais (opcional)</Text>
+      <TextInput
+        style={[styles.input, styles.inputMultiline]}
+        multiline
+        numberOfLines={3}
+        placeholder="Ex.: Tomar medicação diária"
+        value={specialCare}
+        onChangeText={setSpecialCare}
+        testID="input-special-care"
+      />
+
       <Text style={styles.label}>Bairro / Cidade *</Text>
       <TextInput
         style={styles.input}
@@ -363,58 +414,61 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Pré-visualização (RF09, limite de 4 fotos): em edição, começa com as
-            fotos atuais do anúncio; novas fotos entram no fim da lista e a
-            ordem/remoção são definidas antes de salvar. */}
-        {(photoList.length > 0 ? photoList : [null]).map((item, index) =>
-          item ? (
-            <View key={`${item.uri}-${index}`} style={styles.photoItem}>
-              <AnimalPhotoView
-                uri={item.uri}
-                photo={null}
-                testID={index === 0 ? 'form-photo-preview' : `form-photo-preview-${index + 1}`}
-                style={styles.photoThumb}
-              />
-              {photoList.length > 1 && (
-                <View style={styles.photoNavRow}>
+        {/* Pré-visualização em carrossel (RF09 + decisão 16): todas as fotos do
+            formulário deslizáveis foto a foto; tocar na foto abre o
+            visualizador em tela cheia com zoom. ◀/▶/remover seguem POR FOTO
+            (testIDs do RF09 preservados); 1 foto = página única, sem indicador. */}
+        {photoList.length > 0 ? (
+          <PhotoCarousel
+            height={170}
+            testID="form-photo-carousel"
+            pages={photoList.map((item, index) => ({
+              uri: item.uri,
+              testID: index === 0 ? 'form-photo-preview' : `form-photo-preview-${index + 1}`,
+              onPress: () => setPhotoViewerIndex(index),
+              footer: (
+                <View>
+                  {photoList.length > 1 && (
+                    <View style={styles.photoNavRow}>
+                      <TouchableOpacity
+                        style={styles.photoNavBtn}
+                        onPress={() => handleMovePhoto(index, -1)}
+                        disabled={index === 0}
+                        testID={`btn-photo-left-${index}`}
+                      >
+                        <Text style={styles.photoNavText}>◀</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.photoIndex} testID={`photo-index-${index}`}>
+                        {index + 1}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.photoNavBtn}
+                        onPress={() => handleMovePhoto(index, 1)}
+                        disabled={index === photoList.length - 1}
+                        testID={`btn-photo-right-${index}`}
+                      >
+                        <Text style={styles.photoNavText}>▶</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                   <TouchableOpacity
-                    style={styles.photoNavBtn}
-                    onPress={() => handleMovePhoto(index, -1)}
-                    disabled={index === 0}
-                    testID={`btn-photo-left-${index}`}
+                    style={styles.removePhotoBtn}
+                    onPress={() => handleRemovePhoto(index)}
+                    testID={`btn-remove-photo-${index}`}
                   >
-                    <Text style={styles.photoNavText}>◀</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.photoIndex} testID={`photo-index-${index}`}>
-                    {index + 1}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.photoNavBtn}
-                    onPress={() => handleMovePhoto(index, 1)}
-                    disabled={index === photoList.length - 1}
-                    testID={`btn-photo-right-${index}`}
-                  >
-                    <Text style={styles.photoNavText}>▶</Text>
+                    <Text style={styles.removePhotoText}>✕ Remover foto</Text>
                   </TouchableOpacity>
                 </View>
-              )}
-              <TouchableOpacity
-                style={styles.removePhotoBtn}
-                onPress={() => handleRemovePhoto(index)}
-                testID={`btn-remove-photo-${index}`}
-              >
-                <Text style={styles.removePhotoText}>✕ Remover foto</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <AnimalPhotoView
-              key="placeholder"
-              uri={undefined}
-              photo={null}
-              testID="form-photo-preview"
-              style={styles.photoPreview}
-            />
-          )
+              ),
+            }))}
+          />
+        ) : (
+          <AnimalPhotoView
+            uri={undefined}
+            photo={null}
+            testID="form-photo-preview"
+            style={styles.photoPreview}
+          />
         )}
 
         <Text
@@ -442,6 +496,15 @@ export const AnimalFormScreen: React.FC<AnimalFormScreenProps> = ({
       <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} testID="btn-submit-animal">
         <Text style={styles.submitText}>Salvar Anúncio</Text>
       </TouchableOpacity>
+
+      {/* Decisão 16: zoom por pinça (1x–4x) sobre as fotos do formulário,
+          com deslizar entre elas e fechar (✕/voltar). */}
+      <PhotoViewer
+        visible={photoViewerIndex !== null}
+        initialIndex={photoViewerIndex ?? 0}
+        pages={photoList.map((item) => ({ uri: item.uri }))}
+        onClose={() => setPhotoViewerIndex(null)}
+      />
     </ScrollView>
   );
 };
@@ -534,6 +597,10 @@ const styles = StyleSheet.create({
   photoPreview: {
     height: 170,
     marginBottom: 10,
+  },
+  inputMultiline: {
+    height: 80,
+    textAlignVertical: 'top',
   },
   photoItem: {
     marginBottom: 10,

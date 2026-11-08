@@ -668,9 +668,8 @@ navegáveis e ampliables em `V06/V16` (detalhes) e `V10/V11` (formulário):
   (deslizar foto a foto + indicador de posição); **1 foto** = foto simples.
 - Qualquer foto abre no **visualizador de tela cheia com zoom** (pinça 1x–4x,
   deslizar entre as fotos do anúncio, toque fecha) — estados registrados em 8.2.
-- Implementação **sem dependência nova** (Modal + `ScrollView` de pinça +
-  paginação horizontal nativos do RN); componentes `PhotoCarousel` e
-  `PhotoViewer` em `src/adapters/components/` (era atual), a migrar para
+- Implementação **sem dependência nova** (Modal + paginação nativos do RN; **pinça via `PanResponder` do core**, pois o zoom nativo do `ScrollView` é iOS-only — verificação em `ReactScrollView` do Android): componentes `PhotoCarousel` e
+  `PhotoViewer` implementados em `src/adapters/components/` (era atual, mockável/testáveis — helpers de zoom puros: `clampZoom`/`pinchDistance`/`clampPan`), a migrar para
   `src/adapters/ui/` na fase de redesign reusando `HeroPhoto`/`AnimalCard`.
 - **Características opcionais (decisão 17):** `V10/V11` ganham os campos
   opcionais características/comportamento/cuidados especiais (ClayField

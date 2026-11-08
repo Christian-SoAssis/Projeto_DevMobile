@@ -191,9 +191,6 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
   const [position, setPosition] = useState(initialIndex);
   const { width, height } = Dimensions.get('window');
 
-  // Fechado: nada renderiza (o conteúdo nunca vaza para a árvore/UI).
-  if (!visible) return null;
-
   // Reabre na foto pedida (ex.: tocar na 2ª do carrossel abre na 2ª).
   useEffect(() => {
     if (!visible) return;
@@ -201,6 +198,13 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
     setPosition((prev) => (prev === initialIndex ? prev : initialIndex));
     scrollRef.current?.scrollTo({ x: initialIndex * width, animated: false });
   }, [visible, initialIndex, width]);
+
+  // Fechado: nada renderiza (o conteúdo nunca vaza para a árvore/UI). REGRA
+  // DOS HOOKS: o early return precisa vir DEPOIS de TODOS os hooks — a tela
+  // hospedeira mantém o <PhotoViewer> montado com visible=false; se o hook
+  // nascesse condicional, a contagem mudaria entre renderizações
+  // ("Rendered more hooks than during the previous render").
+  if (!visible) return null;
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offset = event.nativeEvent.contentOffset.x;

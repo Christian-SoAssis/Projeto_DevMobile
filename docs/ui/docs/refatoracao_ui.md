@@ -677,7 +677,9 @@ navegáveis e ampliables em `V06/V16` (detalhes) e `V10/V11` (formulário):
   **dependência mínima aprovada e instalada: `react-native-gesture-handler` (~3.3.0)**;
   `Gesture.Pinch()` + `Gesture.Pan()` simultâneos via `GestureDetector`, **um detector por página** (o zoom
   funciona em cada foto, inclusive depois de deslizar dentro do visualizador); `scrollEnabled={false}`
-  na página ampliada; `GestureHandlerRootView` na raiz do app e dentro do Modal.
+  na página ampliada; `GestureHandlerRootView` na raiz do app e dentro do Modal; **callbacks com
+  `.runOnJS(true)`** — o Expo Go embute o Reanimated e, sem isso, o RNGH auto-workletiza os callbacks
+  (mutação de ref/state na thread da UI é proibida: zoom morto + warnings/crash).
 - **Letterbox no visualizador (DECISÃO do usuário 07/11/2026 — implementado):** fotos em proporção
   diferente da tela (ex.: horizontal) aparecem **inteiras, centradas, fundo preto** —
   `AnimalPhotoView` ganha prop `resizeMode` (default `'cover'`); o fullscreen usa

@@ -132,6 +132,14 @@ const ZoomablePhoto: React.FC<{
   const pinch = useMemo(
     () =>
       Gesture.Pinch()
+        // Expo Go embute o Reanimated/Worklets; sem runOnJS o RNGH auto-envia
+        // os callbacks para a thread da UI (worklet) — onde mutar o ref JS e
+        // aplicar o state do React são proibidos ("Tried to modify key
+        // \`scale\`/`pan` of an object … passed to a worklet"): o zoom morria
+        // na fronteira JS↔worklet (warnings + crash intermitente). Com
+        // runOnJS os callbacks rodam na thread do JS — mesmo modelo do
+        // PanResponder anterior — e o state reflete 1:1.
+        .runOnJS(true)
         .onBegin(() => {
           // Gesto novo parte da escala corrente (ex.: 2x → pinça a partir daí).
           gesture.current.baseScale = gesture.current.scale;
@@ -166,6 +174,9 @@ const ZoomablePhoto: React.FC<{
   const pan = useMemo(
     () =>
       Gesture.Pan()
+        // Mesmo motivo do pinch: callbacks na thread do JS (ver comentário
+        // acima sobre worklets do Expo Go).
+        .runOnJS(true)
         // Só quando ampliada: em 1x o carrossel horizontal regula a troca de
         // fotos sem disputa de gesto (sem Pan ativo, o scroll nativo vence).
         .enabled(zoomed)

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Slot } from 'expo-router';
+import { usePathname, useRootNavigationState } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
@@ -14,6 +15,23 @@ import { SessionStorageSecureStore } from '../src/adapters/auth/SessionStorageSe
  * mantendo os testes e o modo demo estáveis.
  */
 const AppSessionStorage = new SessionStorageSecureStore();
+
+/**
+ * DIAGNÓSTICO TEMPORÁRIO (apaga após validar o bug "voltar cai no Início"):
+ * registra no terminal cada mudança de rota com a pilha na raiz do stack.
+ * Só em desenvolvimento (__DEV__) — zero efeito em build de produção.
+ */
+function NavigationLogger() {
+  const pathname = usePathname();
+  const rootState = useRootNavigationState();
+  React.useEffect(() => {
+    if (__DEV__) {
+      const stack = (rootState?.routes ?? []).map((route) => route.name + (route.state ? `(${route.state.index ?? 0})` : ''));
+      console.log('[NAV]', pathname, '→', JSON.stringify(stack));
+    }
+  }, [pathname, rootState]);
+  return null;
+}
 
 export default function RootLayout() {
   return (
@@ -30,6 +48,7 @@ export default function RootLayout() {
         <AuthProviderBridge sessionStorage={AppSessionStorage}>
           <StatusBar style="dark" />
           <AutoSync />
+          <NavigationLogger />
           <Slot />
         </AuthProviderBridge>
       </RepositoriesProvider>

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MyAnimalsScreen } from '../../src/adapters/screens/MyAnimalsScreen';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
@@ -11,6 +11,21 @@ export default function MeusAnunciosTab() {
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
   const { animalRepository, syncQueueRepository, unitOfWork } = useRepositories();
 
+  // Pulso de atualização: com o outer Stack (fix "voltar mantém a aba"), o
+  // pop do formulário/detalhes NÃO remonta esta aba — relê o banco a cada
+  // foco para o animal recém-criado/editado aparecer de imediato.
+  const [refreshToken, setRefreshToken] = useState(0);
+  const SKIP = useRef(true); // 1º foco = montagem inicial: a tela já carrega
+  useFocusEffect(
+    useCallback(() => {
+      if (SKIP.current) {
+        SKIP.current = false;
+        return;
+      }
+      setRefreshToken((token) => token + 1);
+    }, [])
+  );
+
   return (
     <RequireAccess area="MY_ANIMALS">
       {(user) => (
@@ -20,6 +35,7 @@ export default function MeusAnunciosTab() {
             syncQueueRepository={syncQueueRepository}
             unitOfWork={unitOfWork}
             ownerId={user.id}
+            refreshToken={refreshToken}
             onSelectAnimal={(animal) =>
               router.push({ pathname: '/animal/[id]', params: { id: animal.id } })
             }

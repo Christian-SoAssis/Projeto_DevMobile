@@ -1,5 +1,5 @@
 import React from 'react';
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
 import { usePathname, useRootNavigationState } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -49,7 +49,14 @@ export default function RootLayout() {
           <StatusBar style="dark" />
           <AutoSync />
           <NavigationLogger />
-          <Slot />
+          {/* OUTER STACK (padrão canônico da doc, seção "Going back to the
+              tab you came from"): telas FORA das abas (detalhes, formulários)
+              populam ESTE stack distintamente, e o pop volta mantendo o estado
+              interno do navegador de abas. O <Slot /> anterior montava o grupo
+              de abas NOVAMENTE no pop — tab em estado inicial (1ª aba, Início),
+              que era o bug relatado (voltar → Início). Rotas fora de abas
+              continuam irmãs aqui (login, cadastro, animal/[id], protected). */}
+          <Stack screenOptions={{ headerShown: false }} />
         </AuthProviderBridge>
       </RepositoriesProvider>
       </SafeAreaProvider>

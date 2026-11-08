@@ -26,6 +26,13 @@ export interface MyAnimalsScreenProps {
   onBack?: () => void;
   isOnline?: boolean;
   unitOfWork?: UnitOfWork;
+  /**
+   * Pulsado pela rota hospedeira a cada FOCO da tela (retorno do formulário/
+   * detalhes). Com o outer Stack (correção "voltar mantém a aba"), o pop NÃO
+   * remonta a tela — sem este pulso, animal criado/editado em outra tela só
+   * aparecia após excluir algo ou reiniciar o app.
+   */
+  refreshToken?: number;
 }
 
 export const MyAnimalsScreen: React.FC<MyAnimalsScreenProps> = ({
@@ -38,6 +45,7 @@ export const MyAnimalsScreen: React.FC<MyAnimalsScreenProps> = ({
   onBack,
   isOnline = true,
   unitOfWork = new NoopUnitOfWork(),
+  refreshToken,
 }) => {
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,8 +61,10 @@ export const MyAnimalsScreen: React.FC<MyAnimalsScreenProps> = ({
   }, [animalRepository, ownerId]);
 
   useEffect(() => {
+    // refreshToken ?? 0: sem pulso, comporta-se como antes (carrega no
+    // mount); com pulso, relê a cada foco da rota hospedeira.
     loadAnimals();
-  }, [loadAnimals]);
+  }, [loadAnimals, refreshToken ?? 0]);
 
   const handleDelete = async (id: string) => {
     setFeedback(null);

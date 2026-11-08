@@ -13,6 +13,10 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      // backBehavior="history": voltar dentro das abas prioriza as abas já
+      // visitadas (ordem real de uso) — parte da correção do bug "voltar de
+      // pet/formulário caía no Início" (o outro lado é o outer Stack na raiz).
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#0066cc',

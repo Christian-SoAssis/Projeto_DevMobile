@@ -60,4 +60,26 @@ describe('MyAnimalsScreen Component', () => {
     await fireEvent.press(getByTestId('new-animal-button'));
     expect(onNewMock).toHaveBeenCalled();
   });
+
+  it('pulso (refreshToken) força nova listagem: anúncio criado no formulário aparece no retorno', async () => {
+    const repo = new AnimalRepositoryFake();
+    const listSpy = jest.spyOn(repo, 'listByOwner');
+
+    const screen = await render(<MyAnimalsScreen animalRepository={repo} ownerId="u1" />);
+    await waitFor(() => expect(screen.getByTestId('empty-my-animals')).toBeTruthy());
+    // Carrega uma única vez no mount (comportamento original).
+    expect(listSpy).toHaveBeenCalledTimes(1);
+
+    // Anúncio gravado EM OUTRA TELA (formulário) — a tela não remonta com o
+    // outer Stack; o pop só devolve o foco.
+    await repo.saveLocal(
+      new Animal({ id: 'a9', ownerId: 'u1', name: 'Bidu', characteristics: dummyChar, location: dummyLoc })
+    );
+
+    // Retorno: a rota hospedeira incrimenta o pulso → tela relê o banco.
+    await screen.rerender(<MyAnimalsScreen animalRepository={repo} ownerId="u1" refreshToken={1} />);
+
+    expect(await screen.findByText('Bidu')).toBeTruthy();
+    expect(listSpy).toHaveBeenCalledTimes(2);
+  });
 });

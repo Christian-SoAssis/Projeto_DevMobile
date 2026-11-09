@@ -52,7 +52,8 @@ export class SupabaseInterestGateway implements InterestRemoteGateway {
       contact_name: interest.contactName ?? null,
       contact_email: interest.contactEmail ?? null,
       contact_phone: interest.contactPhone ?? null,
-      status: 'PENDING',
+      // Decisão 18: novas manifestações nascem ENVIADA (legado era 'PENDING').
+      status: interest.status ?? 'ENVIADA',
       created_at: interest.createdAt ?? new Date().toISOString(),
     });
     if (error && error.code !== UNIQUE_VIOLATION) {
@@ -77,7 +78,47 @@ export class SupabaseInterestGateway implements InterestRemoteGateway {
       contactName: row.contact_name ?? undefined,
       contactEmail: row.contact_email ?? undefined,
       contactPhone: row.contact_phone ?? undefined,
+      status: row.status ?? undefined,
+      updatedAt: row.updated_at ?? undefined,
       createdAt: row.created_at,
     }));
+  }
+
+  // Trilha (decisão 18): o interessado lê as PRÓPRIAS manifestações — a RLS
+  // das linhas privadas por usuário já cobre (§15.1).
+  async listForUser(userId: string): Promise<RemoteInterest[]> {
+    const { data, error } = await this.client
+      .from<AdoptionInterestRow>('adoption_interests')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) {
+      throw new RemoteSupabaseError(`Falha ao ler suas manifestações: ${error.message}`);
+    }
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      animalId: row.animal_id,
+      message: row.message ?? undefined,
+      contactName: row.contact_name ?? undefined,
+      contactEmail: row.contact_email ?? undefined,
+      contactPhone: row.contact_phone ?? undefined,
+      status: row.status ?? undefined,
+      updatedAt: row.updated_at ?? undefined,
+      createdAt: row.created_at,
+    }));
+  }
+
+  // Responsável avança/recusa: RLS do servidor precisa autorizar o dono do
+  // animal a `update` (policy `interests_animal_owner_update`). Sem o error
+  // silencioso: falha volta para a fila (RNF02).
+  async updateStatusRemote(interestId: string, status: string, updatedAt?: string): Promise<void> {
+    const { data, error } = await this.client
+      .from<AdoptionInterestRow>('adoption_interests')
+      .update({ status, updated_at: updatedAt ?? new Date().toISOString() })
+      .eq('id', interestId).select();
+    if (error || !data?.length) {
+      throw new RemoteSupabaseError(`Falha ao atualizar a etapa da manifestação: ${error?.message ?? "Registro indisponível ou sem permissão"}`);
+    }
   }
 }

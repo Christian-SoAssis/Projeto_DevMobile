@@ -67,6 +67,43 @@ describe('React Native Screens UI Tests (RNTL)', () => {
       expect(onSelectMock).toHaveBeenCalledWith(animal1);
     });
 
+    it('pull-to-refresh relê a lista de anúncios (melhoria #9)', async () => {
+      const animal1 = new Animal({ id: 'a1', ownerId: 'u1', name: 'Luna', characteristics: dummyChar, location: dummyLoc });
+      const repo = new AnimalRepositoryFake([animal1]);
+      const searchSpy = jest.spyOn(repo, 'search');
+
+      const screen = await render(
+        <SearchScreen animalRepository={repo} isOnlineInitial={true} />
+      );
+      await waitFor(() => expect(screen.getByText('Luna')).toBeTruthy());
+      expect(searchSpy).toHaveBeenCalled();
+
+      // Novo anúncio gravado em outra tela (pull do servidor não interfere).
+      await repo.saveLocal(
+        new Animal({ id: 'a2', ownerId: 'u2', name: 'Mel', characteristics: dummyChar, location: dummyLoc })
+      );
+
+      // Puxar a lista dispara a nova consulta (FlatList prop onRefresh).
+      await fireEvent(screen.getByTestId('animals-list'), 'refresh');
+      await waitFor(() => {
+        expect(screen.getByText('Mel')).toBeTruthy();
+      });
+      expect(searchSpy.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    it('exibe skeleton no primeiro carregamento sem dados (melhoria #9)', async () => {
+      const repo = new AnimalRepositoryFake();
+      // Consulta em andamento: loading persiste, lista vazia → skeleton.
+      (repo.search as unknown as jest.Mock) = jest.fn().mockReturnValue(new Promise(() => {}));
+
+      const { getByTestId, queryByTestId } = await render(
+        <SearchScreen animalRepository={repo} isOnlineInitial={true} />
+      );
+
+      expect(getByTestId('list-skeleton-row-1')).toBeTruthy();
+      expect(queryByTestId('empty-message')).toBeNull();
+    });
+
     it('deve exibir estado offline quando busca falhar', async () => {
       const repo = new AnimalRepositoryFake();
       repo.search = jest.fn().mockRejectedValue(new Error('Erro de conexão'));

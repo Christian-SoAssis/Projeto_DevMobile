@@ -82,4 +82,34 @@ describe('MyAnimalsScreen Component', () => {
     expect(await screen.findByText('Bidu')).toBeTruthy();
     expect(listSpy).toHaveBeenCalledTimes(2);
   });
+
+  it('pull-to-refresh relê a listagem (melhoria #9) e skeleton cobre o carregamento vazio', async () => {
+    const repo = new AnimalRepositoryFake();
+    const listSpy = jest.spyOn(repo, 'listByOwner');
+
+    const screen = await render(<MyAnimalsScreen animalRepository={repo} ownerId="u1" />);
+    await waitFor(() => expect(screen.getByTestId('empty-my-animals')).toBeTruthy());
+    expect(listSpy).toHaveBeenCalledTimes(1);
+
+    await repo.saveLocal(
+      new Animal({ id: 'a8', ownerId: 'u1', name: 'Mel', characteristics: dummyChar, location: dummyLoc })
+    );
+
+    // Puxar a lista dispara o refetch (FlatList recebe prop onRefresh).
+    await fireEvent(screen.getByTestId('my-animals-list'), 'refresh');
+    await waitFor(() => {
+      expect(screen.getByText('Mel')).toBeTruthy();
+    });
+    expect(listSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('exibe skeleton enquanto carrega sem dados (melhoria #9)', async () => {
+    const repo = new AnimalRepositoryFake();
+    // Consulta em andamento: loading persiste, lista vazia → skeleton.
+    (repo.listByOwner as unknown as jest.Mock) = jest.fn().mockReturnValue(new Promise(() => {}));
+
+    const { getByTestId } = await render(<MyAnimalsScreen animalRepository={repo} ownerId="u1" />);
+
+    expect(getByTestId('my-animals-skeleton-row-2')).toBeTruthy();
+  });
 });

@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+
 import { useAuth } from '../../src/adapters/context/AuthContext';
 import { canAccess } from '../../src/domain/services/AccessPolicy';
+import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
+import { BuildNotificationsUseCase } from '../../src/application/use-cases/BuildNotificationsUseCase';
+import { useUnseenNotifications } from '../../src/adapters/hooks/useUnseenNotifications';
 
 export default function TabsLayout() {
   const { user } = useAuth();
@@ -10,6 +14,19 @@ export default function TabsLayout() {
   // Abas restritas somem para visitantes (`href: null`); a rota continua
   // protegida por RequireAccess caso alguém chegue por link direto.
   const tabHref = (area: Parameters<typeof canAccess>[1]) => (canAccess(role, area) ? undefined : null);
+  const { appStateRepository, animalRepository, interestRepository, remoteInterests, syncQueueRepository } =
+    useRepositories();
+
+  const notifications = useMemo(() => new BuildNotificationsUseCase(appStateRepository, {
+    animalRepository,
+    localInterests: interestRepository,
+    remoteInterests,
+    syncQueueRepository,
+  }), [appStateRepository, animalRepository, interestRepository, remoteInterests, syncQueueRepository]);
+  const unseenNotifications = useUnseenNotifications(
+    appStateRepository ? notifications : undefined,
+    user?.id ?? null
+  );
 
   return (
     <Tabs
@@ -90,6 +107,19 @@ export default function TabsLayout() {
           title: user ? 'Conta' : 'Entrar',
           tabBarIcon: ({ focused, size }) => (
             <Ionicons name="person-outline" size={size} color={focused ? '#0066cc' : '#8e8e93'} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notificacoes"
+        options={{
+          title: 'Notificações',
+          // Badge persistido no aparelho (decisão 20): sobrevive a reinícios;
+          // abrir a central zera. Some quando não há novas.
+          tabBarBadge: unseenNotifications > 0 ? unseenNotifications : undefined,
+          tabBarBadgeStyle: { backgroundColor: '#c62828', color: '#fff' },
+          tabBarIcon: ({ focused, size }) => (
+            <Ionicons name="notifications-outline" size={size} color={focused ? '#0066cc' : '#8e8e93'} />
           ),
         }}
       />

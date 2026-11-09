@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text } from 'react-native';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { AccountScreen } from '../../src/adapters/screens/AccountScreen';
 import { RegisterScreen } from '../../src/adapters/screens/RegisterScreen';
 import { AuthProvider, useAuth } from '../../src/adapters/context/AuthContext';
@@ -219,13 +219,15 @@ describe('AuthContext.updateProfile / perfil local', () => {
       </AuthProvider>
     );
     await waitFor(() => expect(auth.isLoading).toBe(false));
-    const user = await auth.login('ana@exemplo.com', 'senha');
+    let user!: Awaited<ReturnType<typeof auth.login>>;
+    await act(async () => { user = await auth.login('ana@exemplo.com', 'senha'); });
     expect(user.bio).toBe('bio local');
     expect(user.interests).toEqual(['Gatos']);
 
     // `auth` é reatribuído a cada render: espera o estado com o usuário logado.
     await waitFor(() => expect(auth.user?.id).toBe('usr_1'));
-    const saved = await auth.updateProfile({ bio: 'novo' });
+    let saved!: Awaited<ReturnType<typeof auth.updateProfile>>;
+    await act(async () => { saved = await auth.updateProfile({ bio: 'novo' }); });
     expect(saved.user.bio).toBe('novo');
     expect((await repo.findById('usr_1'))?.bio).toBe('novo');
   });

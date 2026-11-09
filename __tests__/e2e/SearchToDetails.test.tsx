@@ -5,6 +5,7 @@ const mockPush = jest.fn();
 const mockBack = jest.fn();
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]),
   useRouter: () => ({ push: mockPush, back: mockBack }),
   useLocalSearchParams: () => ({ id: 'anim_1' }),
 }));
@@ -20,7 +21,11 @@ describe('E2E — Visitante pesquisa e abre um animal (doc §16.4 item 1)', () =
   });
 
   it('deve pesquisar na busca e navegar para os detalhes do animal', async () => {
-    const { getByTestId, getByText } = await render(<HomeTab />);
+    const { getByTestId, getByText } = await render(
+      <AuthProvider>
+        <HomeTab />
+      </AuthProvider>
+    );
 
     await waitFor(() => {
       expect(getByText('Luna')).toBeTruthy();

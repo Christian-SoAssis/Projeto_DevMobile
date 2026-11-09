@@ -1,15 +1,19 @@
+import { publishActiveUserId, resetActiveUserId } from '../../../src/adapters/sync/activeSession';
 import { loadAppContainer, AppContainer } from '../../../src/infrastructure/composition/loadAppContainer';
 import { InMemorySqliteDriver } from '../../../src/infrastructure/database/sqlite/DatabaseDriver';
 import { getFullSync } from '../../../src/adapters/hooks/useFullSync';
 import { ImageProcessorFake } from '../../../src/application/fakes/ImageProcessorFake';
 import { ToggleFavoriteUseCase } from '../../../src/application/use-cases/ToggleFavoriteUseCase';
 import { RegisterAdoptionInterestUseCase } from '../../../src/application/use-cases/RegisterAdoptionInterestUseCase';
+import { UpdateInterestStatusUseCase } from '../../../src/application/use-cases/UpdateInterestStatusUseCase';
 import { UpdateAnimalUseCase } from '../../../src/application/use-cases/UpdateAnimalUseCase';
 import { MarkAnimalAdoptedUseCase } from '../../../src/application/use-cases/MarkAnimalAdoptedUseCase';
 import { ResolveSyncConflictUseCase } from '../../../src/application/use-cases/ResolveSyncConflictUseCase';
 import { ANIMALS_SYNC_KEY } from '../../../src/application/use-cases/PullRemoteAnimalsUseCase';
 import { FakeSupabaseClient, FakeSupabaseDb, seedFakeDb } from '../../../test-support/SupabaseFake';
 import { newUuid } from '../../../src/domain/services/IdGenerator';
+import { AdoptionInterest } from '../../../src/domain/entities/AdoptionInterest';
+import { InterestStatus } from '../../../src/domain/value-objects/InterestStatus';
 
 const OWNER = '11111111-1111-4111-8111-111111111111';
 const VISITOR = '22222222-2222-4222-8222-222222222222';
@@ -187,6 +191,64 @@ describe('Passo 5 — favoritos e interesses na fila', () => {
 
     const stranger = await boot('44444444-4444-4444-8444-444444444444', db);
     expect(await stranger.container.remoteInterests!.listForAnimal(ANIMAL)).toHaveLength(0);
+  });
+
+  it('trilha: responsável avança a etapa; o UPDATE da fila chega ao servidor (decisão 18)', async () => {
+    const db = seedFakeDb({ users: [], animals: [row()] });
+    const interestId = newUuid();
+    // A manifestação JÁ está no servidor (foi sincronizada quando criada).
+    db['adoption_interests'] = [
+      {
+        id: interestId,
+        user_id: VISITOR,
+        animal_id: ANIMAL,
+        message: null,
+        contact_name: 'Bia',
+        contact_email: null,
+        contact_phone: '35999',
+        status: 'ENVIADA',
+        created_at: '2026-11-03T09:00:00.000Z',
+      },
+    ];
+    const owner = await boot(OWNER, db);
+
+    await sync(owner.container);
+
+    // Espelho local do dono (o pull de interesses é um próximo passo — mirar
+    // direto isola o comportamento ETA→fila→servidor da trilha).
+    await owner.container.interestRepository.registerInterest(
+      new AdoptionInterest(interestId, VISITOR, ANIMAL, '2026-11-03T09:00:00.000Z')
+    );
+
+    const advance = new UpdateInterestStatusUseCase(
+      owner.container.interestRepository,
+      owner.container.syncQueueRepository,
+      owner.container.unitOfWork,
+      owner.container.animalRepository
+    );
+    const advanced = await advance.execute(
+      new AdoptionInterest(interestId, VISITOR, ANIMAL),
+      InterestStatus.emAnalise(), OWNER
+    );
+    expect(advanced.status.value).toBe('EM_ANALISE');
+
+    publishActiveUserId(OWNER);
+    let result;
+    try { result = await sync(owner.container); } finally { resetActiveUserId(); }
+    expect(result.push).toMatchObject({ successCount: 1, failedCount: 0 });
+    expect((db['adoption_interests'] ?? [])[0]).toMatchObject({
+      id: interestId,
+      status: 'EM_ANALISE',
+      updated_at: advanced.updatedAt,
+    });
+
+    // O interessado lê a etapa viva pelo próprio registro (RLS privada).
+    const visitor = await boot(VISITOR, db);
+    const own = await visitor.container.remoteInterests!.listForUser(VISITOR);
+    expect(own).toHaveLength(1);
+    expect(own[0]).toMatchObject({ id: interestId, status: 'EM_ANALISE' });
+    await expect(visitor.container.remoteInterests!.updateStatusRemote(interestId, 'CONCLUIDA')).rejects.toThrow();
+    await expect(owner.container.remoteInterests!.updateStatusRemote(newUuid(), 'EM_ANALISE')).rejects.toThrow();
   });
 });
 

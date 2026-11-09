@@ -65,4 +65,49 @@ describe('FavoritesScreen Component', () => {
     await fireEvent.press(getByTestId('favorite-card-a1'));
     expect(onSelectMock).toHaveBeenCalledWith(animal);
   });
+
+  it('pull-to-refresh relê os favoritos: salvo em "outra tela" aparece', async () => {
+    const animalRepo = new AnimalRepositoryFake();
+    const favRepo = new FavoriteRepositoryFake();
+    const listSpy = jest.spyOn(favRepo, 'listByUser');
+
+    const screen = await render(
+      <FavoritesScreen
+        animalRepository={animalRepo}
+        favoriteRepository={favRepo}
+        currentUserId="u1"
+      />
+    );
+    await waitFor(() => expect(screen.getByTestId('empty-favorites')).toBeTruthy());
+    expect(listSpy).toHaveBeenCalledTimes(1);
+
+    // Favorito gravado em outra tela (detalhes) + animal correspondente.
+    await favRepo.addFavorite(new Favorite('u1', 'a2'));
+    await animalRepo.saveLocal(makeAnimal('a2', 'Bidu'));
+
+    // Puxar a lista dispara o refetch (FlatList recebe prop onRefresh).
+    await fireEvent(screen.getByTestId('favorites-list'), 'refresh');
+
+    await waitFor(() => {
+      expect(screen.getByText('Bidu')).toBeTruthy();
+    });
+    expect(listSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('exibe skeleton enquanto carrega sem dados (melhoria #9)', async () => {
+    const favRepo = new FavoriteRepositoryFake();
+    // Consulta em andamento: loading persiste, lista vazia → skeleton.
+    (favRepo.listByUser as unknown as jest.Mock) = jest.fn().mockReturnValue(new Promise(() => {}));
+
+    const { getByTestId } = await render(
+      <FavoritesScreen
+        animalRepository={new AnimalRepositoryFake()}
+        favoriteRepository={favRepo}
+        currentUserId="u1"
+      />
+    );
+
+    expect(getByTestId('favorites-skeleton-row-1')).toBeTruthy();
+    expect(getByTestId('favorites-skeleton-row-3')).toBeTruthy();
+  });
 });

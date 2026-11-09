@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { Animal } from '../../domain/entities/Animal';
 import { AnimalFilterOptions, AnimalRepository } from '../../domain/ports/AnimalRepository';
@@ -16,6 +15,7 @@ import { SearchAnimalsUseCase } from '../../application/use-cases/SearchAnimalsU
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
 import { getActiveUserId } from '../sync/activeSession';
 import { onPullCompleted } from '../sync/pullEvents';
+import { ListSkeleton } from '../components/ListSkeleton';
 
 export interface SearchScreenProps {
   animalRepository: AnimalRepository;
@@ -59,6 +59,11 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
    * `performSearch` fresca do render, sem stale closure das dep de texto.
    */
   const [syncPulse, setSyncPulse] = useState(0);
+  /**
+   * Pull-to-refresh (melhoria #9): o próprio usuário dispara a nova consulta
+   * puxando a lista — `refreshing` controla o indicador nativo do RefreshControl.
+   */
+  const [refreshing, setRefreshing] = useState(false);
 
   const performSearch = async (onlineOverride?: boolean) => {
     setLoading(true);
@@ -127,6 +132,16 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
     // Refaz a busca também quando a conectividade muda (Fase 2: NetInfo real)
     // e quando o pull de sincronização traz anúncios novos (ordem 4).
   }, [selectedSpecies, selectedSize, selectedSex, radiusKm, isOnlineInitial, syncPulse]);
+
+  /** Pull-to-refresh: relê com os filtros atuais, sempre tentando online. */
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await performSearch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <View style={styles.container} testID="search-screen">
@@ -268,8 +283,12 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
         </TouchableOpacity>
       </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#0066cc" testID="loading-indicator" style={styles.loader} />
+      {/* Skeleton no carregamento SEM dados (melhoria #9): linhas pulsantes
+          em vez do spinner. Com dados na tela, a lista PERMANECE visível
+          durante a recarga — o feedback vem do RefreshControl (pull) ou do
+          banner. */}
+      {loading && animals.length === 0 ? (
+        <ListSkeleton rows={3} />
       ) : viewMode === 'map' ? (
         <AnimalMap animals={animals} onSelectAnimal={onSelectAnimal} />
       ) : (
@@ -277,6 +296,8 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
           data={animals}
           keyExtractor={(item) => item.id}
           testID="animals-list"
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
           ListEmptyComponent={
             <Text style={styles.emptyText} testID="empty-message">
               Nenhum animal encontrado para estes critérios.

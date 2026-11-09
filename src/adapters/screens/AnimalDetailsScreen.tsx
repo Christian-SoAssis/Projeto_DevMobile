@@ -1,23 +1,29 @@
+import { loadInterests } from '../../application/use-cases/LoadInterestsUseCase';
+import { notifyNotificationsChanged } from '../sync/notificationEvents';
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Share } from 'react-native';
 import { Animal } from '../../domain/entities/Animal';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { FavoriteRepository } from '../../domain/ports/FavoriteRepository';
 import { AdoptionInterestRepository } from '../../domain/ports/AdoptionInterestRepository';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
 import { InterestRemoteGateway, RemoteInterest } from '../../domain/ports/InterestRemoteGateway';
+import { InterestStatus } from '../../domain/value-objects/InterestStatus';
 import { ToggleFavoriteUseCase } from '../../application/use-cases/ToggleFavoriteUseCase';
 import { InterestContact, RegisterAdoptionInterestUseCase } from '../../application/use-cases/RegisterAdoptionInterestUseCase';
+import { UpdateInterestStatusUseCase } from '../../application/use-cases/UpdateInterestStatusUseCase';
 import { MarkAnimalAdoptedUseCase } from '../../application/use-cases/MarkAnimalAdoptedUseCase';
 import { GerarPdfUseCase } from '../../application/use-cases/GerarPdfUseCase';
 import { AnimalPhotoView } from '../components/AnimalPhotoView';
 import { PhotoCarousel } from '../components/PhotoCarousel';
 import { PhotoViewer } from '../components/PhotoViewer';
+import { InterestTrail, interestStatusLabel } from '../components/InterestTrail';
 import { FavoriteRepositoryFake } from '../../application/fakes/FavoriteRepositoryFake';
 import { AdoptionInterestRepositoryFake } from '../../application/fakes/AdoptionInterestRepositoryFake';
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
 import { UnitOfWork } from '../../application/ports/UnitOfWork';
 import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
+import { AdoptionInterest as InterestEntity } from '../../domain/entities/AdoptionInterest';
 
 export interface AnimalDetailsScreenProps {
   animal: Animal;
@@ -56,6 +62,9 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [received, setReceived] = useState<RemoteInterest[] | null>(null);
   const [receivedError, setReceivedError] = useState<string | null>(null);
+  // Trilha (decisão 18): lista consolidada de interessados + botão "N interesses".
+  const [interestsOpen, setInterestsOpen] = useState(false);
+  const [advancingId, setAdvancingId] = useState<string | null>(null);
   // Decisão 16: índice da foto aberta no visualizador (null = fechado).
   const [photoViewerIndex, setPhotoViewerIndex] = useState<number | null>(null);
 
@@ -84,12 +93,11 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   useEffect(() => {
     if (!isOwner || !remoteInterests) return;
     let active = true;
-    remoteInterests
-      .listForAnimal(animal.id)
+    loadInterests(interestRepository, remoteInterests, 'animal', animal.id, syncQueueRepository, () => { if (active) setReceivedError('Não foi possível carregar os interessados agora (sem conexão?).'); })
       .then((list) => {
         if (active) {
           setReceived(list);
-          setReceivedError(null);
+
         }
       })
       .catch(() => {
@@ -99,6 +107,113 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       active = false;
     };
   }, [animal.id, isOwner, remoteInterests]);
+  // Trilha (decisão 18): o dono também lê o LOCAL (demo/offline: interesses
+  // criados neste aparelho existem só aqui). O LOCAL vira por cima do remoto
+  // porque a ação dele é a fonte das mudanças de etapa mais recentes.
+  const [localInterests, setLocalInterests] = useState<InterestEntity[]>([]);
+  useEffect(() => {
+    if (!isOwner) return;
+    let active = true;
+    interestRepository
+      .listByAnimal(animal.id)
+      .then((list) => active && setLocalInterests(list))
+      .catch(() => active && setLocalInterests([]));
+    return () => {
+      active = false;
+    };
+  }, [animal.id, isOwner]);
+
+  const [ownerRows, setOwnerRows] = useState<RemoteInterest[]>([]);
+  useEffect(() => {
+    // Merge remoto+local por id: remoto traz nome/contato; local (com a etapa
+    // acabada de mudar pelas ações do próprio responsável) vence no status.
+    // `InterestStatus.from` interpreta legado (PENDING) e remotos.
+    const byId = new Map<string, RemoteInterest>();
+    for (const r of received ?? []) {
+      byId.set(r.id, { ...r, status: r.status ?? 'ENVIADA' });
+    }
+    for (const l of localInterests) {
+      byId.set(l.id, {
+        ...(byId.get(l.id) ?? {
+          id: l.id,
+          userId: l.userId,
+          animalId: l.animalId,
+          createdAt: l.createdAt,
+        }),
+        status: byId.get(l.id)?.status ?? l.status.value,
+      });
+    }
+    setOwnerRows(Array.from(byId.values()));
+  }, [localInterests, received]);
+
+  // Ação do responsável: avança para a próxima etapa da trilha (ou o botão
+  // fica oculto quando a etapa não avança mais — CONCLUÍDA/RECUSADA).
+  const handleAdvanceInterest = async (row: RemoteInterest) => {
+    const current = InterestStatus.from(row.status);
+    const next = current.nextInTrail();
+    if (!next) return;
+    setAdvancingId(row.id);
+    try {
+      await new UpdateInterestStatusUseCase(
+        interestRepository,
+        syncQueueRepository,
+        unitOfWork,
+        animalRepository
+      ).execute(new InterestEntity(row.id, row.userId, row.animalId, row.createdAt, current), next, currentUserId!);
+      setLocalInterests(
+        localInterests.some((l) => l.id === row.id)
+          ? localInterests.map((l) =>
+              l.id === row.id ? l.withStatus(next, new Date().toISOString()) : l
+            )
+          : [
+              ...localInterests,
+              new InterestEntity(row.id, row.userId, row.animalId, row.createdAt).withStatus(
+                next,
+                new Date().toISOString()
+              ),
+            ]
+      );
+      notifyNotificationsChanged();
+      setReceived(rows => rows?.map(r => r.id === row.id ? { ...r, status: next.value } : r) ?? null);
+      setFeedback(`Etapa avançada: ${interestStatusLabel(next)}`);
+    } catch (err: any) {
+      setFeedback(err.message || 'Não foi possível atualizar a etapa.');
+    } finally {
+      setAdvancingId(null);
+    }
+  };
+
+  const handleRefuseInterest = async (row: RemoteInterest) => {
+    setAdvancingId(row.id);
+    try {
+      await new UpdateInterestStatusUseCase(
+        interestRepository,
+        syncQueueRepository,
+        unitOfWork,
+        animalRepository
+      ).execute(new InterestEntity(row.id, row.userId, row.animalId, row.createdAt, InterestStatus.from(row.status)), InterestStatus.recusada(), currentUserId!);
+      setLocalInterests(
+        localInterests.some((l) => l.id === row.id)
+          ? localInterests.map((l) =>
+              l.id === row.id ? l.withStatus(InterestStatus.recusada(), new Date().toISOString()) : l
+            )
+          : [
+              ...localInterests,
+              new InterestEntity(row.id, row.userId, row.animalId, row.createdAt).withStatus(
+                InterestStatus.recusada(),
+                new Date().toISOString()
+              ),
+            ]
+      );
+      notifyNotificationsChanged();
+      setReceived(rows => rows?.map(r => r.id === row.id ? { ...r, status: 'RECUSADA' } : r) ?? null);
+      setFeedback('Manifestação recusada.');
+    } catch (err: any) {
+      setFeedback(err.message || 'Não foi possível recusar a manifestação.');
+    } finally {
+      setAdvancingId(null);
+    }
+  };
 
   const handleToggleFavorite = async () => {
     if (!currentUserId) {
@@ -158,6 +273,26 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       setFeedback(`PDF gerado com sucesso (${pdf.pdfBase64.substring(0, 30)}...)`);
     } catch (err: any) {
       setFeedback(err.message);
+    }
+  };
+
+  // Compartilhar (melhoria #6): Share API nativa do RN — texto resumo com o
+  // essencial do anúncio + nome do app. Sem deep link/URL inventado: o link
+  // real do app entra quando existir store/scheme publicados (decisão de
+  // produto registrada em nextsteps §4).
+  const handleShare = async () => {
+    try {
+      const status = animal.status.isAvailable() ? 'Disponível para adoção!' : 'Já encontrou um lar 🎉';
+      const message = [
+        `${animal.name} — ${status}`,
+        `${animal.characteristics.species} · Porte ${animal.characteristics.size} · ${animal.characteristics.approximateAge} · ${animal.characteristics.sex}`,
+        `📍 ${animal.location.formatDisplayLocation()}`,
+        '',
+        'Conheça este e outros anúncios no Enlace — rede de adoção de animais.',
+      ].join('\n');
+      await Share.share({ title: `Enlace — ${animal.name}`, message });
+    } catch (err: any) {
+      setFeedback(err.message || 'Não foi possível compartilhar agora.');
     }
   };
 
@@ -267,27 +402,78 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
           </TouchableOpacity>
         )}
 
-        {isOwner && remoteInterests && (
-          <View style={styles.interestsBox} testID="received-interests">
-            <Text style={styles.interestsTitle}>
-              Interessados{received ? ` (${received.length})` : ''}
+        {/* Trilha de adoção (decisão 18): o botão "N interesses" abre a lista
+            com o contato do interessado, a trilha de 4 etapas e as ações de
+            avanço/recusa no contexto do anúncio. */}
+        {isOwner && (
+          <TouchableOpacity
+            style={[styles.btn, styles.btnSecondary]}
+            onPress={() => setInterestsOpen((open) => !open)}
+            testID="interests-toggle"
+          >
+            <Text style={styles.btnText}>
+              {ownerRows.length > 0
+                ? `${ownerRows.length} interesses`
+                : '0 interesses'}
             </Text>
+          </TouchableOpacity>
+        )}
+
+        {isOwner && interestsOpen && (
+          <View style={styles.interestsBox} testID="received-interests">
             {receivedError && <Text style={styles.interestsEmpty} testID="received-interests-error">{receivedError}</Text>}
-            {received && received.length === 0 && (
+            {ownerRows.length === 0 && !receivedError && (
               <Text style={styles.interestsEmpty} testID="received-interests-empty">
                 Ninguém demonstrou interesse ainda.
               </Text>
             )}
-            {(received ?? []).map((item) => (
-              <View key={item.id} style={styles.interestCard} testID={`received-interest-${item.id}`}>
-                <Text style={styles.interestName}>{item.contactName || 'Interessado'}</Text>
-                {item.contactPhone ? <Text style={styles.interestLine}>Telefone: {item.contactPhone}</Text> : null}
-                {item.contactEmail ? <Text style={styles.interestLine}>E-mail: {item.contactEmail}</Text> : null}
-                {item.message ? <Text style={styles.interestLine}>{item.message}</Text> : null}
-              </View>
-            ))}
+            {ownerRows.map((row) => {
+              const status = InterestStatus.from(row.status);
+              const next = status.nextInTrail();
+              return (
+                <View key={row.id} style={styles.interestCard} testID={`received-interest-${row.id}`}>
+                  <Text style={styles.interestName}>{row.contactName || 'Interessado'}</Text>
+                  {row.contactPhone ? <Text style={styles.interestLine}>Telefone: {row.contactPhone}</Text> : null}
+                  {row.contactEmail ? <Text style={styles.interestLine}>E-mail: {row.contactEmail}</Text> : null}
+                  {row.message ? <Text style={styles.interestLine}>{row.message}</Text> : null}
+                  <InterestTrail status={status} testID={`interest-trail-${row.id}`} />
+                  {(next || (status.stepIndex() <= 1 && !status.isRecusada())) && (
+                    <View style={styles.interestActions}>
+                      {next && (
+                        <TouchableOpacity
+                          style={[styles.interestActionBtn, styles.interestAdvance]}
+                          disabled={advancingId === row.id}
+                          onPress={() => handleAdvanceInterest(row)}
+                          testID={`interest-advance-${row.id}`}
+                        >
+                          <Text style={styles.interestActionText}>
+                            {advancingId === row.id ? '…' : `Avançar: ${interestStatusLabel(next)}`}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      {status.stepIndex() <= 1 && !status.isRecusada() && (
+                        <TouchableOpacity
+                          style={[styles.interestActionBtn, styles.interestRefuse]}
+                          disabled={advancingId === row.id}
+                          onPress={() => handleRefuseInterest(row)}
+                          testID={`interest-refuse-${row.id}`}
+                        >
+                          <Text style={[styles.interestActionText, styles.interestRefuseText]}>
+                            Recusar
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </View>
         )}
+
+        <TouchableOpacity style={[styles.btn, styles.btnSecondary]} onPress={handleShare} testID="share-animal-button">
+          <Text style={styles.btnText}>📤 Compartilhar Anúncio</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity style={[styles.btn, styles.btnSecondary]} onPress={handleExportPdf} testID="export-pdf-button">
           <Text style={styles.btnText}>📄 Gerar PDF do Anúncio</Text>
@@ -308,6 +494,18 @@ const styles = StyleSheet.create({
   interestCard: { backgroundColor: '#fff', borderRadius: 8, padding: 12, marginBottom: 8 },
   interestName: { fontWeight: 'bold', color: '#1c1c1e', marginBottom: 2 },
   interestLine: { color: '#48484a', fontSize: 14 },
+  interestActions: { flexDirection: 'row', marginTop: 8 },
+  interestActionBtn: {
+    flex: 1,
+    borderRadius: 6,
+    paddingVertical: 8,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  interestAdvance: { backgroundColor: '#0066cc' },
+  interestRefuse: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#c62828', marginRight: 0 },
+  interestActionText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  interestRefuseText: { color: '#c62828' },
   container: {
     flex: 1,
     flexDirection: 'column',

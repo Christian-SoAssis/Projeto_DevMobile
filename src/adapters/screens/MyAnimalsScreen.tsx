@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { Animal } from '../../domain/entities/Animal';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
@@ -15,6 +14,7 @@ import { MarkAnimalAdoptedUseCase } from '../../application/use-cases/MarkAnimal
 import { SyncQueueRepositoryFake } from '../../application/fakes/SyncQueueRepositoryFake';
 import { UnitOfWork } from '../../application/ports/UnitOfWork';
 import { NoopUnitOfWork } from '../../application/fakes/NoopUnitOfWork';
+import { ListSkeleton } from '../components/ListSkeleton';
 
 export interface MyAnimalsScreenProps {
   animalRepository: AnimalRepository;
@@ -98,6 +98,17 @@ export const MyAnimalsScreen: React.FC<MyAnimalsScreenProps> = ({
     }
   };
 
+  // Pull-to-refresh (melhoria #9): relê anúncios sob ação do usuário.
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadAnimals();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <View style={styles.container} testID="my-animals-screen">
       {onBack && (
@@ -122,13 +133,17 @@ export const MyAnimalsScreen: React.FC<MyAnimalsScreenProps> = ({
           <Text style={styles.feedbackText}>{feedback}</Text>
         </View>
       )}
-      {loading ? (
-        <ActivityIndicator size="large" color="#0066cc" testID="my-animals-loading" />
+      {/* Skeleton apenas no carregamento inicial SEM dados (melhoria #9);
+          com dados, a lista fica visível e o refresh indica via RefreshControl. */}
+      {loading && animals.length === 0 ? (
+        <ListSkeleton rows={3} testID="my-animals-skeleton" />
       ) : (
         <FlatList
           data={animals}
           keyExtractor={(item) => item.id}
           testID="my-animals-list"
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
           ListEmptyComponent={
             <Text style={styles.emptyText} testID="empty-my-animals">
               Você ainda não publicou nenhum anúncio.

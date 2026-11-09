@@ -262,6 +262,9 @@ class FakeFilter<TRow extends object> implements SupabaseFilter<TRow> {
     };
     const canWriteRow = (row: FakeRow): boolean => {
       if (isPhotoRow) return ctx.isAdmin || ownsAnimal(row.animal_id);
+      // Trilha (decisão 18): o responsável do anúncio atualiza a etapa
+      // (policy interests_animal_owner_update no servidor).
+      if (table === 'adoption_interests' && op === 'update') return ownsAnimal(row.animal_id);
       if (isUserRow) return ctx.currentUserId !== null && row.id === ctx.currentUserId;
       if (ctx.isAdmin) return true;
       if (ctx.currentUserId === null) return false;

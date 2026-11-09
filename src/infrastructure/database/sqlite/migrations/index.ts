@@ -7,7 +7,7 @@ import { INITIAL_SCHEMA_SQL } from './schema.sql';
  * A migração 001 é o schema inicial da Fase 2. Ela usa `IF NOT EXISTS` para
  * também ser segura em bancos criados antes do controle de versão existir.
  */
-export const LATEST_SCHEMA_VERSION = 3;
+export const LATEST_SCHEMA_VERSION = 4;
 
 interface UserVersionRow {
   user_version: number;
@@ -54,6 +54,39 @@ const MIGRATIONS: Migration[] = [
       const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(sync_state)');
       if (!cols.some((c) => c.name === 'cursor')) {
         await db.execAsync(`ALTER TABLE sync_state ADD COLUMN cursor TEXT;`);
+      }
+    },
+  },
+  {
+    // Decisão 18 (trilha de adoção): `adoption_interests.updated_at` marca a
+    // última mudança de etapa. Decisão 20 (central in-app): tabela `app_state`
+    // persiste pares chave/valor (ex.: notifications_last_seen) entre aberturas.
+    version: 4,
+    up: async (db) => {
+      await db.execAsync(
+        `CREATE TABLE IF NOT EXISTS app_state (
+           key TEXT PRIMARY KEY NOT NULL,
+           value TEXT,
+           updated_at TEXT NOT NULL
+         );`
+      );
+      // Defensivo: bancos parciais (ex.: criados antes de adoption_interests
+      // existir) ganham a tabela inteira já com a forma moderna.
+      await db.execAsync(
+        `CREATE TABLE IF NOT EXISTS adoption_interests (
+           id TEXT PRIMARY KEY NOT NULL,
+           user_id TEXT NOT NULL,
+           animal_id TEXT NOT NULL,
+           message TEXT,
+           contact_phone TEXT,
+           status TEXT NOT NULL DEFAULT 'PENDING',
+           created_at TEXT NOT NULL,
+           UNIQUE(user_id, animal_id)
+         );`
+      );
+      const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(adoption_interests)');
+      if (!cols.some((c) => c.name === 'updated_at')) {
+        await db.execAsync(`ALTER TABLE adoption_interests ADD COLUMN updated_at TEXT;`);
       }
     },
   },

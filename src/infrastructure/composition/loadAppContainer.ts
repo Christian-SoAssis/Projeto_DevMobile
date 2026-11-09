@@ -28,6 +28,8 @@ import { SqlitePhotoStorage } from '../database/sqlite/repositories/SqlitePhotoS
 import { SqliteUserRepository } from '../database/sqlite/repositories/SqliteUserRepository';
 import { SqliteSearchPreferencesRepository } from '../database/sqlite/repositories/SqliteSearchPreferencesRepository';
 import { SqliteSyncMetadataRepository } from '../database/sqlite/repositories/SqliteSyncMetadataRepository';
+import { SqliteAppStateRepository } from '../database/sqlite/repositories/SqliteAppStateRepository';
+import { AppStateRepository } from '../../domain/ports/AppStateRepository';
 import { ImagePickerCameraAdapter } from '../device/camera/ImagePickerCameraAdapter';
 import { ExpoLocationAdapter } from '../device/location/LocationAdapter';
 import { loadSupabaseClient } from '../supabase/client';
@@ -60,6 +62,8 @@ export interface AppContainer {
   userRepository: UserRepository;
   searchPreferencesRepository: SearchPreferencesRepository;
   syncMetadataRepository: SyncMetadataRepository;
+  /** Decisão 20: chave/valor persistido no aparelho (badge de notificações). */
+  appStateRepository: AppStateRepository;
   unitOfWork: UnitOfWork;
   /** Gateways de hardware (passo da geolocalização/fotos real). */
   cameraGateway: CameraGateway;
@@ -131,6 +135,9 @@ export async function loadAppContainer(
   const userRepository = new SqliteUserRepository(db);
   const searchPreferencesRepository = new SqliteSearchPreferencesRepository(db);
   const syncMetadataRepository = new SqliteSyncMetadataRepository(db);
+  // Central de notificações (decisão 20): pares chave/valor persistidos
+  // (ex. notifications_last_seen) sobrevivem a reinícios do app.
+  const appStateRepository: AppStateRepository = new SqliteAppStateRepository(db);
   const unitOfWork = new SqliteUnitOfWork(db);
 
   let authGateway: AuthGateway | undefined;
@@ -181,6 +188,7 @@ export async function loadAppContainer(
     userRepository,
     searchPreferencesRepository,
     syncMetadataRepository,
+    appStateRepository,
     unitOfWork,
     cameraGateway,
     locationGateway,

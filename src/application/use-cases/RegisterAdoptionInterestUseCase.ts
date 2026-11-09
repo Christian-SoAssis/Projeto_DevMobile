@@ -48,6 +48,8 @@ export class RegisterAdoptionInterestUseCase {
               contactName: contact.name,
               contactEmail: contact.email,
               contactPhone: contact.phone,
+              // Decisão 18: trilha começa em ENVIADA no servidor também.
+              status: interest.status.value,
               createdAt: interest.createdAt,
             },
           })

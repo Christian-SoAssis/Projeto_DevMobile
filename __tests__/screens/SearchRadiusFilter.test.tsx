@@ -52,10 +52,12 @@ describe('SearchScreen — filtro por distância (RF04)', () => {
       await render(<SearchScreen animalRepository={animalRepository} locationGateway={grantedGateway() as any} />);
 
     await waitFor(() => expect(queryByTestId('animal-card-perto')).toBeTruthy());
-    fireEvent.press(getByTestId('filter-radius-5'));
+    await fireEvent.press(getByTestId('filter-radius-5'));
 
     await waitFor(() => expect(queryByTestId('animal-card-perto')).toBeTruthy());
-    expect(queryByTestId('animal-card-longe')).toBeNull();
+    // A lista permanece visível durante a recarga (melhoria #9); aguarda a
+    // SAÍDA do anúncio fora do raio, que só acontece quando o filtro aplica.
+    await waitFor(() => expect(queryByTestId('animal-card-longe')).toBeNull());
     expect(queryByTestId('radius-feedback')).toBeNull();
   });
 
@@ -69,10 +71,10 @@ describe('SearchScreen — filtro por distância (RF04)', () => {
     );
 
     await waitFor(() => expect(queryByTestId('animal-card-perto')).toBeTruthy());
-    fireEvent.press(getByTestId('filter-radius-5'));
+    await fireEvent.press(getByTestId('filter-radius-5'));
     await waitFor(() => expect(queryByTestId('animal-card-longe')).toBeNull());
 
-    fireEvent.press(getByTestId('filter-radius-0'));
+    await fireEvent.press(getByTestId('filter-radius-0'));
     await waitFor(() => expect(queryByTestId('animal-card-longe')).toBeTruthy());
     expect(queryByTestId('animal-card-perto')).toBeTruthy();
   });
@@ -90,7 +92,7 @@ describe('SearchScreen — filtro por distância (RF04)', () => {
     );
 
     await waitFor(() => expect(queryByTestId('animal-card-perto')).toBeTruthy());
-    fireEvent.press(getByTestId('filter-radius-5'));
+    await fireEvent.press(getByTestId('filter-radius-5'));
 
     await waitFor(() => expect(getByTestId('radius-feedback').props.children).toContain('pesquise por outra região'));
     await waitFor(() => expect(queryByTestId('animal-card-perto')).toBeTruthy());
@@ -107,7 +109,7 @@ describe('SearchScreen — filtro por distância (RF04)', () => {
     );
 
     await waitFor(() => expect(queryByTestId('animal-card-perto')).toBeTruthy());
-    fireEvent.press(getByTestId('filter-radius-10'));
+    await fireEvent.press(getByTestId('filter-radius-10'));
 
     await waitFor(() => expect(getByTestId('radius-feedback').props.children).toContain('pesquise por outra região'));
     await waitFor(() => expect(queryByTestId('animal-card-perto')).toBeTruthy());

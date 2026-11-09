@@ -1,3 +1,4 @@
+import { notifyNotificationsChanged } from '../sync/notificationEvents';
 import { useCallback } from 'react';
 import { AppContainer } from '../../infrastructure/composition/loadAppContainer';
 import { useRepositories } from '../context/RepositoriesContext';
@@ -24,6 +25,7 @@ class PullNotifyingFullSync extends RunFullSyncUseCase {
   async execute(): Promise<FullSyncResult> {
     const result = await super.execute();
     if (result.pull) notifyPullCompleted();
+    else notifyNotificationsChanged();
     return result;
   }
 }

@@ -5,11 +5,11 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { Animal } from '../../domain/entities/Animal';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
 import { FavoriteRepository } from '../../domain/ports/FavoriteRepository';
+import { ListSkeleton } from '../components/ListSkeleton';
 
 export interface FavoritesScreenProps {
   animalRepository: AnimalRepository;
@@ -48,6 +48,17 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
     loadFavorites();
   }, [loadFavorites]);
 
+  // Pull-to-refresh (melhoria #9): relê favoritos sob ação do usuário.
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadFavorites();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <View style={styles.container} testID="favorites-screen">
       {onBack && (
@@ -58,13 +69,17 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
       <Text style={styles.title} testID="favorites-title">
         Meus Favoritos ({animals.length})
       </Text>
-      {loading ? (
-        <ActivityIndicator size="large" color="#0066cc" testID="favorites-loading" />
+      {/* Skeleton apenas no carregamento inicial SEM dados (melhoria #9);
+          com dados, a lista fica visível e o refresh indica via RefreshControl. */}
+      {loading && animals.length === 0 ? (
+        <ListSkeleton rows={3} testID="favorites-skeleton" />
       ) : (
         <FlatList
           data={animals}
           keyExtractor={(item) => item.id}
           testID="favorites-list"
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
           ListEmptyComponent={
             <Text style={styles.emptyText} testID="empty-favorites">
               Você ainda não favoritou nenhum anúncio.

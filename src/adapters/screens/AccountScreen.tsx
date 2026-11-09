@@ -1,3 +1,5 @@
+import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
+import { loadInterests } from '../../application/use-cases/LoadInterestsUseCase';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -11,14 +13,21 @@ import {
 } from 'react-native';
 import { User } from '../../domain/entities/User';
 import { CameraGateway } from '../../domain/ports/CameraGateway';
+import { AnimalRepository } from '../../domain/ports/AnimalRepository';
+import { AdoptionInterestRepository } from '../../domain/ports/AdoptionInterestRepository';
+import { InterestRemoteGateway } from '../../domain/ports/InterestRemoteGateway';
+import { InterestStatus } from '../../domain/value-objects/InterestStatus';
 import { ROLE_LABELS, canAccess } from '../../domain/services/AccessPolicy';
 import {
   MAX_BIO_LENGTH,
   PROFILE_INTERESTS,
   ProfilePatch,
 } from '../../domain/value-objects/UserProfile';
+import { InterestTrail, interestStatusLabel } from '../components/InterestTrail';
 
 export interface AccountScreenProps {
+  refreshToken?: number;
+  syncQueueRepository?: SyncQueueRepository;
   user: User | null;
   isLoading?: boolean;
   cameraGateway?: CameraGateway;
@@ -27,6 +36,11 @@ export interface AccountScreenProps {
   onLogout?: () => void | Promise<void>;
   /** Salva o perfil; `syncedRemotely: false` = ficou só no aparelho. */
   onSaveProfile?: (patch: ProfilePatch) => Promise<{ user: User; syncedRemotely: boolean }>;
+  /** Trilha de adoção (decisão 18): manifestações do próprio usuário. */
+  interestRepository?: AdoptionInterestRepository;
+  animalRepository?: AnimalRepository;
+  /** Etapas vindas do SERVIDOR cobrem o local quando mais novas (recusa/avanço). */
+  remoteInterests?: InterestRemoteGateway;
 }
 
 const Avatar: React.FC<{ user: User; uri?: string | null }> = ({ user, uri }) =>
@@ -39,6 +53,8 @@ const Avatar: React.FC<{ user: User; uri?: string | null }> = ({ user, uri }) =>
   );
 
 export const AccountScreen: React.FC<AccountScreenProps> = ({
+  refreshToken = 0,
+  syncQueueRepository,
   user,
   isLoading = false,
   cameraGateway,
@@ -46,6 +62,9 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
   onRegister,
   onLogout,
   onSaveProfile,
+  interestRepository,
+  animalRepository,
+  remoteInterests,
 }) => {
   const [name, setName] = useState(user?.name ?? '');
   const [phone, setPhone] = useState(user?.contactInfo.phone ?? '');
@@ -54,6 +73,44 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
   const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatarUri ?? user?.avatarUrl ?? null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Trilha de adoção (decisão 18): "Minhas manifestações" — etapa local
+  // combinada com o estado do servidor (quando configurado).
+  const [myInterests, setMyInterests] = useState<
+    Array<{ id: string; animalId: string; createdAt: string; status: InterestStatus; animalName: string | null }>
+  >([]);
+  useEffect(() => {
+    if (!user || !interestRepository) return;
+    let active = true;
+    async function load() {
+      const list = await loadInterests(interestRepository!, remoteInterests, 'user', user!.id, syncQueueRepository);
+      const rows: Array<{
+        id: string;
+        animalId: string;
+        createdAt: string;
+        status: InterestStatus;
+        animalName: string | null;
+      }> = [];
+      for (const interest of list) {
+        // Servidor vence quando tem a linha: a recusa/avanço é decisão do
+        // responsável e o local pode estar defasado.
+        const status = InterestStatus.from(interest.status);
+        const animal = animalRepository ? await animalRepository.findById(interest.animalId).catch(() => null) : null;
+        rows.push({
+          id: interest.id,
+          animalId: interest.animalId,
+          createdAt: interest.createdAt ?? '',
+          status,
+          animalName: animal?.name ?? null,
+        });
+      }
+      if (active) setMyInterests(rows);
+    }
+    load().catch(() => { if (active) setMyInterests([]); });
+    return () => {
+      active = false;
+    };
+  }, [user?.id, interestRepository, animalRepository, remoteInterests, refreshToken, syncQueueRepository]);
 
   // Troca de conta: o rascunho acompanha o usuário atual.
   useEffect(() => {
@@ -232,6 +289,33 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
         <Text style={styles.primaryText}>{saving ? 'Salvando...' : 'Salvar alterações'}</Text>
       </TouchableOpacity>
 
+      {user && interestRepository && (
+        <>
+          <Text style={[styles.section, styles.sectionSpaced]}>Minhas manifestações</Text>
+          {myInterests.length === 0 && (
+            <Text style={styles.ability} testID="my-interests-empty">
+              Você ainda não demonstrou interesse em nenhum anúncio.
+            </Text>
+          )}
+          {myInterests.map((item) => (
+            <View key={item.id} style={styles.interestCard} testID={`my-interest-${item.id}`}>
+              <Text style={styles.myInterestName} testID={`my-interest-name-${item.id}`}>
+                {item.animalName ?? 'Anúncio não disponível'}
+              </Text>
+              <View style={styles.myInterestStatus}>
+                <Text
+                  style={styles.myInterestStatusText}
+                  testID={`my-interest-status-${item.id}`}
+                >
+                  {interestStatusLabel(item.status)}
+                </Text>
+              </View>
+              <InterestTrail status={item.status} testID={`my-interest-trail-${item.id}`} />
+            </View>
+          ))}
+        </>
+      )}
+
       <Text style={[styles.section, styles.sectionSpaced]}>O que você pode fazer</Text>
       {abilities.map(([label, allowed]) => (
         <Text key={label} style={[styles.ability, !allowed && styles.abilityOff]}>
@@ -295,6 +379,17 @@ const styles = StyleSheet.create({
   },
   smallBtnText: { color: '#0066cc', fontWeight: 'bold', fontSize: 13 },
   chips: { flexDirection: 'row', flexWrap: 'wrap' },
+  interestCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderColor: '#e5e5ea',
+    borderWidth: 1,
+  },
+  myInterestName: { fontWeight: 'bold', color: '#1c1c1e', marginBottom: 2 },
+  myInterestStatus: { alignSelf: 'flex-start', backgroundColor: '#eef4ff', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 4 },
+  myInterestStatusText: { color: '#0066cc', fontWeight: 'bold', fontSize: 12 },
   chip: {
     borderColor: '#c7c7cc',
     borderWidth: 1,

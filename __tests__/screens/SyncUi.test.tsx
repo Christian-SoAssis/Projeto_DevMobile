@@ -8,6 +8,7 @@ import { SyncAction } from '../../src/domain/entities/SyncAction';
 import { ConflictResolutionService } from '../../src/domain/services/ConflictResolutionService';
 import { ConflictView, ResolveSyncConflictUseCase } from '../../src/application/use-cases/ResolveSyncConflictUseCase';
 import { SyncQueueRepositoryFake } from '../../src/application/fakes/SyncQueueRepositoryFake';
+import { AdoptionInterestRepositoryFake } from '../../src/application/fakes/AdoptionInterestRepositoryFake';
 import { AnimalRepositoryFake } from '../../src/application/fakes/AnimalRepositoryFake';
 import { ConnectivityGateway } from '../../src/domain/ports/ConnectivityGateway';
 import { InterestRemoteGateway } from '../../src/domain/ports/InterestRemoteGateway';
@@ -202,39 +203,91 @@ describe('useAutoSync — uma vez por ciclo de reconexão', () => {
 
 describe('AnimalDetailsScreen — interessados recebidos (responsável)', () => {
   const animal = makeAnimal({ ownerId: 'user_1' });
-  const baseProps = { animal, animalRepository: new AnimalRepositoryFake() };
+  const baseProps = { animal, animalRepository: new AnimalRepositoryFake([animal]) };
 
-  it('responsável vê nome, telefone e e-mail de quem demonstrou interesse', async () => {
-    const remoteInterests: InterestRemoteGateway = {
+  const remoteStub = () =>
+    ({
       createRemote: jest.fn(),
-      listForAnimal: jest.fn().mockResolvedValue([
-        { id: 'i1', userId: 'u2', animalId: 'animal_1', contactName: 'Bia', contactPhone: '35999', contactEmail: 'bia@x.com', message: 'Adoro!' },
-      ]),
-    };
-    const { findByTestId, getByText } = await render(
+      listForAnimal: jest.fn().mockResolvedValue([]),
+      listForUser: jest.fn().mockResolvedValue([]),
+      updateStatusRemote: jest.fn(),
+    }) as unknown as InterestRemoteGateway;
+
+  it('botão "1 interesse" abre a lista: nome, contato, trilha e ações (decisão 18)', async () => {
+    const remoteInterests = remoteStub();
+    (remoteInterests.listForAnimal as jest.Mock).mockResolvedValue([
+      { id: 'i1', userId: 'u2', animalId: 'animal_1', contactName: 'Bia', contactPhone: '35999', contactEmail: 'bia@x.com', message: 'Adoro!', status: 'ENVIADA' },
+    ]);
+    const { findByTestId, getByTestId, getByText, queryByTestId } = await render(
       <AnimalDetailsScreen {...baseProps} currentUserId="user_1" remoteInterests={remoteInterests} />
     );
+
+    // Fechado por padrão: só o botão com a contagem.
+    expect(await findByTestId('interests-toggle')).toBeTruthy();
+    expect(queryByTestId('received-interest-i1')).toBeNull();
+
+    await fireEvent.press(getByTestId('interests-toggle'));
     expect(await findByTestId('received-interest-i1')).toBeTruthy();
     expect(getByText('Bia')).toBeTruthy();
     expect(getByText('Telefone: 35999')).toBeTruthy();
     expect(getByText('E-mail: bia@x.com')).toBeTruthy();
-    expect(getByText('Interessados (1)')).toBeTruthy();
+    // Trilha 4 etapas; ENVIADA = 1º passo marcado.
+    expect(getByTestId('interest-trail-i1-dot-1')).toBeTruthy();
+    expect(getByTestId('interest-trail-i1-dot-4')).toBeTruthy();
+    // Ações no contexto: avança para a próxima etapa + recusa permitida.
+    expect(getByTestId('interest-advance-i1')).toBeTruthy();
+    expect(getByTestId('interest-refuse-i1')).toBeTruthy();
   });
 
-  it('lista vazia e falha de rede têm mensagens próprias; não-dono não consulta', async () => {
-    const empty: InterestRemoteGateway = { createRemote: jest.fn(), listForAnimal: jest.fn().mockResolvedValue([]) };
+  it('Avançar executa o caso de uso com a PRÓXIMA etapa e feedback mostra o novo estado', async () => {
+    const remoteInterests = remoteStub();
+    (remoteInterests.listForAnimal as jest.Mock).mockResolvedValue([
+      { id: 'i1', userId: 'u2', animalId: 'animal_1', contactName: 'Bia', status: 'EM_ANALISE' },
+    ]);
+    const interestRepo = new AdoptionInterestRepositoryFake();
+    const queue = new SyncQueueRepositoryFake();
+
+    const { findByTestId, getByTestId, getByText } = await render(
+      <AnimalDetailsScreen
+        {...baseProps}
+        currentUserId="user_1"
+        remoteInterests={remoteInterests}
+        interestRepository={interestRepo}
+        syncQueueRepository={queue}
+      />
+    );
+
+    await findByTestId('interests-toggle');
+    await fireEvent.press(getByTestId('interests-toggle'));
+    await fireEvent.press(getByTestId('interest-advance-i1'));
+
+    await waitFor(() => {
+      expect(getByText('Etapa avançada: Visita combinada')).toBeTruthy();
+    });
+    // Fila recebeu o UPDATE da trilha (local-first + offline).
+    const pending = await queue.listPending();
+    expect(pending[0].operation).toBe('UPDATE');
+    expect(pending[0].payload.status).toBe('VISITA_COMBINADA');
+  });
+
+  it('lista vazia e falha de rede têm mensagens próprias; não-dono não consulta nem vê o botão', async () => {
+    const empty: InterestRemoteGateway = remoteStub();
     const a = await render(<AnimalDetailsScreen {...baseProps} currentUserId="user_1" remoteInterests={empty} />);
+    await fireEvent.press(a.getByTestId('interests-toggle'));
     expect(await a.findByTestId('received-interests-empty')).toBeTruthy();
-    a.unmount();
+    await a.unmount();
 
-    const failing: InterestRemoteGateway = { createRemote: jest.fn(), listForAnimal: jest.fn().mockRejectedValue(new Error('x')) };
+    const failing = remoteStub();
+    (failing.listForAnimal as jest.Mock).mockRejectedValue(new Error('x'));
     const b = await render(<AnimalDetailsScreen {...baseProps} currentUserId="user_1" remoteInterests={failing} />);
+    await fireEvent.press(b.getByTestId('interests-toggle'));
     expect(await b.findByTestId('received-interests-error')).toBeTruthy();
-    b.unmount();
+    await b.unmount();
 
-    const spy: InterestRemoteGateway = { createRemote: jest.fn(), listForAnimal: jest.fn().mockResolvedValue([]) };
+    const spy: InterestRemoteGateway = remoteStub();
     const c = await render(<AnimalDetailsScreen {...baseProps} currentUserId="outra_pessoa" remoteInterests={spy} />);
     expect(c.queryByTestId('received-interests')).toBeNull();
+    expect(c.queryByTestId('interests-toggle')).toBeNull();
     expect(spy.listForAnimal).not.toHaveBeenCalled();
   });
 });

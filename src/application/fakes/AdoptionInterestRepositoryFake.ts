@@ -1,4 +1,5 @@
 import { AdoptionInterest } from '../../domain/entities/AdoptionInterest';
+import { InterestStatus } from '../../domain/value-objects/InterestStatus';
 import { AdoptionInterestRepository } from '../../domain/ports/AdoptionInterestRepository';
 
 export class AdoptionInterestRepositoryFake implements AdoptionInterestRepository {
@@ -21,5 +22,11 @@ export class AdoptionInterestRepositoryFake implements AdoptionInterestRepositor
 
   async hasInterest(userId: string, animalId: string): Promise<boolean> {
     return this.interests.some((i) => i.userId === userId && i.animalId === animalId);
+  }
+
+  async updateStatus(interestId: string, status: InterestStatus, updatedAt: string): Promise<void> {
+    const index = this.interests.findIndex((i) => i.id === interestId);
+    if (index === -1) return; // linha só no servidor: no-op (a intenção viaja na fila).
+    this.interests[index] = this.interests[index].withStatus(status, updatedAt);
   }
 }

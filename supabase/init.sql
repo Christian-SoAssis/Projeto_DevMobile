@@ -216,10 +216,18 @@ create policy photos_delete_owner on public.animal_photos
 -- adoption_interests: contato do interessado, visível ao responsável pelo anúncio.
 alter table public.adoption_interests add column if not exists contact_name text;
 alter table public.adoption_interests add column if not exists contact_email text;
+-- Trilha de adoção (decisão 18): quando a etapa mudou por último.
+alter table public.adoption_interests add column if not exists updated_at timestamptz;
 
 drop policy if exists interests_animal_owner_read on public.adoption_interests;
 create policy interests_animal_owner_read on public.adoption_interests
   for select using (public.is_animal_owner(animal_id));
+
+-- Trilha (decisão 18): o responsável pelo ANÚNCIO avança/recusa a etapa
+-- (ENVIADA → EM ANÁLISE → VISITA COMBINADA → CONCLUÍDA; RECUSADA = folha).
+drop policy if exists interests_animal_owner_update on public.adoption_interests;
+create policy interests_animal_owner_update on public.adoption_interests
+  for update using (public.is_animal_owner(animal_id));
 
 -- favorites: 100% privados (§15.1 — "favoritos e interesses protegidos")
 drop policy if exists favorites_owner_all on public.favorites;
@@ -228,8 +236,34 @@ create policy favorites_owner_all on public.favorites
 
 -- adoption_interests: 100% privados (§15.1)
 drop policy if exists interests_owner_all on public.adoption_interests;
-create policy interests_owner_all on public.adoption_interests
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists interests_own_read on public.adoption_interests;
+create policy interests_own_read on public.adoption_interests for select using (user_id = auth.uid());
+drop policy if exists interests_own_insert on public.adoption_interests;
+create policy interests_own_insert on public.adoption_interests for insert with check (user_id = auth.uid() and status in ('PENDING', 'ENVIADA'));
+drop policy if exists interests_own_delete on public.adoption_interests;
+create policy interests_own_delete on public.adoption_interests for delete using (user_id = auth.uid());
+
+create or replace function public.protect_interest_stage() returns trigger
+language plpgsql set search_path = public as $$
+declare previous text;
+begin
+  if new.id is distinct from old.id or new.user_id is distinct from old.user_id or new.animal_id is distinct from old.animal_id
+     or new.created_at is distinct from old.created_at or new.contact_name is distinct from old.contact_name
+     or new.contact_email is distinct from old.contact_email or new.contact_phone is distinct from old.contact_phone
+     or new.message is distinct from old.message then
+    raise exception 'Identidade e contato da manifestação não podem ser alterados';
+  end if;
+  previous := case when old.status = 'PENDING' then 'ENVIADA' else old.status end;
+  if new.status is distinct from old.status and not (
+    (previous = 'ENVIADA' and new.status in ('EM_ANALISE', 'RECUSADA')) or
+    (previous = 'EM_ANALISE' and new.status in ('VISITA_COMBINADA', 'RECUSADA')) or
+    (previous = 'VISITA_COMBINADA' and new.status = 'CONCLUIDA')
+  ) then raise exception 'Transição de etapa inválida'; end if;
+  return new;
+end; $$;
+drop trigger if exists trg_interest_stage on public.adoption_interests;
+create trigger trg_interest_stage before update on public.adoption_interests
+for each row execute function public.protect_interest_stage();
 
 -- ============================================================================
 -- Pull incremental (OFF-06 — decisão da ordem 6: cursor/delta, não snapshot)

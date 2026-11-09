@@ -1,3 +1,4 @@
+import { useFocusRefresh } from '../../src/adapters/hooks/useFocusRefresh';
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -5,17 +6,29 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchScreen } from '../../src/adapters/screens/SearchScreen';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
+import { useAuth } from '../../src/adapters/context/AuthContext';
+import { OnboardingProgressCard } from '../../src/adapters/components/OnboardingProgressCard';
 
 export default function HomeTab() {
   const router = useRouter();
+  const refreshToken = useFocusRefresh();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
   // RF04: o GPS do container fornece a origem do filtro por distância.
   const { animalRepository, syncQueueRepository, locationGateway } = useRepositories();
   // Fase 2: conectividade real (NetInfo) alimenta o estado offline inicial.
   const isOnline = useConnectivity();
+  // Progress card de onboarding (melhoria #12): derivado da sessão real;
+  // visitante (sem user) não vê card.
+  const { user } = useAuth();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <OnboardingProgressCard refreshToken={refreshToken}
+        user={user}
+        animalRepository={animalRepository}
+        onGoToAccount={() => router.push('/(tabs)/conta')}
+        onNewAnimal={() => router.push('/(protected)/novo-anuncio')}
+      />
       <SearchScreen
         animalRepository={animalRepository}
         syncQueueRepository={syncQueueRepository}

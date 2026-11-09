@@ -77,6 +77,8 @@ export interface AdoptionInterestRow {
   contact_phone: string | null;
   status: string;
   created_at: string;
+  /** Última mudança de etapa da trilha (decisão 18) — alimenta notificações. */
+  updated_at?: string;
 }
 
 export interface UserRow {

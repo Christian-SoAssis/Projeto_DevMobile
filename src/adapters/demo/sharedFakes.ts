@@ -1,3 +1,4 @@
+import { AppStateRepositoryFake } from '../../application/fakes/AppStateRepositoryFake';
 import { AnimalRepositoryFake } from '../../application/fakes/AnimalRepositoryFake';
 import { FavoriteRepositoryFake } from '../../application/fakes/FavoriteRepositoryFake';
 import { AdoptionInterestRepositoryFake } from '../../application/fakes/AdoptionInterestRepositoryFake';
@@ -40,6 +41,7 @@ export const syncQueueRepository = new SyncQueueRepositoryFake();
  */
 export const demoContainer = {
   mode: 'demo' as const,
+  appStateRepository: new AppStateRepositoryFake(),
   animalRepository,
   favoriteRepository,
   interestRepository,

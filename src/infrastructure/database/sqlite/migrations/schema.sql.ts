@@ -51,6 +51,15 @@ CREATE TABLE IF NOT EXISTS adoption_interests (
   UNIQUE(user_id, animal_id)
 );
 
+-- Central de notificações in-app (decisão 20): par chave/valor persistido no
+-- aparelho (ex.: notifications_last_seen). Chaves compostas por usuário usam
+-- o sufixo do user id.
+CREATE TABLE IF NOT EXISTS app_state (
+  key TEXT PRIMARY KEY NOT NULL,
+  value TEXT,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY NOT NULL,
   name TEXT NOT NULL,

@@ -290,19 +290,33 @@ export class ProcessSyncQueueUseCase {
   private async applyInterestAction(action: SyncAction): Promise<void> {
     const gateway = this.extras.interests;
     if (!gateway) throw new PermanentSyncError('Sincronização de interesses indisponível sem backend.');
-    if (action.operation !== 'CREATE') {
-      throw new PermanentSyncError(`Operação de sincronização não suportada: ${action.operation}`);
-    }
     const p = action.payload;
-    await gateway.createRemote({
-      id: String(p.id ?? action.entityId),
-      userId: String(p.userId ?? ''),
-      animalId: String(p.animalId ?? ''),
-      message: typeof p.message === 'string' ? p.message : undefined,
-      contactName: typeof p.contactName === 'string' ? p.contactName : undefined,
-      contactEmail: typeof p.contactEmail === 'string' ? p.contactEmail : undefined,
-      contactPhone: typeof p.contactPhone === 'string' ? p.contactPhone : undefined,
-      createdAt: typeof p.createdAt === 'string' ? p.createdAt : undefined,
-    });
+    if (action.operation === 'CREATE') {
+      await gateway.createRemote({
+        id: String(p.id ?? action.entityId),
+        userId: String(p.userId ?? ''),
+        animalId: String(p.animalId ?? ''),
+        message: typeof p.message === 'string' ? p.message : undefined,
+        contactName: typeof p.contactName === 'string' ? p.contactName : undefined,
+        contactEmail: typeof p.contactEmail === 'string' ? p.contactEmail : undefined,
+        contactPhone: typeof p.contactPhone === 'string' ? p.contactPhone : undefined,
+        // Decisão 18: nasce ENVIADA (legado 'PENDING' continua legível).
+        status: typeof p.status === 'string' ? p.status : undefined,
+        createdAt: typeof p.createdAt === 'string' ? p.createdAt : undefined,
+      });
+      return;
+    }
+    if (action.operation === 'UPDATE') {
+      // Trilha (decisão 18): o responsável avança/recusa no servidor.
+      const status = String(p.status ?? '');
+      if (!status) throw new PermanentSyncError('UPDATE de interesse sem status da trilha.');
+      await gateway.updateStatusRemote(
+        String(p.id ?? action.entityId),
+        status,
+        typeof p.updatedAt === 'string' ? p.updatedAt : undefined
+      );
+      return;
+    }
+    throw new PermanentSyncError(`Operação de sincronização não suportada: ${action.operation}`);
   }
 }

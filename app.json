@@ -12,6 +12,11 @@
     },
     "android": {
       "package": "br.com.enlace.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": ""
+        }
+      },
       "permissions": [
         "CAMERA",
         "ACCESS_COARSE_LOCATION"

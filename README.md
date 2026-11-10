@@ -48,15 +48,15 @@ Busca → Filtros → Detalhes → Favoritar / Demonstrar interesse → Contato 
 
 | Camada | Tecnologia |
 |---|---|
-| Framework | Expo SDK **~57** + React Native **0.86** + React **19.2** |
+| Framework | Expo SDK **~58** + React Native **0.88.1** + React **19.3** |
 | Linguagem | TypeScript ~6.0 |
-| Navegação | Expo Router ~57 (rotas por arquivo na pasta `app/`) |
+| Navegação | Expo Router ~58 (rotas por arquivo na pasta `app/`) |
 | Estado | Context API (`AuthProvider`) + hooks (`useAuth`, `useAnimals`, `useSync`) |
 | Persistência local | SQLite (`expo-sqlite`) — integrada ao app na Fase 2 (cache, fila e imagens locais) |
 | Sessão segura | `SessionStorageSecureStore` — `expo-secure-store` real (Keychain/Keystore) com fallback em memória em Jest/demo |
 | Conectividade | `@react-native-community/netinfo` via port `ConnectivityGateway` (Fase 2) |
 | Backend online | Supabase (`@supabase/supabase-js`): Auth (e-mail/senha), PostgreSQL + RLS, Storage (Passo 4) — **opcional**, ligado por `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_ANON_KEY` |
-| Testes | Jest 29 + `jest-expo` + React Native Testing Library |
+| Testes | Jest ~30.5 + `jest-expo` + React Native Testing Library |
 
 ---
 
@@ -66,7 +66,7 @@ Busca → Filtros → Detalhes → Favoritar / Demonstrar interesse → Contato 
 
 - **Node.js** 20.x ou 22.x
 - **npm** 10.x ou superior
-- App **Expo Go** no celular ([Android](https://play.google.com/store/apps/details?id=host.exp.exponent) / [iOS](https://apps.apple.com/app/expo-go/id982107779)), compatível com o **SDK 57**
+- App **Expo Go** no celular ([Android](https://play.google.com/store/apps/details?id=host.exp.exponent) / [iOS](https://apps.apple.com/app/expo-go/id982107779)), compatível com o **SDK 58**
 - *(Opcional)* emulador Android (Android Studio) ou simulador iOS (Xcode, só no macOS)
 
 ### 1. Instalação
@@ -147,9 +147,9 @@ O relatório de cobertura em HTML fica em `coverage/lcov-report/index.html`.
 | Problema | Solução |
 |---|---|
 | QR code não conecta | Use `npx expo start --tunnel` ou confira se o PC e o celular estão na mesma rede |
-| "Project is incompatible with this version of Expo Go" | Atualize o Expo Go na loja (o projeto usa o SDK 57) |
+| "Project is incompatible with this version of Expo Go" | Atualize o Expo Go na loja (o projeto usa o SDK 58) |
 | Cache estranho ou bundle desatualizado | `npx expo start -c` (limpa o cache do Metro) |
-| Dependências quebradas | `rm -rf node_modules package-lock.json && npm install` |
+| Dependências quebradas | `rm -rf node_modules package-lock.json && npm install --ignore-scripts` (o `better-sqlite3` falha ao compilar via node-gyp sem Build Tools; use `--ignore-scripts` em checkout novo) |
 | Versões incompatíveis de pacotes Expo | `npx expo install --fix` |
 
 ---

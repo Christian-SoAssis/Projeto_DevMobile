@@ -4,12 +4,16 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MyAnimalsScreen } from '../../src/adapters/screens/MyAnimalsScreen';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
+import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
+import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 import { RequireAccess } from '../../src/adapters/guards/RequireAccess';
 
 export default function MeusAnunciosTab() {
   const router = useRouter();
+  const isOnline = useConnectivity();
+  const runSync = useFullSync();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
-  const { animalRepository, syncQueueRepository, unitOfWork } = useRepositories();
+  const { animalRepository, syncQueueRepository, unitOfWork, remoteMode } = useRepositories();
 
   // Pulso de atualização: com o outer Stack (fix "voltar mantém a aba"), o
   // pop do formulário/detalhes NÃO remonta esta aba — relê o banco a cada
@@ -35,6 +39,8 @@ export default function MeusAnunciosTab() {
             syncQueueRepository={syncQueueRepository}
             unitOfWork={unitOfWork}
             ownerId={user.id}
+            isOnline={isOnline}
+            onSync={remoteMode === 'supabase' ? runSync : undefined}
             refreshToken={refreshToken}
             onSelectAnimal={(animal) =>
               router.push({ pathname: '/animal/[id]', params: { id: animal.id } })

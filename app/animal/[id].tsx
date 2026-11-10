@@ -5,12 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalDetailsScreen } from '../../src/adapters/screens/AnimalDetailsScreen';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useAuth } from '../../src/adapters/context/AuthContext';
+import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 
 export default function AnimalDetailsRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   // Detalhes são públicos (RF06); sem sessão o usuário é visitante.
   const { user } = useAuth();
+  const runSync = useFullSync();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
   const {
     animalRepository,
@@ -19,6 +21,7 @@ export default function AnimalDetailsRoute() {
     syncQueueRepository,
     unitOfWork,
     remoteInterests,
+    remoteMode,
   } = useRepositories();
   const [animal, setAnimal] = React.useState<Awaited<
     ReturnType<typeof animalRepository.findById>
@@ -73,6 +76,7 @@ export default function AnimalDetailsRoute() {
         interestRepository={interestRepository}
         syncQueueRepository={syncQueueRepository}
         unitOfWork={unitOfWork}
+        onSync={remoteMode === 'supabase' ? runSync : undefined}
         onBack={() => router.back()}
       />
     );

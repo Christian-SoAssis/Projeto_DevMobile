@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalFormScreen } from '../../src/adapters/screens/AnimalFormScreen';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
+import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
 import { RequireAccess } from '../../src/adapters/guards/RequireAccess';
 
 export default function EditarAnuncioRoute() {
@@ -13,6 +14,7 @@ export default function EditarAnuncioRoute() {
 function EditarAnuncioForm({ ownerId }: { ownerId: string }) {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const isOnline = useConnectivity();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
   const { animalRepository, syncQueueRepository, unitOfWork, cameraGateway, locationGateway, photoStorage } =
     useRepositories();
@@ -64,6 +66,7 @@ function EditarAnuncioForm({ ownerId }: { ownerId: string }) {
         cameraGateway={cameraGateway}
         locationGateway={locationGateway}
         photoStorage={photoStorage}
+        isOnline={isOnline}
         onSuccess={() => router.back()}
       />
     );

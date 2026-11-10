@@ -7,14 +7,16 @@ import { SearchScreen } from '../../src/adapters/screens/SearchScreen';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
 import { useAuth } from '../../src/adapters/context/AuthContext';
+import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 import { OnboardingProgressCard } from '../../src/adapters/components/OnboardingProgressCard';
 
 export default function HomeTab() {
   const router = useRouter();
   const refreshToken = useFocusRefresh();
+  const runSync = useFullSync();
   // Fase 2: repositórios SQLite compostos pelo RepositoriesProvider.
   // RF04: o GPS do container fornece a origem do filtro por distância.
-  const { animalRepository, syncQueueRepository, locationGateway } = useRepositories();
+  const { animalRepository, syncQueueRepository, locationGateway, remoteMode } = useRepositories();
   // Fase 2: conectividade real (NetInfo) alimenta o estado offline inicial.
   const isOnline = useConnectivity();
   // Progress card de onboarding (melhoria #12): derivado da sessão real;
@@ -34,6 +36,7 @@ export default function HomeTab() {
         syncQueueRepository={syncQueueRepository}
         locationGateway={locationGateway}
         isOnlineInitial={isOnline}
+        onSync={remoteMode === 'supabase' ? runSync : undefined}
         onSelectAnimal={(animal) =>
           router.push({ pathname: '/animal/[id]', params: { id: animal.id } })
         }

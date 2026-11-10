@@ -26,6 +26,7 @@ export interface MyAnimalsScreenProps {
   onBack?: () => void;
   isOnline?: boolean;
   unitOfWork?: UnitOfWork;
+  onSync?: () => Promise<unknown>;
   /**
    * Pulsado pela rota hospedeira a cada FOCO da tela (retorno do formulário/
    * detalhes). Com o outer Stack (correção "voltar mantém a aba"), o pop NÃO
@@ -45,6 +46,7 @@ export const MyAnimalsScreen: React.FC<MyAnimalsScreenProps> = ({
   onBack,
   isOnline = true,
   unitOfWork = new NoopUnitOfWork(),
+  onSync,
   refreshToken,
 }) => {
   const [animals, setAnimals] = useState<Animal[]>([]);
@@ -103,6 +105,7 @@ export const MyAnimalsScreen: React.FC<MyAnimalsScreenProps> = ({
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
+      await onSync?.().catch(() => undefined);
       await loadAnimals();
     } finally {
       setRefreshing(false);

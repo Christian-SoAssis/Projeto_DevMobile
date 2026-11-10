@@ -26,6 +26,22 @@ export class SupabaseAuthGateway implements AuthGateway {
     this.client = options.client;
   }
 
+  /**
+   * Garante que o PostgREST/Storage do `@supabase/supabase-js` envie o JWT
+   * autenticado mesmo quando a sessão foi restaurada do SecureStore via
+   * `acessarViaToken` (onde `auth.getUser(token)` não popula `auth.getSession()`).
+   */
+  private bindAccessToken(token: string | null): void {
+    const target = this.client as SupabaseClientLike & {
+      accessToken?: (() => Promise<string | null>) | undefined;
+    };
+    if (token) {
+      target.accessToken = async () => token;
+    } else {
+      delete target.accessToken;
+    }
+  }
+
   async register(input: RegisterInput): Promise<RegisterResult> {
     const email = input.email.trim();
     const name = input.name.trim();
@@ -103,11 +119,13 @@ export class SupabaseAuthGateway implements AuthGateway {
     if (!data.session) {
       throw new Error('Não foi possível entrar. Verifique e-mail e senha.');
     }
+    this.bindAccessToken(data.session.access_token);
     const user = await this.resolveUser(data.session.user);
     return { user, token: data.session.access_token };
   }
 
   async logout(): Promise<void> {
+    this.bindAccessToken(null);
     const { error } = await this.client.auth.signOut();
     if (error) {
       throw new Error(`Falha ao encerrar a sessão: ${error.message}`);
@@ -119,6 +137,7 @@ export class SupabaseAuthGateway implements AuthGateway {
     if (error || !data.session) {
       return null;
     }
+    this.bindAccessToken(data.session.access_token);
     const user = await this.resolveUser(data.session.user);
     return { user, token: data.session.access_token };
   }
@@ -126,8 +145,10 @@ export class SupabaseAuthGateway implements AuthGateway {
   async acessarViaToken(token: string): Promise<AuthSession> {
     const { data, error } = await this.client.auth.getUser(token);
     if (error || !data.user) {
+      this.bindAccessToken(null);
       throw new Error('Sessão expirada. Faça login novamente.');
     }
+    this.bindAccessToken(token);
     const user = await this.resolveUser(data.user);
     return { user, token };
   }

@@ -40,6 +40,8 @@ export interface AnimalDetailsScreenProps {
   interestRepository?: AdoptionInterestRepository;
   syncQueueRepository?: SyncQueueRepository;
   unitOfWork?: UnitOfWork;
+  /** Dispara a sincronização imediata com o Supabase após ações (favorito, interesse, trilha). */
+  onSync?: () => Promise<unknown>;
   onBack?: () => void;
 }
 
@@ -54,6 +56,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
   interestRepository = new AdoptionInterestRepositoryFake(),
   syncQueueRepository = new SyncQueueRepositoryFake(),
   unitOfWork = new NoopUnitOfWork(),
+  onSync,
   onBack,
 }) => {
   const [animal, setAnimal] = useState<Animal>(initialAnimal);
@@ -176,6 +179,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       notifyNotificationsChanged();
       setReceived(rows => rows?.map(r => r.id === row.id ? { ...r, status: next.value } : r) ?? null);
       setFeedback(`Etapa avançada: ${interestStatusLabel(next)}`);
+      await onSync?.().catch(() => undefined);
     } catch (err: any) {
       setFeedback(err.message || 'Não foi possível atualizar a etapa.');
     } finally {
@@ -208,6 +212,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       notifyNotificationsChanged();
       setReceived(rows => rows?.map(r => r.id === row.id ? { ...r, status: 'RECUSADA' } : r) ?? null);
       setFeedback('Manifestação recusada.');
+      await onSync?.().catch(() => undefined);
     } catch (err: any) {
       setFeedback(err.message || 'Não foi possível recusar a manifestação.');
     } finally {
@@ -230,6 +235,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       const newState = await useCase.execute(currentUserId, animal.id);
       setIsFav(newState);
       setFeedback(newState ? 'Adicionado aos favoritos!' : 'Removido dos favoritos.');
+      await onSync?.().catch(() => undefined);
     } catch (err: any) {
       setFeedback(err.message || 'Erro ao favoritar. Tente novamente.');
     }
@@ -245,6 +251,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
     await useCase.execute(currentUserId, animal.id, interestContact);
     setHasInterest(true);
     setFeedback('Manifestação de interesse enviada ao responsável!');
+    await onSync?.().catch(() => undefined);
   };
 
   const handleMarkAdopted = async () => {
@@ -261,6 +268,7 @@ export const AnimalDetailsScreen: React.FC<AnimalDetailsScreenProps> = ({
       const updated = await useCase.execute(currentUserId, animal.id, true);
       setAnimal(updated);
       setFeedback('Animal marcado como adotado com sucesso!');
+      await onSync?.().catch(() => undefined);
     } catch (err: any) {
       setFeedback(err.message || 'Erro ao alterar status.');
     }

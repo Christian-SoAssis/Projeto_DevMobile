@@ -25,6 +25,8 @@ export interface SearchScreenProps {
   locationGateway?: LocationGateway;
   onSelectAnimal?: (animal: Animal) => void;
   isOnlineInitial?: boolean;
+  /** Sincroniza com o servidor (push fila + pull delta) ao atualizar a lista. */
+  onSync?: () => Promise<unknown>;
 }
 
 export const SearchScreen: React.FC<SearchScreenProps> = ({
@@ -33,6 +35,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
   locationGateway,
   onSelectAnimal,
   isOnlineInitial = true,
+  onSync,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedSpecies, setSelectedSpecies] = useState<string>('');
@@ -137,6 +140,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
+      await onSync?.().catch(() => undefined);
       await performSearch();
     } finally {
       setRefreshing(false);

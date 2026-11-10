@@ -40,6 +40,7 @@ import { SupabaseModerationRepository } from '../supabase/repositories/SupabaseM
 import { AuthGateway } from '../../domain/ports/AuthGateway';
 import { ModerationGateway } from '../../domain/ports/ModerationGateway';
 import { buildSeedAnimals } from '../../adapters/demo/seedAnimals';
+import { isUuid } from '../../domain/services/IdGenerator';
 
 export type AppMode = 'sqlite' | 'memory' | 'demo';
 export type RemoteMode = 'none' | 'supabase';
@@ -171,7 +172,34 @@ export async function loadAppContainer(
   const cameraGateway = new ImagePickerCameraAdapter();
   const locationGateway = new ExpoLocationAdapter();
 
-  await seedCacheIfEmpty(animalRepository);
+  const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+  if (supabaseClient && !isTestEnv) {
+    // Em runtime real com Supabase ativo, remove anúncios locais de demonstração
+    // (ids não-UUID como `anim_1`..`anim_7`) para que apenas anúncios reais com
+    // UUID do Supabase fiquem visíveis e sincronizáveis.
+    const existing = await animalRepository.search({});
+    for (const item of existing) {
+      if (!isUuid(item.id)) {
+        await animalRepository.deleteLocal(item.id);
+      }
+    }
+    // Limpa itens antigos da fila que ficaram presos em modo offline/mock sem backend
+    // ou que apontam para entidades/animais de demonstração (não-UUID).
+    const pendingActions = await syncQueueRepository.listPending();
+    for (const action of pendingActions) {
+      const payloadAnimalId =
+        typeof action.payload?.animalId === 'string' ? action.payload.animalId : undefined;
+      const isMockOrLegacyFailure =
+        Boolean(action.lastError && action.lastError.includes('indisponível sem backend')) ||
+        ((action.entityType === 'animal' || action.entityType === 'interest') && !isUuid(action.entityId)) ||
+        Boolean(payloadAnimalId && !isUuid(payloadAnimalId));
+      if (isMockOrLegacyFailure) {
+        await syncQueueRepository.delete(action.id);
+      }
+    }
+  } else {
+    await seedCacheIfEmpty(animalRepository);
+  }
 
   return {
     mode: db.mode,

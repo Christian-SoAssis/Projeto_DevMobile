@@ -20,6 +20,8 @@ export interface SyncStatusScreenProps {
   animalRepository?: AnimalRepository;
   /** Upload remoto das fotos (só com backend configurado). */
   remotePhotoStorage?: PhotoStorage;
+  /** Modo remoto atual do app ('supabase' ou 'none'). */
+  remoteMode?: 'supabase' | 'none';
   /** Ciclo completo (envia a fila e atualiza pelo servidor). Padrão: só processa a fila. */
   runSync?: () => Promise<FullSyncResult>;
   /** Abre a revisão de conflitos (RF23). */
@@ -30,6 +32,7 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
   syncQueueRepository = new SyncQueueRepositoryFake(),
   animalRepository = new AnimalRepositoryFake(),
   remotePhotoStorage,
+  remoteMode = 'none',
   runSync,
   onOpenConflicts,
 }) => {
@@ -41,6 +44,20 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
     const items = await syncQueueRepository.listPending();
     // DAT-10: pendências de outra conta ficam na fila, mas não aparecem.
     setPending(items.filter(isVisibleToActiveSession));
+  };
+
+  const handleDismissAction = async (actionId: string) => {
+    await syncQueueRepository.delete(actionId);
+    await loadPending();
+  };
+
+  const handleClearPermanentErrors = async () => {
+    for (const item of pending) {
+      if (item.lastError && item.lastError.includes('ERRO PERMANENTE')) {
+        await syncQueueRepository.delete(item.id);
+      }
+    }
+    await loadPending();
   };
 
   useEffect(() => {
@@ -79,7 +96,15 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
 
   return (
     <View style={styles.container} testID="sync-status-screen">
-      <Text style={styles.title}>Status de Sincronização Offline</Text>
+      <Text style={styles.title}>Status de Sincronização</Text>
+
+      <View style={[styles.modeBadge, remoteMode === 'supabase' ? styles.modeBadgeOnline : styles.modeBadgeOffline]}>
+        <Text style={styles.modeBadgeText}>
+          {remoteMode === 'supabase'
+            ? '🟢 Backend Supabase Conectado'
+            : '🟡 Modo Offline Local (SQLite / Sem Supabase)'}
+        </Text>
+      </View>
 
       {lastResult && (
         <View style={styles.banner} testID="sync-result-banner">
@@ -106,6 +131,17 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
         </TouchableOpacity>
       )}
 
+      {pending.some((item) => item.lastError && item.lastError.includes('ERRO PERMANENTE')) && (
+        <TouchableOpacity
+          style={styles.clearErrorsBtn}
+          onPress={handleClearPermanentErrors}
+        >
+          <Text style={styles.clearErrorsBtnText}>
+            🗑️ Limpar itens antigos com erro permanente da fila
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <Text style={styles.subtitle}>Operações Pendentes ({pending.length})</Text>
 
       <FlatList
@@ -119,9 +155,19 @@ export const SyncStatusScreen: React.FC<SyncStatusScreenProps> = ({
         }
         renderItem={({ item }) => (
           <View style={styles.itemCard} testID={`sync-item-${item.id}`}>
-            <Text style={styles.itemOp}>
-              [{item.operation}] Entidade: {item.entityType} ({item.entityId})
-            </Text>
+            <View style={styles.itemCardHeader}>
+              <Text style={styles.itemOp}>
+                [{item.operation}] Entidade: {item.entityType} ({item.entityId})
+              </Text>
+              {item.lastError ? (
+                <TouchableOpacity
+                  onPress={() => handleDismissAction(item.id)}
+                  style={styles.dismissBtn}
+                >
+                  <Text style={styles.dismissBtnText}>Descartar</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
             <Text style={styles.itemMeta}>
               Tentativas: {item.attempts} | Status: {item.status.value}
             </Text>
@@ -258,5 +304,57 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: '#856404',
     marginTop: 8,
+  },
+  modeBadge: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  modeBadgeOnline: {
+    backgroundColor: '#d4edda',
+    borderColor: '#c3e6cb',
+    borderWidth: 1,
+  },
+  modeBadgeOffline: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffeeba',
+    borderWidth: 1,
+  },
+  modeBadgeText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#155724',
+  },
+  clearErrorsBtn: {
+    backgroundColor: '#f8d7da',
+    borderColor: '#f5c6cb',
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  clearErrorsBtnText: {
+    color: '#721c24',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  itemCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dismissBtn: {
+    backgroundColor: '#6c757d',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  dismissBtnText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
 });

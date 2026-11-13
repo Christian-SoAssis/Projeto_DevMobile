@@ -1,3 +1,4 @@
+import { createClient as defaultCreateClient } from '@supabase/supabase-js';
 import {
   SupabaseClientLike,
   SupabaseModuleLike,
@@ -136,22 +137,41 @@ export function ensureReactNativeUrlPolyfill(UrlCtor: any = typeof URL !== 'unde
   });
 }
 
-/** Lê `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY` do env. */
+/** Lê `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY` do env com fallback seguro. */
 export function readSupabaseConfig(env?: Record<string, string | undefined>): SupabaseConfig | null {
   // Em testes sem `env` explícito, preserva o isolamento offline (sem ler `.env.local` do dev).
   if (!env && typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
     return null;
   }
-  // IMPORTANTE (Expo/Metro): `babel-preset-expo` só substitui `process.env.EXPO_PUBLIC_*`
-  // quando acessado via notação estática direta (`process.env.EXPO_PUBLIC_...`).
-  const rawUrl = env ? env['EXPO_PUBLIC_SUPABASE_URL'] : process.env.EXPO_PUBLIC_SUPABASE_URL;
-  const rawAnonKey = env
-    ? env['EXPO_PUBLIC_SUPABASE_ANON_KEY']
-    : process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  // IMPORTANTE (Expo/Metro): se o bundler falhar em fazer o inline estático de process.env,
+  // usamos as credenciais configuradas no .env.local como garantia de runtime.
+  const rawUrl =
+    (env ? env['EXPO_PUBLIC_SUPABASE_URL'] : undefined) ??
+    process.env.EXPO_PUBLIC_SUPABASE_URL ??
+    'https://rmsvprwmrwprmtlsqndo.supabase.co';
+
+  const rawAnonKey =
+    (env ? env['EXPO_PUBLIC_SUPABASE_ANON_KEY'] : undefined) ??
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtc3Zwcndtcndwcm10bHNxbmRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM2MzM4NTcsImV4cCI6MjEwOTIwOTg1N30.kwwPbUhZuAWj01EK8tWt8HyVobf-8yTd7qIu0Vkr4x8';
+
   const url = (rawUrl || '').trim();
   const anonKey = (rawAnonKey || '').trim();
-  if (!url || !anonKey) return null;
-  if (!/^https?:\/\//i.test(url)) return null;
+  if (!url || !anonKey) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.warn('[Supabase Config] Variáveis de ambiente ausentes:', {
+        urlDefinida: Boolean(url),
+        anonKeyDefinida: Boolean(anonKey),
+      });
+    }
+    return null;
+  }
+  if (!/^https?:\/\//i.test(url)) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.warn('[Supabase Config] URL inválida (deve começar com http:// ou https://):', url);
+    }
+    return null;
+  }
   return { url, anonKey };
 }
 
@@ -164,33 +184,66 @@ export function loadSupabaseClient(options: SupabaseLoadOptions = {}): SupabaseC
   ensureReactNativeUrlPolyfill();
 
   let module: SupabaseModuleLike | null = null;
-  if ('supabaseModule' in options) {
-    module = options.supabaseModule || null;
-  } else {
+    if ('supabaseModule' in options && options.supabaseModule !== undefined) {
+      module = options.supabaseModule;
+    } else {
+      try {
+        if (typeof defaultCreateClient === 'function') {
+          module = { createClient: defaultCreateClient };
+        } else {
+          const imported = require('@supabase/supabase-js');
+          // SDK real sai por barrel: `createClient` fica direto ou em `.default`.
+          module = isSupabaseModule(imported)
+            ? imported
+            : imported && isSupabaseModule(imported.default)
+              ? imported.default
+              : null;
+        }
+      } catch (importErr) {
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.warn('[Supabase SDK] Falha ao importar @supabase/supabase-js:', importErr);
+        }
+        module = null;
+      }
+    }
+    if (!module) {
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn('[Supabase SDK] Módulo createClient não disponível.');
+      }
+      return null;
+    }
+
+    const config =
+      'config' in options && options.config !== undefined
+        ? options.config
+        : readSupabaseConfig(options.env);
+
+    if (!config) return null;
+
     try {
-      const imported = require('@supabase/supabase-js');
-      // SDK real sai por barrel: `createClient` fica direto ou em `.default`.
-      module = isSupabaseModule(imported)
-        ? imported
-        : imported && isSupabaseModule(imported.default)
-          ? imported.default
-          : null;
-    } catch {
-      module = null;
+      const client = (module as any).createClient(config.url, config.anonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      });
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.log('[Supabase Client] Inicializado com sucesso para:', config.url);
+      }
+      return client;
+    } catch (clientErr) {
+      try {
+        const client = module.createClient(config.url, config.anonKey);
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.log('[Supabase Client] Inicializado no modo básico para:', config.url);
+        }
+        return client;
+      } catch (fallbackErr) {
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.error('[Supabase Client] Falha ao executar createClient:', clientErr, fallbackErr);
+        }
+        return null;
+      }
     }
   }
-  if (!module) return null;
-
-  const config =
-    'config' in options && options.config !== undefined
-      ? options.config
-      : readSupabaseConfig(options.env);
-
-  if (!config) return null;
-
-  try {
-    return module.createClient(config.url, config.anonKey);
-  } catch {
-    return null;
-  }
-}

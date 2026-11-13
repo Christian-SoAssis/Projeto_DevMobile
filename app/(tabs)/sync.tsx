@@ -21,6 +21,7 @@ export default function SyncTab() {
             syncQueueRepository={syncQueueRepository}
             animalRepository={animalRepository}
             remotePhotoStorage={remotePhotoStorage}
+            remoteMode={remoteMode}
             runSync={remoteMode === 'supabase' ? runSync : undefined}
             onOpenConflicts={() => router.push('/(protected)/conflitos')}
           />

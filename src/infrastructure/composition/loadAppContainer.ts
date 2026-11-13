@@ -115,10 +115,18 @@ export async function loadAppContainer(
   const supabaseClient: SupabaseClientLike | null =
     'supabaseClient' in options
       ? options.supabaseClient || null
-      : loadSupabaseClient({
-          supabaseModule: 'supabaseModule' in options ? options.supabaseModule : undefined,
-          config: 'supabaseConfig' in options ? options.supabaseConfig : undefined,
-        });
+      : loadSupabaseClient(
+        options.supabaseModule !== undefined || options.supabaseConfig !== undefined
+          ? {
+            supabaseModule: options.supabaseModule,
+            config: options.supabaseConfig,
+          }
+          : {}
+      );
+
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    console.log('[AppContainer] Modo remoto ativado:', supabaseClient ? 'supabase' : 'none');
+  }
 
   let animalRepository: AnimalRepository = new SqliteAnimalRepository(db);
   const favoriteRepository = new SqliteFavoriteRepository(db);

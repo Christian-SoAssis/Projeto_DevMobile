@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Enlace",
+    "slug": "enlace-rede-adocao",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "enlace",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "O Enlace precisa da câmera para você fotografar o animal do anúncio ou sua foto de perfil.",
+        "NSPhotoLibraryUsageDescription": "O Enlace precisa acessar a galeria para você escolher fotos do animal ou do seu perfil.",
+        "NSLocationWhenInUseUsageDescription": "O Enlace usa sua localização apenas para preencher o bairro/cidade aproximados do anúncio ou buscar animais próximos (até 10 km)."
+      }
+    },
+    "android": {
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Enlace precisa acessar suas fotos para anexar imagens ao anúncio de adoção.",
+          "cameraPermission": "O Enlace precisa acessar a câmera para fotografar o animal para adoção."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O Enlace usa sua localização aproximada para indicar o bairro e a cidade do anúncio ou filtrar animais próximos."
+        }
+      ]
+    ]
+  }
+}

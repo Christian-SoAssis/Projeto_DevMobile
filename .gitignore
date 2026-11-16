@@ -4,6 +4,18 @@ dist/
 web-build/
 coverage/
 
+# Native builds
+/android/
+/ios/
+
+# Native keys and certificates
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
 # Local env files
 .env*.local
 
@@ -17,5 +29,6 @@ yarn-error.log*
 
 expo-env.d.ts
 # @end expo-cli
+
 # Estado local da CLI do Supabase
 supabase/.temp/

@@ -4,11 +4,12 @@
     "slug": "enlace-rede-adocao",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
     "scheme": "enlace",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.enlace.app",
       "infoPlist": {
         "NSCameraUsageDescription": "O Enlace precisa da câmera para você fotografar o animal do anúncio ou sua foto de perfil.",
         "NSPhotoLibraryUsageDescription": "O Enlace precisa acessar a galeria para você escolher fotos do animal ou do seu perfil.",
@@ -16,12 +17,22 @@
       }
     },
     "android": {
+      "package": "com.enlace.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#FDF7F0"
+      },
       "permissions": [
         "CAMERA",
         "READ_MEDIA_IMAGES",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
       ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -39,7 +50,20 @@
         {
           "locationWhenInUsePermission": "O Enlace usa sua localização aproximada para indicar o bairro e a cidade do anúncio ou filtrar animais próximos."
         }
-      ]
+      ],
+      "expo-font",
+    [
+      "expo-splash-screen",
+      {
+        "image": "./assets/images/splash-icon.png",
+        "imageWidth": 200,
+        "resizeMode": "contain",
+        "backgroundColor": "#FDF7F0"
+      }
     ]
+  ],
+  "experiments": {
+    "typedRoutes": true
   }
+}
 }

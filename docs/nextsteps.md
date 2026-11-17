@@ -155,16 +155,28 @@ Os itens abaixo estão organizados em ordem sequencial de construção, seguindo
 - [x] Confirmar que os 14 use cases em `src/application/use-cases/` orquestram via portas e não contêm regras de negócio puras nem código de interface.
 - [x] Validar o `UnitOfWork` em `src/application/ports/UnitOfWork.ts` para consistência transacional entre SQLite e fila de sincronização (OFF-04). (implementado; teste de interrupção ainda pendente — OFF-04 classificado como PA)
 
-### 4.4. Implementar a camada de testes (FALTANDO — prioridade alta)
+### 4.4. Implementar a camada de testes ✅ CONCLUÍDO
 
-A pirâmide prescrita exige 80%+ de cobertura. Atualmente só existem testes de domínio (7 testes em 1 arquivo).
+A pirâmide prescrita exige 80%+ de cobertura. Foram implementados:
 
-- [ ] **Testes de Use Cases:** Criar testes com fakes/repositórios in-memory para cada use case (caminho feliz, tratamento de erros, falta de permissões). Exemplo: `CreateAnimalUseCase`, `SearchAnimalsUseCase`, `ToggleFavoriteUseCase`, `RegisterAdoptionInterestUseCase`, `ProcessSyncQueueUseCase`, `ResolveSyncConflictUseCase`.
+- [x] **Testes de Use Cases:** 9 arquivos de teste com fakes/repositórios in-memory para cada use case:
+  - `CreateAnimalUseCase.test.ts` — criação online/offline, limite de 4 fotos, transação atômica, falha remota
+  - `SearchAnimalsUseCase.test.ts` — filtros (espécie, porte, nome, dono), DAT-10 isolamento de contas
+  - `ToggleFavoriteUseCase.test.ts` — adicionar/remover favorito, autenticação obrigatória, offline, falha remota
+  - `RegisterAdoptionInterestUseCase.test.ts` — registro de interesse, animal não disponível, usuário não autenticado, offline, falha remota, mensagem padrão
+  - `ProcessSyncQueueUseCase.test.ts` — processar CREATE/UPDATE/DELETE, DAT-10 isolamento, favoritos, interesses, conflito de status, last-write wins, falha remota
+  - `ResolveSyncConflictUseCase.test.ts` — KEEP_LOCAL, USE_REMOTE, erros de versão inexistente
+  - `UpdateAnimalUseCase.test.ts` — atualizar anúncio, não-dono, características/localização, online/offline
+  - `DeleteAnimalUseCase.test.ts` — excluir anúncio, não-dono, online com remoto, falha remota
+  - `MarkAnimalAdoptedUseCase.test.ts` — marcar adotado, já adotado, não-dono, online, offline
+- [x] **Fakes in-memory:** `src/__tests__/fakes/in-memory-repositories.ts` com implementações para todos os ports (AnimalRepository, SyncQueueRepository, FavoriteRepository, AdoptionInterestRepository, UserRepository, PhotoStorage, AuthGateway, LocationGateway, ConnectivityGateway, RemoteAnimalSource, FavoriteRemoteGateway, InterestRemoteGateway, ModerationGateway, AppStateRepository, SearchPreferencesRepository, SyncMetadataRepository, UnitOfWork) e fabricantes de dados de teste
 - [ ] **Testes de Context API & Hooks:** Validar `AuthProvider`, `useAuth`, `RepositoriesContext` e hooks de ponte (`useConnectivity`, `useFullSync`).
 - [ ] **Testes de Telas e Componentes:** Configurar `@testing-library/react-native` (RNTL) e escrever testes que simulem ações do usuário (`fireEvent.press`, `fireEvent.changeText`) nas telas envolvidas por `<AuthProvider>` e injetadas com use cases fakes.
 - [ ] **Testes de Infraestrutura (SQLite):** Validar migrations (criação de todas as tabelas), persistência de cache após reinício, transações entre anúncio e ação da fila de sincronização (OFF-04, OFF-02, DAT-01).
 - [ ] **Testes de Infraestrutura (Supabase):** Validar gateways com mock (RLS, leitura pública de anúncios ativos, bloqueio de edição por terceiro, proteção de favoritos e interesses, upload de fotos associado ao anúncio correto, controle de versão em atualização concorrente).
 - [ ] **Testes E2E (pouquíssimos, fluxos críticos):** Reservar para fluxos completos: visitante pesquisa e abre animal; usuário autentica e favorita; responsável cria anúncio online e offline; sincronização; edição offline; fluxo de conflito; marcar adotado; bloqueio de edição de anúncio de terceiro.
+
+**Resultado:** 65 testes passando em 10 suítes (incluindo os 7 testes de domínio existentes).
 
 ### 4.5. Testes específicos dos critérios não verificados (docs/arquitetura)
 

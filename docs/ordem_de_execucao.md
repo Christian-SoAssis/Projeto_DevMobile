@@ -34,18 +34,25 @@ Isso serve de diagnóstico oficial antes de qualquer implementação.
 
 ---
 
-## 3. Implementar camada de testes (PRIORIDADE MAIS ALTA)
+## 3. Implementar camada de testes ✅ CONCLUÍDO
 
 **Prioridade: Crítica**
 
-Atualmente existem apenas 7 testes de domínio (`enlace.test.ts`). Faltam:
+Foram implementados 65 testes em 10 suítes (incluindo os 7 testes de domínio existentes):
 
-- **Testes de Use Cases:** com fakes/repositórios in-memory para cada use case (caminho feliz, tratamento de erros, falta de permissões).
-- **Testes de Context API & Hooks:** `AuthProvider`, `useAuth`, `RepositoriesContext`, `useConnectivity`, `useFullSync`.
-- **Testes de Telas e Componentes:** configurar `@testing-library/react-native` (RNTL) e simular ações do usuário.
-- **Testes de Infraestrutura (SQLite):** migrations, persistência de cache após reinício, transações atômicas.
-- **Testes de Infraestrutura (Supabase):** gateways com mock (RLS, bloqueio de edição por terceiro, proteção de favoritos/interesses, upload de fotos, controle de versão).
-- **Testes E2E:** fluxos críticos completos (visitante busca animal, usuário favorita, responsável cria anúncio online/offline, sincroniza, edição offline, fluxo de conflito, marca adotado, bloqueio de edição de terceiro).
+- **Testes de Use Cases:** 9 arquivos com fakes/repositórios in-memory para cada use case:
+  - `CreateAnimalUseCase.test.ts`, `SearchAnimalsUseCase.test.ts`, `ToggleFavoriteUseCase.test.ts`
+  - `RegisterAdoptionInterestUseCase.test.ts`, `ProcessSyncQueueUseCase.test.ts`
+  - `ResolveSyncConflictUseCase.test.ts`, `UpdateAnimalUseCase.test.ts`
+  - `DeleteAnimalUseCase.test.ts`, `MarkAnimalAdoptedUseCase.test.ts`
+- **Fakes in-memory:** `src/__tests__/fakes/in-memory-repositories.ts` com todos os ports e fabricantes de dados
+- **Typecheck:** `tsc --noEmit` limpo
+
+Pendente:
+- Testes de Context API & Hooks (`AuthProvider`, `useAuth`, `RepositoriesContext`, `useConnectivity`, `useFullSync`)
+- Testes de Telas e Componentes (RNTL)
+- Testes de Infraestrutura SQLite e Supabase
+- Testes E2E (fluxos críticos)
 
 ---
 

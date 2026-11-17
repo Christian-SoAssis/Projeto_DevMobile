@@ -1,4 +1,5 @@
 import { SupabaseClientLike, SupabaseConfig, SupabaseModuleLike } from './types';
+import { SessionStorageSecureStore } from '../../adapters/auth/SessionStorageSecureStore';
 
 export interface LoadSupabaseClientOptions {
   config?: SupabaseConfig | null;
@@ -6,58 +7,11 @@ export interface LoadSupabaseClientOptions {
 }
 
 /**
- * Armazenamento de sessão em `expo-secure-store` com fallback seguro em memória.
+ * Armazenamento de sessão seguro (DAT-03, DAT-04).
+ * Implementado por `SessionStorageSecureStore` (encapsula `expo-secure-store`
+ * com fallback em memória para testes).
  */
-function createSessionStorage() {
-  const memoryStore = new Map<string, string>();
-  let secureStore: any = null;
-  const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
-
-  if (!isTestEnv) {
-    try {
-      secureStore = require('expo-secure-store');
-    } catch {
-      secureStore = null;
-    }
-  }
-
-  return {
-    async getItem(key: string): Promise<string | null> {
-      const safeKey = key.replace(/[^a-zA-Z0-9._-]/g, '_');
-      if (secureStore && typeof secureStore.getItemAsync === 'function') {
-        try {
-          const val = await secureStore.getItemAsync(safeKey);
-          if (val !== null && val !== undefined) return val;
-        } catch {
-          // fallback para memória
-        }
-      }
-      return memoryStore.get(safeKey) ?? null;
-    },
-    async setItem(key: string, value: string): Promise<void> {
-      const safeKey = key.replace(/[^a-zA-Z0-9._-]/g, '_');
-      memoryStore.set(safeKey, value);
-      if (secureStore && typeof secureStore.setItemAsync === 'function') {
-        try {
-          await secureStore.setItemAsync(safeKey, value);
-        } catch {
-          // fallback em memória já salvo
-        }
-      }
-    },
-    async removeItem(key: string): Promise<void> {
-      const safeKey = key.replace(/[^a-zA-Z0-9._-]/g, '_');
-      memoryStore.delete(safeKey);
-      if (secureStore && typeof secureStore.deleteItemAsync === 'function') {
-        try {
-          await secureStore.deleteItemAsync(safeKey);
-        } catch {
-          // ignora
-        }
-      }
-    },
-  };
-}
+const sessionStorage = new SessionStorageSecureStore();
 
 let singletonClient: SupabaseClientLike | null = null;
 
@@ -114,7 +68,7 @@ export function loadSupabaseClient(
 
   const client = mod.createClient(config.url, config.anonKey, {
     auth: {
-      storage: createSessionStorage(),
+      storage: sessionStorage,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,

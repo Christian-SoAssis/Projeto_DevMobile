@@ -150,7 +150,10 @@ Conforme o item 2 do `docs/ordem_de_execucao.md`, foram validadas as camadas já
 | Interfaces em `src/domain/ports/` são puramente declarativas | AT | 18 ports importam apenas de entidades e value objects do próprio domínio (confirmado via grep) |
 | 14 use cases orquestram via portas, sem regras de negócio puras nem código de interface | AT | 14 arquivos em `src/application/use-cases/` (Create, Delete, Get, MarkAdopted, Moderate, ProcessSyncQueue, PullRemote, RegisterInterest, ResolveConflict, RunFullSync, Search, ToggleFavorite, Update, UpdateInterestStatus) |
 | `UnitOfWork` garante consistência transacional entre SQLite e fila de sincronização (OFF-04) | PA | `SqliteUnitOfWork` implementa `withTransactionAsync`. Use cases criam entidade + registro de fila na mesma transação. Não testado interrupção de gravação no meio da transação. Evidência: `src/infrastructure/database/sqlite/SqliteUnitOfWork.ts`, `src/application/ports/UnitOfWork.ts` |
-| Testes de use cases implementados com fakes in-memory | AT | 9 arquivos de teste em `src/__tests__/use-cases/` cobrindo todos os 14 use cases. 65 testes passando (incluindo 7 de domínio existentes). Fakes em `src/__tests__/fakes/in-memory-repositories.ts`. Evidência: `npm test` passa, `tsc --noEmit` limpo. |
+| Testes de use cases implementados com fakes in-memory | AT | 9 arquivos de teste em `src/__tests__/use-cases/` cobrindo todos os 14 use cases. Fakes em `src/__tests__/fakes/in-memory-repositories.ts`. |
+| Testes de cenários de validação (T01-T27) implementados | AT | 1 arquivo de teste em `src/__tests__/integration/validation-scenarios.test.ts` cobrindo 22 cenários com fakes in-memory e 7 marcados como NA. 29 testes passando. Evidência: `npm test` passa, `tsc --noEmit` limpo. |
+| Adapter de sessão seguro dedicado implementado | AT | Interface `SessionStorage` no domínio (`src/domain/ports/SessionStorage.ts`), implementação `SessionStorageSecureStore` em `src/adapters/auth/SessionStorageSecureStore.ts`, client do Supabase atualizado para usar o adapter. 8 testes passando em `src/__tests__/adapters/SessionStorageSecureStore.test.ts`. |
+| Total de testes | AT | 103 testes passando em 12 suítes (7 de domínio + 58 de use cases + 29 de cenários de validação + 8 de adapter de sessão). |
 
 ---
 

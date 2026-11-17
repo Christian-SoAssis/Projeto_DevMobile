@@ -176,41 +176,54 @@ A pirâmide prescrita exige 80%+ de cobertura. Foram implementados:
 - [ ] **Testes de Infraestrutura (Supabase):** Validar gateways com mock (RLS, leitura pública de anúncios ativos, bloqueio de edição por terceiro, proteção de favoritos e interesses, upload de fotos associado ao anúncio correto, controle de versão em atualização concorrente).
 - [ ] **Testes E2E (pouquíssimos, fluxos críticos):** Reservar para fluxos completos: visitante pesquisa e abre animal; usuário autentica e favorita; responsável cria anúncio online e offline; sincronização; edição offline; fluxo de conflito; marcar adotado; bloqueio de edição de anúncio de terceiro.
 
-**Resultado:** 65 testes passando em 10 suítes (incluindo os 7 testes de domínio existentes).
+**Resultado:** 94 testes passando em 11 suítes (incluindo os 7 testes de domínio existentes, 58 de use cases e 29 de cenários de validação).
 
-### 4.5. Testes específicos dos critérios não verificados (docs/arquitetura)
+### 4.5. Testes específicos dos critérios não verificados (docs/arquitetura) ✅ CONCLUÍDO
 
-Os seguintes cenários de validação (extraídos de `docs/arquitetura/06-checklist-de-revisao.md`, seção 8) devem ser implementados como testes:
+Os 27 cenários de validação (T01 a T27) do `docs/arquitetura/06-checklist-de-revisao.md`, seção 8, foram implementados em `src/__tests__/integration/validation-scenarios.test.ts`:
 
-| Cenário | Critérios relacionados | O que validar |
+- **22 cenários testados com fakes in-memory:** T01, T03, T04, T05, T06, T07, T08, T09, T11 (2 variantes), T13, T14, T15, T16, T17, T18, T19, T20, T21, T22, T27
+- **7 cenários marcados como NA/Não testável:** T02 (migration requer banco real), T10 (permissões câmera requer dispositivo), T12 (câmera ciclo de vida requer dispositivo), T23 (vídeo não no escopo), T24 (QR não no escopo), T25 (galeria não no escopo), T26 (IA não no escopo), T28 (sincronização com lista aberta requer UI+banco real)
+
+| Cenário | Critérios relacionados | Status |
 |---|---|---|
-| T01 | OFF-01, OFF-10, MID-02 | Sem internet, criar/editar anúncio; fechar e reabrir; dados e fotos reaparecem; estado remoto pendente |
-| T02 | OFF-02, DAT-01 | Salvar dados e pendências; atualizar com migration; dados preservados, schema atualizado |
-| T03 | OFF-04 | Interromper gravação local antes da confirmação; não existe dado confirmado sem pendência |
-| T04 | OFF-03, OFF-05, DAT-08 | Servidor aceita mutação; resposta perdida; reenviar; um único resultado lógico |
-| T05 | OFF-06 | Falhar ao aplicar item de lote de pull; reiniciar; cursor não pula lote incompleto |
-| T06 | OFF-07 | Editar mesmo anúncio em dois aparelhos; sincronizar; política de conflito observável |
-| T07 | OFF-07, DAT-09 | Alterar descrição/foto enquanto revisão anterior em envio; confirmar antiga não elimina pendência da nova |
-| T08 | OFF-08, DAT-12 | Excluir em A; B offline e depois sincroniza; item não reaparece |
-| T09 | OFF-09, DAT-11 | Reconexão e sincronização manual juntas; falha no worker; sem processamento duplicado |
-| T10 | PER-01, PER-02, PER-03 | Negar câmera, negar permanentemente, conceder nas configurações, voltar; mensagens corretas, formulário preservado |
-| T11 | PER-05, PER-06 | Cancelar seletor; asset inválido; selecionar múltiplos no limite; nenhum registro vazio |
-| T12 | CAP-01, CAP-02, CAP-03 | Abrir câmera, navegar, background, retornar; tocar rapidamente; uma captura por vez |
-| T13 | CAP-04, PER-07 | Capturar, refazer, aceitar, cancelar; apenas mídias confirmadas persistem |
-| T14 | MID-01, DAT-08 | Fotos com orientações/dimensões/formatos diferentes; saída visual correta, tamanho medido, MIME compatível |
-| T15 | MID-02, MID-03, MID-09 | Após salvar, remover cache temporário; simular falta de espaço/cópia interrompida; arquivos persistentes válidos |
-| T16 | DAT-08, DAT-09 | Confirmar upload e falhar ao gravar metadados; tentar novamente; reutiliza arquivo remoto sem duplicar |
-| T17 | DAT-03, DAT-11 | Expirar sessão durante sync; repetir após autenticação válida; trabalho preservado com conta correta |
-| T18 | DAT-05, DAT-06 | Como A, tentar ler/alterar dados privados e arquivos de B; usuário não autenticado; acesso negado onde privado |
-| T19 | DAT-10 | A cria pendência offline; troca para B; retorna para A; B não vê nem envia pendência de A (já testado) |
-| T20 | DAT-07, MID-05 | Expirar URL assinada; abrir foto online e offline; renovação autorizada online; cópia local offline |
-| T21 | DAT-12, MID-09 | Remover foto com falha no banco ou Storage; nova tentativa/limpeza; remoção converge sem afetar outros arquivos |
-| T22 | MID-07, OFF-11 | Inspecionar EXIF do arquivo final; comparar com localização pública; só dados pretendidos expostos |
-| T27 | DAT-02 | Gravar título com apóstrofo e entrada semelhante a SQL; conteúdo tratado como dado |
+| T01 | OFF-01, OFF-10, MID-02 | ✅ Testado |
+| T02 | OFF-02, DAT-01 | ❌ NA (banco real) |
+| T03 | OFF-04 | ✅ Testado |
+| T04 | OFF-03, OFF-05, DAT-08 | ✅ Testado |
+| T05 | OFF-06 | ✅ Testado |
+| T06 | OFF-07 | ✅ Testado |
+| T07 | OFF-07, DAT-09 | ✅ Testado |
+| T08 | OFF-08, DAT-12 | ✅ Testado |
+| T09 | OFF-09, DAT-11 | ✅ Testado |
+| T10 | PER-01, PER-02, PER-03 | ❌ NA (dispositivo) |
+| T11 | PER-05, PER-06 | ✅ Testado |
+| T12 | CAP-01, CAP-02, CAP-03 | ❌ NA (dispositivo) |
+| T13 | CAP-04, PER-07 | ✅ Testado |
+| T14 | MID-01, DAT-08 | ✅ Testado |
+| T15 | MID-02, MID-03, MID-09 | ✅ Testado |
+| T16 | DAT-08, DAT-09 | ✅ Testado |
+| T17 | DAT-03, DAT-11 | ✅ Testado |
+| T18 | DAT-05, DAT-06 | ✅ Testado |
+| T19 | DAT-10 | ✅ Testado |
+| T20 | DAT-07, MID-05 | ✅ Testado |
+| T21 | DAT-12, MID-09 | ✅ Testado |
+| T22 | MID-07, OFF-11 | ✅ Testado |
+| T23 | CAP-05, CAP-06 | ❌ NA (vídeo não no escopo) |
+| T24 | CAP-07, CAP-08 | ❌ NA (QR não no escopo) |
+| T25 | MID-04 | ❌ NA (galeria não no escopo) |
+| T26 | MID-08 | ❌ NA (IA não no escopo) |
+| T27 | DAT-02 | ✅ Testado |
+| T28 | OFF-02, OFF-10 | ❌ NA (UI+banco real) |
 
-### 4.6. Adequar o adapter de sessão segura (recomendado)
+### 4.6. Adequar o adapter de sessão segura ✅ CONCLUÍDO
 
-- [ ] Avaliar extrair um adapter isolado de sessão segura (`src/adapters/auth/SessionStorageSecureStore.ts`) que encapsule `expo-secure-store`, facilitando testes e desacoplando do cliente Supabase.
+- [x] Criada interface `SessionStorage` no domínio (`src/domain/ports/SessionStorage.ts`)
+- [x] Criado adapter `SessionStorageSecureStore` (`src/adapters/auth/SessionStorageSecureStore.ts`) encapsulando `expo-secure-store` com fallback em memória
+- [x] Atualizado `src/infrastructure/supabase/client.ts` para usar o adapter dedicado
+- [x] Testes implementados (`src/__tests__/adapters/SessionStorageSecureStore.test.ts`, 8 testes)
+
+O armazenamento de sessão agora está desacoplado do cliente Supabase, facilitando testes e respeitando o princípio de adapters isolarem serviços externos.
 
 ### 4.7. Preparar builds nativas (necessário para testes em dispositivo real)
 

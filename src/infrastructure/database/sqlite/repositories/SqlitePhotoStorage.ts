@@ -105,6 +105,54 @@ export class SqlitePhotoStorage implements PhotoStorage {
     await this.db.runAsync('DELETE FROM local_images WHERE id = ?', [photoId]);
   }
 
+  /**
+   * Remove registros de fotos locais cujo arquivo físico não existe mais
+   * (órfãos por limpeza de cache do SO ou falha de cópia anterior).
+   * Só remove quando o registro não tem remote_url (não foi enviado ao servidor).
+   * MID-09, DAT-12.
+   */
+  async cleanupOrphanedFiles(): Promise<{ removed: number; errors: string[] }> {
+    const errors: string[] = [];
+    let removed = 0;
+
+    const fs = this.fileSystem ?? this.loadFileSystem();
+    if (!fs?.documentDirectory) {
+      return { removed: 0, errors: ['Filesystem não disponível para limpeza.'] };
+    }
+
+    const rows = await this.db.getAllAsync<{
+      id: string;
+      local_path: string | null;
+      remote_url: string | null;
+      upload_status: string;
+    }>('SELECT id, local_path, remote_url, upload_status FROM local_images');
+
+    for (const row of rows) {
+      // Se já foi enviado ao servidor, não remove (a referência remota mantém a foto).
+      if (row.remote_url) continue;
+
+      const localPath = row.local_path;
+      if (!localPath) {
+        // Sem caminho local e sem URL remota: registro órfão, pode remover.
+        await this.db.runAsync('DELETE FROM local_images WHERE id = ?', [row.id]);
+        removed += 1;
+        continue;
+      }
+
+      try {
+        const info = await fs.getInfoAsync(localPath);
+        if (!info.exists) {
+          await this.db.runAsync('DELETE FROM local_images WHERE id = ?', [row.id]);
+          removed += 1;
+        }
+      } catch (err) {
+        errors.push(`Falha ao verificar ${localPath}: ${err}`);
+      }
+    }
+
+    return { removed, errors };
+  }
+
   private async copyToAppStorage(photo: AnimalPhoto): Promise<string> {
     const source = photo.localPath || '';
     if (!source) return source;
@@ -128,14 +176,10 @@ export class SqlitePhotoStorage implements PhotoStorage {
       await fs.copyAsync({ from: source, to: target });
       return target;
     } catch (err) {
-      const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
-      if (isTestEnv) {
-        throw new PhotoCopyError(
-          `Falha ao persistir a foto ${photo.id} no armazenamento do app (RNF01/RNF02).`,
-          err
-        );
-      }
-      return source;
+      throw new PhotoCopyError(
+        `Falha ao persistir a foto ${photo.id} no armazenamento do app (RNF01/RNF02).`,
+        err
+      );
     }
   }
 

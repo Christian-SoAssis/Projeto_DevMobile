@@ -1,12 +1,24 @@
 import { SqliteDatabaseDriver } from './DatabaseDriver';
 
 /**
- * Inicialização e migrations idempotentes do schema SQLite local (DAT-01, OFF-02).
- * Preserva todos os dados existentes ao evoluir a estrutura.
+ * Registro de migrations aplicadas (DAT-01, OFF-02).
+ * Permite evoluir o schema de forma sequenciada, preservando dados existentes.
  */
-export async function applyMigrations(db: SqliteDatabaseDriver): Promise<void> {
-  await db.execAsync(`
+interface Migration {
+  version: number;
+  sql: string;
+}
+
+const MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    sql: `
     PRAGMA journal_mode = WAL;
+
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
     CREATE TABLE IF NOT EXISTS animals (
       id TEXT PRIMARY KEY NOT NULL,
@@ -114,5 +126,47 @@ export async function applyMigrations(db: SqliteDatabaseDriver): Promise<void> {
       interests_json TEXT NOT NULL DEFAULT '[]',
       role TEXT NOT NULL DEFAULT 'USER'
     );
+
+    CREATE TABLE IF NOT EXISTS profiles (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      contact_info TEXT NOT NULL DEFAULT '',
+      bio TEXT NOT NULL DEFAULT '',
+      avatar_url TEXT,
+      role TEXT NOT NULL DEFAULT 'USER',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+`
+  }
+];
+
+/**
+ * Inicialização e migrations idempotentes do schema SQLite local (DAT-01, OFF-02).
+ * Preserva todos os dados existentes ao evoluir a estrutura.
+ */
+export async function applyMigrations(db: SqliteDatabaseDriver): Promise<void> {
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
+
+  const appliedRows = await db.getAllAsync<{ version: number }>(
+    'SELECT version FROM schema_migrations ORDER BY version'
+  );
+  const appliedVersions = new Set(appliedRows.map((r) => r.version));
+
+  for (const migration of MIGRATIONS) {
+    if (appliedVersions.has(migration.version)) continue;
+
+    await db.execAsync(migration.sql);
+
+    await db.runAsync(
+      'INSERT OR REPLACE INTO schema_migrations (version, applied_at) VALUES (?, datetime(\'now\'))',
+      [migration.version]
+    );
+  }
 }

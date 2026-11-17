@@ -155,16 +155,34 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
     return (await this.findById(animal.id)) ?? animal;
   }
 
-  async updateRemote(animal: Animal, _expectedVersion?: number): Promise<Animal> {
+  async updateRemote(animal: Animal, expectedVersion?: number): Promise<Animal> {
     const rowPayload = this.toRemoteRow(animal);
+    const versionToMatch = typeof expectedVersion === 'number' ? expectedVersion : animal.version - 1;
 
+    // Bloqueio otimista: só atualiza se a versão remota corresponder à esperada.
+    // Isso impede sobrescrita silenciosa de edição concorrente (RNF03, OFF-05).
     const { data, error } = await this.client
       .from('animals')
-      .upsert(rowPayload, { onConflict: 'id' })
+      .update(rowPayload)
+      .eq('id', animal.id)
+      .eq('version', versionToMatch)
       .select('*')
       .single();
 
     if (error || !data) {
+      // Verificar se o registro existe com versão diferente (conflito de versão).
+      const { data: existing } = await this.client
+        .from('animals')
+        .select('version')
+        .eq('id', animal.id)
+        .maybeSingle();
+
+      if (existing) {
+        const remoteVersion = Number((existing as { version: number }).version) || 1;
+        throw new Error(
+          `CONFLICT_VERSION: versão remota ${remoteVersion} diverge da versão esperada ${versionToMatch}.`
+        );
+      }
       throw new Error(error?.message || 'Não foi possível atualizar o anúncio no Supabase.');
     }
 

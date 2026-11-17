@@ -11,11 +11,10 @@ interface RemoteUserProfileRow {
   id: string;
   name: string | null;
   email: string | null;
-  phone: string | null;
+  contact_info: string | null;
   bio: string | null;
-  interests: string[] | null;
   avatar_url: string | null;
-  user_type: string | null;
+  role: string | null;
 }
 
 /**
@@ -120,29 +119,24 @@ export class SupabaseAuthGateway implements AuthGateway {
   }
 
   async updateProfile(input: UpdateProfileInput): Promise<User> {
-    const payload = {
-      id: input.userId,
-      name: input.name.trim(),
-      phone: input.contactInfo.trim(),
-      bio: input.bio.trim(),
-      avatar_url: input.avatarUrl ?? null,
-      interests: input.interestsTags ?? ['Cães', 'Gatos'],
-    };
-
     const { data: existing } = await this.client
-      .from('users')
+      .from('profiles')
       .select('*')
       .eq('id', input.userId)
       .maybeSingle();
 
     const email = existing?.email || 'usuario@exemplo.com';
-    const userType = (existing?.user_type as UserRole) || 'USER';
+    const role = (existing?.role as UserRole) || 'USER';
 
-    const { error } = await this.client.from('users').upsert(
+    const { error } = await this.client.from('profiles').upsert(
       {
-        ...payload,
+        id: input.userId,
+        name: input.name.trim(),
         email,
-        user_type: userType,
+        contact_info: input.contactInfo.trim(),
+        bio: input.bio.trim(),
+        avatar_url: input.avatarUrl ?? null,
+        role,
       },
       { onConflict: 'id' }
     );
@@ -153,13 +147,13 @@ export class SupabaseAuthGateway implements AuthGateway {
 
     return new User({
       id: input.userId,
-      name: payload.name,
+      name: input.name.trim(),
       email,
-      contactInfo: payload.phone,
-      bio: payload.bio,
-      avatarUrl: payload.avatar_url ?? undefined,
-      interestsTags: payload.interests,
-      role: userType,
+      contactInfo: input.contactInfo.trim(),
+      bio: input.bio.trim(),
+      avatarUrl: input.avatarUrl ?? undefined,
+      interestsTags: input.interestsTags ?? ['Cães', 'Gatos'],
+      role,
     });
   }
 
@@ -173,7 +167,7 @@ export class SupabaseAuthGateway implements AuthGateway {
   ): Promise<User> {
     const userId = String(authUser.id);
     const { data: existing } = await this.client
-      .from('users')
+      .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
@@ -184,11 +178,11 @@ export class SupabaseAuthGateway implements AuthGateway {
         id: row.id,
         name: row.name || defaults.name,
         email: row.email || defaults.email,
-        contactInfo: row.phone || defaults.contactInfo,
+        contactInfo: row.contact_info || defaults.contactInfo,
         bio: row.bio || '',
         avatarUrl: row.avatar_url ?? undefined,
-        interestsTags: Array.isArray(row.interests) && row.interests.length > 0 ? row.interests : ['Cães', 'Gatos'],
-        role: row.user_type === 'ADMIN' ? 'ADMIN' : 'USER',
+        interestsTags: ['Cães', 'Gatos'],
+        role: row.role === 'ADMIN' ? 'ADMIN' : 'USER',
       });
     }
 
@@ -196,13 +190,12 @@ export class SupabaseAuthGateway implements AuthGateway {
       id: userId,
       name: defaults.name,
       email: defaults.email,
-      phone: defaults.contactInfo,
-      user_type: 'USER',
+      contact_info: defaults.contactInfo,
       bio: '',
-      interests: ['Cães', 'Gatos'],
+      role: 'USER',
     };
 
-    await this.client.from('users').upsert(insertRow, { onConflict: 'id' });
+    await this.client.from('profiles').upsert(insertRow, { onConflict: 'id' });
 
     return new User({
       id: userId,

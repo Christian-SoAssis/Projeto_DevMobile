@@ -22,7 +22,20 @@ export interface ProcessSyncQueueOptions {
   favorites?: FavoriteRemoteGateway;
   interests?: InterestRemoteGateway;
   currentUserId?: () => string | null;
+  /** Atraso em ms entre tentativas de uma mesma ação (padrão: backoff exponencial). */
+  retryDelayMs?: (attempts: number) => number;
 }
+
+/** Backoff exponencial com jitter simples: 1s, 2s, 4s, 8s ... limitado a 30s. */
+const defaultRetryDelayMs = (attempts: number): number => {
+  const delay = Math.min(1000 * Math.pow(2, Math.max(0, attempts - 1)), 30_000);
+  const jitter = Math.floor(Math.random() * 1_000);
+  return delay + jitter;
+};
+
+/** Aguarda o número de milissegundos informado. */
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Processa a fila outbox local em ordem (UC17, §14.1, OFF-05, DAT-08, DAT-09, DAT-10).
@@ -44,6 +57,7 @@ export class ProcessSyncQueueUseCase {
   async execute(): Promise<ProcessSyncQueueResult> {
     const allPending = await this.syncQueueRepository.listPending();
     const activeUserId = this.options.currentUserId ? this.options.currentUserId() : undefined;
+    const retryDelay = this.options.retryDelayMs ?? defaultRetryDelayMs;
 
     let processed = 0;
     let succeeded = 0;
@@ -58,6 +72,12 @@ export class ProcessSyncQueueUseCase {
       }
 
       processed += 1;
+
+      // Backoff exponencial: aguarda antes de tentar uma ação que já falhou anteriormente.
+      if (action.attempts > 0) {
+        await sleep(retryDelay(action.attempts));
+      }
+
       action.startSync();
       await this.syncQueueRepository.update(action);
 
@@ -199,7 +219,7 @@ export class ProcessSyncQueueUseCase {
       }
     }
 
-    const updated = await remoteAnimals.updateRemote(localAnimal);
+    const updated = await remoteAnimals.updateRemote(localAnimal, expectedVersion);
     await this.animalRepository.saveLocal(updated);
     action.markCompleted();
   }

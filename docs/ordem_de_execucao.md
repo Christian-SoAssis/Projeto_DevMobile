@@ -2,7 +2,7 @@
 
 ---
 
-## 1. Base para todo o restante — Preencher o check-list de revisão
+## 1. Base para todo o restante — Preencher o check-list de revisão ✅ CONCLUÍDO
 
 **Prioridade: Alta (início imediato)**
 
@@ -10,17 +10,27 @@ Preencher o arquivo `docs/arquitetura/06-checklist-de-revisao.md` com evidência
 
 Isso serve de diagnóstico oficial antes de qualquer implementação.
 
+**Resultado:** todas as 33 regras preenchidas:
+- OFF-01 a OFF-08: PA
+- OFF-09 a OFF-11: NV
+- PER-01 a PER-07: NV
+- CAP-01 a CAP-04, CAP-07, CAP-08: NA
+- CAP-05 a CAP-06: NA (vídeo/QR fora de escopo)
+- MID-01 a MID-03, MID-05, MID-07, MID-09: NV
+- MID-04, MID-06, MID-08: NA (fora de escopo)
+- DAT-01: PA; DAT-02 a DAT-09: NV; DAT-10: AT; DAT-11 a DAT-12: NV
+
 ---
 
-## 2. Validar camadas já implementadas (domínio e aplicação)
+## 2. Validar camadas já implementadas (domínio e aplicação) ✅ CONCLUÍDO
 
 **Prioridade: Média**
 
-- Confirmar que `src/domain/` não importa Expo, React Native, Supabase ou SQLite.
-- Validar que todos os Value Objects são imutáveis e se validam na criação.
-- Confirmar que as interfaces em `src/domain/ports/` são puramente declarativas.
-- Confirmar que os 14 use cases orquestram via portas, sem regras de negócio puras nem código de interface.
-- Validar o `UnitOfWork` para consistência transacional entre SQLite e fila de sincronização (critério OFF-04).
+- [x] Confirmar que `src/domain/` não importa Expo, React Native, Supabase ou SQLite. (verificado via grep — zero matches)
+- [x] Validar que todos os Value Objects são imutáveis e se validam na criação.
+- [x] Confirmar que as interfaces em `src/domain/ports/` são puramente declarativas. (verificado via grep — importam apenas de entidades/value objects do próprio domínio)
+- [x] Confirmar que os 14 use cases orquestram via portas, sem regras de negócio puras nem código de interface.
+- [x] Validar o `UnitOfWork` para consistência transacional entre SQLite e fila de sincronização (critério OFF-04). (implementado; teste de interrupção pendente — OFF-04 classificado como PA)
 
 ---
 

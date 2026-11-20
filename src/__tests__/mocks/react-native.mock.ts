@@ -1,0 +1,26 @@
+const reactNative = {
+  View: 'View',
+  Text: 'Text',
+  StyleSheet: { create: (obj: any) => obj },
+  TouchableOpacity: 'TouchableOpacity',
+  FlatList: 'FlatList',
+  ScrollView: 'ScrollView',
+  Image: 'Image',
+  TextInput: 'TextInput',
+  Button: 'Button',
+  ActivityIndicator: 'ActivityIndicator',
+  Alert: { alert: jest.fn() },
+  Platform: { OS: 'ios', select: (obj: any) => obj.default ?? obj.ios ?? obj.android },
+  Dimensions: { get: () => ({ width: 375, height: 812 }) },
+  PixelRatio: { get: () => 1 },
+  StatusBar: { setBackgroundColor: jest.fn(), setBarStyle: jest.fn() },
+  Linking: { addEventListener: jest.fn(), removeEventListener: jest.fn(), openURL: jest.fn() },
+  AppState: { addEventListener: jest.fn(), removeEventListener: jest.fn(), currentState: 'active' },
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
+  SafeAreaView: 'SafeAreaView',
+  Pressable: 'Pressable',
+  useWindowDimensions: () => ({ width: 375, height: 812 }),
+  useColorScheme: () => 'light',
+};
+
+export default reactNative;

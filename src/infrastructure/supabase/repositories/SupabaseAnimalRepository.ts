@@ -179,9 +179,11 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
 
       if (existing) {
         const remoteVersion = Number((existing as { version: number }).version) || 1;
-        throw new Error(
-          `CONFLICT_VERSION: versão remota ${remoteVersion} diverge da versão esperada ${versionToMatch}.`
-        );
+        if (remoteVersion !== versionToMatch) {
+          throw new Error(
+            `CONFLICT_VERSION: versão remota ${remoteVersion} diverge da versão esperada ${versionToMatch}.`
+          );
+        }
       }
       throw new Error(error?.message || 'Não foi possível atualizar o anúncio no Supabase.');
     }

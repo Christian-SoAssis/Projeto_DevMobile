@@ -1,4 +1,4 @@
-export const useRouter = () => ({
+export const mockRouter = {
   push: jest.fn(),
   replace: jest.fn(),
   back: jest.fn(),
@@ -7,7 +7,9 @@ export const useRouter = () => ({
   pathname: '/',
   query: {},
   asPath: '/',
-});
+};
+
+export const useRouter = () => mockRouter;
 
 export const useLocalSearchParams = () => ({});
 export const useGlobalSearchParams = () => ({});
@@ -20,6 +22,7 @@ export const createStackNavigator = () => ({ Screen: () => null });
 export const createTabsNavigator = () => ({ Screen: () => null });
 
 export default {
+  mockRouter,
   useRouter,
   useLocalSearchParams,
   useGlobalSearchParams,

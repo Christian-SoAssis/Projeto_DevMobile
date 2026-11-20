@@ -7,7 +7,7 @@ module.exports = {
   clearMocks: true,
   setupFiles: ['<rootDir>/src/__tests__/setup.ts'],
   transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', { isolatedModules: false }],
+    '^.+\\.(ts|tsx)$': ['ts-jest', { isolatedModules: false, tsconfig: { jsx: 'react-jsx' } }],
   },
   moduleNameMapper: {
     '^expo$': '<rootDir>/src/__tests__/mocks/expo.mock.ts',
@@ -31,6 +31,8 @@ module.exports = {
     '^expo-linking$': '<rootDir>/src/__tests__/mocks/expo-linking.mock.ts',
     '^react-native-url-polyfill$': '<rootDir>/src/__tests__/mocks/url-polyfill.mock.ts',
     '^@supabase/supabase-js$': '<rootDir>/src/__tests__/mocks/supabase.mock.ts',
+    '^@expo/vector-icons$': '<rootDir>/src/__tests__/mocks/vector-icons.mock.ts',
+    '^@expo/vector-icons/.*$': '<rootDir>/src/__tests__/mocks/vector-icons.mock.ts',
     '^.*/adapters/context/RepositoriesContext$': '<rootDir>/src/__tests__/mocks/RepositoriesContext.mock.ts',
     '^.*/adapters/context/AuthContext$': '<rootDir>/src/__tests__/mocks/AuthContext.mock.ts',
   },

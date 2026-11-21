@@ -99,7 +99,8 @@ export default function AnimalDetailsScreen() {
         container.interestRepository,
         container.animalRepository,
         container.syncQueueRepository,
-        container.remoteInterests
+        container.remoteInterests,
+        container.remoteAnimalSource
       ),
     [container]
   );
@@ -216,29 +217,52 @@ export default function AnimalDetailsScreen() {
     }
   };
 
-  const handleAdvanceInterest = async (interest: AdoptionInterest, nextStage: InterestStage) => {
+  const handleAdvanceInterest = (interest: AdoptionInterest, nextStage: InterestStage) => {
     if (!user || !animal) return;
-    try {
-      await updateInterestUseCase.execute(interest.id, user.id, nextStage, isOnline);
-      if (nextStage === 'CONCLUIDA' && animal.status.isAvailable()) {
-        await markAdoptedUseCase.execute(animal.id, user.id, isOnline);
-      }
-      await loadDetails();
-      void runFullSync();
-    } catch (err: any) {
-      Alert.alert('Erro', err?.message || 'Não foi possível atualizar a etapa.');
-    }
+    const nomeInteressado = interest.userName || 'Interessado';
+    const statusLabel = STAGE_LABELS[nextStage];
+    Alert.alert(
+      'Confirmar atualização',
+      `Você tem certeza que quer atualizar o status de interesse de ${nomeInteressado} em ${animal.name} para "${statusLabel}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          onPress: async () => {
+            try {
+              // updateInterestUseCase já faz a auto-adoção atomicamente quando nextStage === 'CONCLUIDA'
+              await updateInterestUseCase.execute(interest.id, user.id, nextStage, isOnline);
+              await loadDetails();
+            } catch (err: any) {
+              Alert.alert('Erro', err?.message || 'Não foi possível atualizar a etapa.');
+            }
+          },
+        },
+      ]
+    );
   };
 
-  const handleMarkAdopted = async () => {
+  const handleMarkAdopted = () => {
     if (!user || !animal) return;
-    try {
-      await markAdoptedUseCase.execute(animal.id, user.id, isOnline);
-      await loadDetails();
-      void runFullSync();
-    } catch (err: any) {
-      Alert.alert('Erro', err?.message || 'Não foi possível marcar como adotado.');
-    }
+    Alert.alert(
+      'Confirmar adoção',
+      `Marcar ${animal.name} como adotado?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sim, marcar como adotado',
+          onPress: async () => {
+            try {
+              await markAdoptedUseCase.execute(animal.id, user.id, isOnline);
+              await loadDetails();
+              void runFullSync();
+            } catch (err: any) {
+              Alert.alert('Erro', err?.message || 'Não foi possível marcar como adotado.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDeleteAnimal = () => {

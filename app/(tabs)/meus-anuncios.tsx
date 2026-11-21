@@ -104,14 +104,29 @@ export default function MeusAnunciosScreen() {
     }
   }, [isOnline, runFullSync, loadMyAnimals]);
 
-  const handleMarkAdopted = async (animal: Animal) => {
+  const handleMarkAdopted = (animal: Animal) => {
     if (!user) return;
-    try {
-      await markAdoptedUseCase.execute(animal.id, user.id, isOnline);
-      await loadMyAnimals();
-    } catch (err) {
-      Alert.alert('Atenção', err instanceof Error ? err.message : 'Erro ao marcar como adotado.');
-    }
+    Alert.alert(
+      'Confirmar adoção',
+      `Marcar ${animal.name} como adotado?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sim, marcar como adotado',
+          onPress: async () => {
+            try {
+              await markAdoptedUseCase.execute(animal.id, user.id, isOnline);
+              await loadMyAnimals();
+            } catch (err) {
+              Alert.alert(
+                'Atenção',
+                err instanceof Error ? err.message : 'Erro ao marcar como adotado.'
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDelete = (animal: Animal) => {

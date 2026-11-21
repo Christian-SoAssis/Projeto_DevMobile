@@ -56,6 +56,10 @@ Requer: Expo Go instalado em dispositivo físico (ou emulator) e builds nativos.
 | V32 | Localização pontual | Captura de localização apenas na criação de anúncio; não há rastreamento contínuo em segundo plano | OFF-11, RNF06 |
 | V33 | Estado de sync na UI | Ausência de rede, falha permanente, nova tentativa — mensagens coerentes; "publicado" não é mostrado quando existe apenas rascunho local | OFF-10 |
 | V34 | Gesto Pull-to-Refresh (deslizar para atualizar) | Deslizar para baixo no topo das listas (Feed, Meus Anúncios, Favoritos, Notificações, Sincronização). Online: exibe spinner terracotta, dispara `useFullSync` com Supabase e atualiza interface com o SQLite local; Offline: recarrega dados locais imediatamente sem travar a interface | OFF-09, OFF-10, RF17 |
+| V35 | Confirmação antes de atualizar status de interesse | Na tela de detalhes do anúncio (visão do responsável), ao tocar em qualquer etapa ("Em análise", "Visita combinada", "Concluída", "Recusada") deve aparecer `Alert.alert` com texto "Você tem certeza que quer atualizar o status de interesse de <nome> em <pet> para <etapa>?" com botões "Cancelar" e "Confirmar" | RF16, D16 |
+| V36 | Auto-adoção ao concluir interesse | Ao confirmar a etapa "Concluída", o animal deve ser automaticamente marcado como adotado. O badge do anúncio muda de "Disponível" para "Adotado" após a operação; a alteração é enfileirada se offline | RF12, D16 |
+| V37 | Confirmação antes de "Marcar como adotado" (tela de detalhes) | Na tela de detalhes do anúncio (botão "Marcar como adotado"), deve aparecer `Alert.alert` com texto "Marcar <nome do pet> como adotado?" com botões "Cancelar" e "Sim, marcar como adotado" antes de executar a ação | RF12 |
+| V38 | Confirmação antes de "Adotado" (tela Meus Anúncios) | Na listagem "Meus Anúncios", ao tocar no botão "Adotado" do card, deve aparecer `Alert.alert` com texto "Marcar <nome do pet> como adotado?" com botões "Cancelar" e "Sim, marcar como adotado" antes de executar a ação | RF12 |
 
 ---
 

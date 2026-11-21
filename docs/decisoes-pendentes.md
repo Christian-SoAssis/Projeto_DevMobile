@@ -40,6 +40,7 @@ Incluídas aqui para referência — não precisam ser decididas novamente:
 | — | Características no formulário | Opcionais (espécie, porte, idade, sexo continuam obrigatórios) | §18 item 17 |
 | — | Estratégia de sync | Delta sync com cursor (updated_at, id), sobreposição 60s, paginação 100 | §18 / OFF-06 |
 | D21 | Mecânica de atualização de páginas (Pull-to-Refresh) | Gesto nativo de deslizar para baixo com `RefreshControl` nas listas (`index`, `meus-anuncios`, `favoritos`, `notificacoes`, `sync`) acionando `useFullSync` quando online e recarga local do SQLite | §18 item 21 / OFF-09 |
+| D22 | Fluxo de confirmação de adoção e auto-adoção ao concluir interesse | (1) Atualizar status de interesse exige `Alert.alert` de confirmação com nome do interessado, nome do pet e etapa destino; (2) Ao confirmar "Concluída", o animal é automaticamente marcado como adotado (atômico, offline-first); (3) Marcar como adotado diretamente (via tela de detalhes ou Meus Anúncios) também exige `Alert.alert` de confirmação com o nome do pet | §18 item 22 / RF12 / D16 |
 
 ---
 

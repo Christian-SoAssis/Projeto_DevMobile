@@ -4,6 +4,8 @@ export interface ApproximateLocationProps {
   region?: string;
   latitude?: number;
   longitude?: number;
+  /** Indica se bairro/cidade/região vieram da geocodificação reversa (true) ou são valores padrão/falha (false). */
+  geocoded?: boolean;
 }
 
 /**
@@ -17,6 +19,7 @@ export class ApproximateLocation {
   public readonly region: string;
   public readonly latitude: number;
   public readonly longitude: number;
+  public readonly geocoded: boolean;
 
   constructor(props: ApproximateLocationProps) {
     const city = (props.city ?? '').trim();
@@ -29,6 +32,7 @@ export class ApproximateLocation {
     this.region = (props.region ?? 'MG').trim() || 'MG';
     this.latitude = ApproximateLocation.roundCoord(props.latitude ?? -21.55);
     this.longitude = ApproximateLocation.roundCoord(props.longitude ?? -45.43);
+    this.geocoded = props.geocoded ?? false;
   }
 
   static roundCoord(value: number): number {

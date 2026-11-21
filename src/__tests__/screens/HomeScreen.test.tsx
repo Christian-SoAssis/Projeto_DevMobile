@@ -82,8 +82,7 @@ describe('HomeScreen (RNTL)', () => {
 
     await fireEvent.press(getByText('Mapa'));
 
-    expect(await findByText('Centro')).toBeTruthy();
-    expect(await findByText('Varginha')).toBeTruthy();
+    // No modo mapa, o headline da lista não é exibido
     expect(queryByText(/Encontre seu/)).toBeNull();
 
     await fireEvent.press(getByText('Lista'));

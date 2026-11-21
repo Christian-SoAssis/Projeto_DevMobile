@@ -7,9 +7,10 @@ module.exports = {
   clearMocks: true,
   setupFiles: ['<rootDir>/src/__tests__/setup.ts'],
   transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', { isolatedModules: false, tsconfig: { jsx: 'react-jsx' } }],
+    '^.+\\.(ts|tsx)$': ['ts-jest', { isolatedModules: true, tsconfig: { jsx: 'react-jsx' } }],
   },
   moduleNameMapper: {
+    '^react-native-maps$': '<rootDir>/src/__tests__/mocks/react-native-maps.mock.ts',
     '^expo$': '<rootDir>/src/__tests__/mocks/expo.mock.ts',
     '^expo-secure-store$': '<rootDir>/src/__tests__/mocks/expo-secure-store.mock.ts',
     '^expo-sqlite$': '<rootDir>/src/__tests__/mocks/expo-sqlite.mock.ts',

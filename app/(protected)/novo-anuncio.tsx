@@ -53,6 +53,7 @@ export default function NovoAnuncioScreen() {
   const [city, setCity] = useState('Varginha');
   const [latitude, setLatitude] = useState(-21.55);
   const [longitude, setLongitude] = useState(-45.43);
+  const [locGeocoded, setLocGeocoded] = useState(true);
   const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -95,6 +96,13 @@ export default function NovoAnuncioScreen() {
       setCity(loc.city);
       setLatitude(loc.latitude);
       setLongitude(loc.longitude);
+      setLocGeocoded(loc.geocoded);
+      if (!loc.geocoded) {
+        Alert.alert(
+          'Localização aproximada',
+          'Não foi possível identificar o bairro e a cidade automaticamente. Preencha manualmente.'
+        );
+      }
     } catch {
       Alert.alert('Localização', 'Preencha o bairro e a cidade manualmente.');
     } finally {
@@ -301,6 +309,11 @@ export default function NovoAnuncioScreen() {
             placeholder="Ex.: Varginha"
             placeholderTextColor={COLORS.brownMuted}
           />
+          {!locGeocoded && !locating && (
+            <Text style={styles.locNotGeocodedText}>
+              Bairro/cidade não identificados automaticamente — preenchidos com valores padrão.
+            </Text>
+          )}
         </View>
 
         <TouchableOpacity
@@ -437,6 +450,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: COLORS.green,
+  },
+  locNotGeocodedText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.brown,
+    marginTop: 4,
   },
   saveButtonText: {
     color: COLORS.white,

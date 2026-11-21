@@ -39,6 +39,12 @@
       "expo-sqlite",
       "expo-secure-store",
       [
+        "react-native-maps",
+        {
+          "googleMapsApiKey": "SUA_CHAVE_GOOGLE_MAPS_AQUI"
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "O Enlace precisa acessar suas fotos para anexar imagens ao anúncio de adoção.",

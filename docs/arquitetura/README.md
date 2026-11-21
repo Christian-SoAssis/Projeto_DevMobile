@@ -1,6 +1,6 @@
 # Enlace - Referência de arquitetura para revisão assistida por IA
 
-Esta documentação adapta os cinco PDFs da disciplina de Desenvolvimento Mobile para consulta dentro do repositório. Seu objetivo é ajudar a equipe e o agente de IA a compreender a teoria, localizar evidências no código e corrigir problemas de arquitetura de forma incremental.
+Esta documentação adapta os oito PDFs da disciplina de Desenvolvimento Mobile para consulta dentro do repositório. Seu objetivo é ajudar a equipe e o agente de IA a compreender a teoria, localizar evidências no código e corrigir problemas de arquitetura de forma incremental.
 
 **Esta é uma referência de revisão, não um diagnóstico do Enlace.** O repositório não foi inspecionado na elaboração destes documentos. Nenhum requisito deve ser marcado como implementado, ausente ou defeituoso sem evidência. Os nomes de entidades e estados sugeridos são conceituais e devem ser associados aos nomes reais do projeto.
 
@@ -17,8 +17,11 @@ Extraia o ZIP na raiz do projeto, preservando `docs/arquitetura/`. Se essa pasta
 | 4 | [Tratamento e armazenamento de mídia](04-tratamento-e-armazenamento-de-midia.md) | Compressão, persistência, galeria, miniaturas e reconhecimento |
 | 5 | [SQLite, Supabase e segurança](05-sqlite-supabase-e-seguranca.md) | Autenticação, RLS, Storage, metadados e integração |
 | 6 | [Checklist de revisão](06-checklist-de-revisao.md) | Auditoria por evidência, prioridades e cenários de validação |
+| 7 | [Fundamentos de Geolocalização](07-fundamentos-geolocalizacao.md) | Coordenadas WGS84, fontes de posicionamento, acurácia, mapas, roteamento, persistência geoespacial, LGPD |
+| 8 | [Expo Location e Mapas](08-expo-location-e-mapas.md) | expo-location, react-native-maps, MapViewDirections, Places, fila offline, segurança de localização |
+| 9 | [Supabase como Backend Seguro](09-supabase-backend-seguro.md) | Auth, RLS, Storage, Edge Functions, Context API, SecureStore, credenciais |
 
-Os sete arquivos são complementares. O documento 01 define o contrato geral de sincronização; o 05 o aplica à integração com fotos e Supabase. O documento 04 trata do arquivo físico, que não deve ser confundido com sua linha no banco.
+Os nove arquivos são complementares. O documento 01 define o contrato geral de sincronização; o 05 o aplica à integração com fotos e Supabase. O documento 04 trata do arquivo físico, que não deve ser confundido com sua linha no banco. Os documentos 07 e 08 tratam de localização e mapas; o 09 aprofunda a segurança do backend Supabase.
 
 ## 2. Fontes e rastreabilidade
 
@@ -31,6 +34,9 @@ As referências usam a página física do PDF, contando a capa como página 1. O
 | S2 | `02_Camera_ExpoCamera_Foto_Video_QR.pdf` | 26 | 03 |
 | S3 | `03_Camera_Tratamento_Compressao_Reconhecimento.pdf` | 23 | 04 |
 | S4 | `04_Camera_SQLite_Supabase.pdf` | 26 | 05 |
+| S5 | `01-fundamentos-geolocalizacao.pdf` | 46 | 07 |
+| S6 | `02-expo-location-maps.pdf` | 43 | 08 |
+| S7 | `03-supabase-backend-seguro.pdf` | 53 | 09 |
 
 Cada documento contém uma tabela dos trechos de origem. Menções como **S0, pp. 18-23** apontam para esses PDFs. Esta adaptação reorganiza o conteúdo; não é uma transcrição integral nem uma especificação oficial adicional do professor.
 
@@ -40,7 +46,7 @@ Cada documento contém uma tabela dos trechos de origem. Menções como **S0, pp
 - **Aplicação ao Enlace:** tradução desse conceito para anúncios de adoção, fotos, rascunhos e localização. É uma proposta de aplicação, sujeita ao escopo real.
 - **Complemento de implementação:** precaução ou detalhamento acrescentado para não transformar um exemplo didático incompleto em código de produção. Não atribuir esse complemento ao professor.
 
-Os identificadores `OFF`, `PER`, `CAP`, `MID` e `DAT` ligam regras ao checklist. Um identificador é um critério de revisão, não prova de que a disciplina exige determinada biblioteca.
+Os identificadores `OFF`, `PER`, `CAP`, `MID`, `DAT`, `GEO`, `LOC` e `SUP` ligam regras ao checklist. Um identificador é um critério de revisão, não prova de que a disciplina exige determinada biblioteca.
 
 ## 3. Escopo e decisões que não estão tomadas
 
@@ -76,7 +82,7 @@ Não reescrever o app inteiro por preferência de arquitetura. Não apagar banco
 ### Prompt sugerido para a primeira auditoria
 
 ```text
-Leia docs/arquitetura/README.md e os seis documentos referenciados.
+Leia docs/arquitetura/README.md e os nove documentos referenciados.
 Analise o código atual do Enlace e preencha o checklist por evidência.
 Para cada item, informe status, arquivo/função ou política relevante,
 risco concreto e correção proposta. Justifique os itens não aplicáveis.

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { Animal } from '../../src/domain/entities/Animal';
 import { SearchPreferences } from '../../src/domain/entities/SearchPreferences';
@@ -335,42 +336,37 @@ export default function HomeScreen() {
           }}
         />
       ) : (
-        /* V04 • Explorar: Mapa com localização aproximada (RF05, RF25) */
         <View style={styles.mapContainer}>
-          <View style={styles.mapCanvas}>
-            <View style={styles.mapRoadHorizontal} />
-            <View style={styles.mapRoadVertical} />
-            <View style={styles.mapParkArea} />
-            <Text style={styles.mapDistrictLabelTop}>Centro</Text>
-            <Text style={styles.mapDistrictLabelBottom}>Varginha</Text>
-
-            {animals.map((item, idx) => {
-              const positions = [
-                { top: '26%', left: '58%' },
-                { top: '48%', left: '22%' },
-                { top: '62%', left: '66%' },
-                { top: '34%', left: '34%' },
-                { top: '70%', left: '38%' },
-              ] as const;
-              const pos = positions[idx % positions.length];
+          <MapView
+            provider="google"
+            style={styles.mapCanvas}
+            initialRegion={{
+              latitude: -21.55,
+              longitude: -45.43,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            }}
+            showsUserLocation
+            showsMyLocationButton
+          >
+            {animals.map((item) => {
+              const { latitude, longitude } = item.location;
+              if (!latitude || !longitude || latitude === 0 || longitude === 0) {
+                return null;
+              }
               const isSelected = selectedMapAnimal?.id === item.id;
               return (
-                <TouchableOpacity
+                <Marker
                   key={item.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Pino aproximado de ${item.name}`}
+                  coordinate={{ latitude, longitude }}
+                  title={item.name}
+                  description={item.location.displayLabel}
+                  pinColor={isSelected ? COLORS.espresso : COLORS.terracotta}
                   onPress={() => setSelectedMapAnimal(item)}
-                  style={[
-                    styles.mapPin,
-                    { top: pos.top, left: pos.left },
-                    isSelected && styles.mapPinActive,
-                  ]}
-                >
-                  <Ionicons name="paw" size={18} color={COLORS.white} />
-                </TouchableOpacity>
+                />
               );
             })}
-          </View>
+          </MapView>
 
           {selectedMapAnimal && (
             <View style={styles.mapPreviewCard}>
@@ -748,75 +744,13 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     flex: 1,
-    paddingHorizontal: 18,
-    paddingBottom: 16,
   },
   mapCanvas: {
     flex: 1,
-    backgroundColor: '#F6E8D8',
     borderRadius: RADII.lg,
     borderWidth: 2,
     borderColor: COLORS.peach,
     overflow: 'hidden',
-    position: 'relative',
-  },
-  mapRoadHorizontal: {
-    position: 'absolute',
-    top: '45%',
-    left: 0,
-    right: 0,
-    height: 18,
-    backgroundColor: '#FFF8F0',
-    transform: [{ rotate: '-12deg' }],
-  },
-  mapRoadVertical: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '48%',
-    width: 16,
-    backgroundColor: '#FFF8F0',
-    transform: [{ rotate: '14deg' }],
-  },
-  mapParkArea: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    width: 120,
-    height: 110,
-    borderRadius: 28,
-    backgroundColor: '#DCE8CE',
-  },
-  mapDistrictLabelTop: {
-    position: 'absolute',
-    top: '36%',
-    left: '34%',
-    fontSize: 15,
-    fontWeight: '800',
-    color: COLORS.espresso,
-  },
-  mapDistrictLabelBottom: {
-    position: 'absolute',
-    top: '58%',
-    left: '36%',
-    fontSize: 16,
-    fontWeight: '900',
-    color: COLORS.espresso,
-  },
-  mapPin: {
-    position: 'absolute',
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: COLORS.terracotta,
-    borderWidth: 2.5,
-    borderColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapPinActive: {
-    transform: [{ scale: 1.18 }],
-    backgroundColor: COLORS.espresso,
   },
   mapPreviewCard: {
     ...CLAY_CARD_STYLE,

@@ -39,6 +39,7 @@ Incluídas aqui para referência — não precisam ser decididas novamente:
 | — | Carrossel + visualizador com zoom nas fotos | ≥ 2 fotos = carrossel; 1 foto = simples; tela cheia com zoom 1x–4x | §18 item 16 |
 | — | Características no formulário | Opcionais (espécie, porte, idade, sexo continuam obrigatórios) | §18 item 17 |
 | — | Estratégia de sync | Delta sync com cursor (updated_at, id), sobreposição 60s, paginação 100 | §18 / OFF-06 |
+| D21 | Mecânica de atualização de páginas (Pull-to-Refresh) | Gesto nativo de deslizar para baixo com `RefreshControl` nas listas (`index`, `meus-anuncios`, `favoritos`, `notificacoes`, `sync`) acionando `useFullSync` quando online e recarga local do SQLite | §18 item 21 / OFF-09 |
 
 ---
 

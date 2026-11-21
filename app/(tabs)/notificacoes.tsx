@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -11,6 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useAuth } from '../../src/adapters/context/AuthContext';
+import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
+import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 import { notifyNotificationsChanged } from '../../src/adapters/sync/notificationEvents';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import { CLAY_CARD_STYLE, COLORS } from '../../src/adapters/theme/tokens';
@@ -31,7 +34,10 @@ export default function NotificacoesScreen() {
   const router = useRouter();
   const container = useRepositories();
   const { user } = useAuth();
+  const isOnline = useConnectivity();
   const [items, setItems] = useState<FeedItem[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const runFullSync = useFullSync();
 
   const loadFeed = useCallback(async () => {
     const feed: FeedItem[] = [];
@@ -95,6 +101,25 @@ export default function NotificacoesScreen() {
     loadFeed();
   }, [loadFeed]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const localReload = loadFeed();
+      if (isOnline) {
+        await Promise.race([
+          runFullSync(),
+          new Promise((resolve) => setTimeout(resolve, 800)),
+        ]);
+      } else {
+        await localReload;
+      }
+    } catch (err) {
+      console.warn('Erro ao atualizar notificações:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [isOnline, runFullSync, loadFeed]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <EnlaceHeader />
@@ -109,6 +134,14 @@ export default function NotificacoesScreen() {
         data={items}
         keyExtractor={(i) => i.id}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.terracotta]}
+            tintColor={COLORS.terracotta}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Ionicons name="notifications-off-outline" size={38} color={COLORS.brownMuted} />

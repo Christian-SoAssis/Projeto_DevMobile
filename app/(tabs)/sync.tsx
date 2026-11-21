@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -69,7 +70,17 @@ export default function SyncScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <EnlaceHeader />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={syncing}
+            onRefresh={handleSyncNow}
+            colors={[COLORS.terracotta]}
+            tintColor={COLORS.terracotta}
+          />
+        }
+      >
         <Text style={styles.heroTitle}>Suas histórias{'\n'}estão salvas</Text>
 
         <View style={styles.cloudHeroBox}>

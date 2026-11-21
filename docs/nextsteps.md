@@ -33,7 +33,7 @@
 | **01-offline-first (OFF-06)** | Delta sync com cursor; lote + cursor na mesma transação; relógio do servidor como autoridade | `PullRemoteAnimalsUseCase` com cursor `(updated_at, id)`; triggers de `updated_at` no servidor. |
 | **01-offline-first (OFF-07)** | Política de conflito explícita; não confirmar revisão nova indevidamente | `ConflictResolutionService` com last-write wins automático e revisão manual para divergência de status. |
 | **01-offline-first (OFF-08)** | Soft delete + tombstones; retenção; não ressuscitar excluídos | Tabela `animal_tombstones` (DELETED/HIDDEN) mantida por trigger no Supabase e no SQLite. |
-| **01-offline-first (OFF-09)** | Gatilhos coordenados (reconexão, foreground, escrita local, manual); sem execuções concorrentes | `AutoSync` + `RunFullSyncUseCase` com trava `runningPromise`; `useAutoSync`. |
+| **01-offline-first (OFF-09)** | Gatilhos coordenados (reconexão, foreground, escrita local, manual via Pull-to-Refresh com RefreshControl); sem execuções concorrentes | `AutoSync` + `RunFullSyncUseCase` com trava `runningPromise`; `useAutoSync` e `useFullSync` acoplados ao gesto nas listas. |
 | **01-offline-first (OFF-10)** | UI distingue salvo localmente / pendente / sincronizado / erro | `SyncScreen`, badge de notificações, chip "Salvo no aparelho". |
 | **02-camera-permissoes-e-selecao** | Permissão no contexto correto; não bloquear app se negada; ImagePicker vs CameraView | `ImagePickerCameraAdapter`; permissões no `app.json`; galeria como alternativa à câmera. |
 | **03-captura-foto-video-e-qr** | Vídeo e QR não devem ser adicionados só porque estão na aula | Não estão no escopo do Enlace (marcar como NA se confirmado). |
@@ -53,7 +53,7 @@ O que já está conforme a arquitetura prescrita:
 - **Adapters de hardware:** `CameraGateway`, `LocationGateway`, `ConnectivityGateway` definidos no domínio e implementados em `src/infrastructure/device/`.
 - **Context API:** `AuthContext.tsx` e `RepositoriesContext.tsx` em `src/adapters/context/`.
 - **Custom hooks:** `useAuth`, `useConnectivity`, `useFullSync`, `useAutoSync` em `src/adapters/hooks/`.
-- **Interface e rotas:** Expo Router estruturado em `app/(public)/`, `app/(tabs)/`, `app/(protected)/`, `app/animal/`; telas com `<View>`, `<Text>`, `StyleSheet`.
+- **Interface e rotas:** Expo Router estruturado em `app/(public)/`, `app/(tabs)/`, `app/(protected)/`, `app/animal/`; telas com `<View>`, `<Text>`, `StyleSheet` e gesto Pull-to-Refresh (`RefreshControl`) nas listas principais.
 - **Infraestrutura real:** SQLite (`expo-sqlite`) com migrations em `src/infrastructure/database/sqlite/`; Supabase (client, auth, repositories, storage) em `src/infrastructure/supabase/`.
 - **Qualidade de código:** `tsc --noEmit` limpo (TypeScript strict). Testes de domínio passando (`src/__tests__/enlace.test.ts`, 7 testes).
 - **DAT-10 (isolamento entre contas):** implementado e testado (`enlace.test.ts`).

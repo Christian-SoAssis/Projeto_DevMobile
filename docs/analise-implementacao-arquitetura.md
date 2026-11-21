@@ -14,54 +14,25 @@ Ele classifica o que **DEVE** ser implementado (itens em aberto, necessários pa
 
 O app já cobre boa parte da teoria dos novos PDFs:
 
-- **Geolocalização pontual** (`src/infrastructure/device/location/LocationAdapter.ts`): `expo-location` com `requestForegroundPermissionsAsync`, `getCurrentPositionAsync`, `reverseGeocodeAsync`, coordenadas arredondadas a 2 casas decimais (~1,1 km), sem rua/número, permissão solicitada somente no momento de uso. Textos de justificativa em `app.json` (iOS/Android).
+- **Geolocalização pontual** (`src/infrastructure/device/location/LocationAdapter.ts`): `expo-location` com `requestForegroundPermissionsAsync`, `getCurrentPositionAsync`, `reverseGeocodeAsync`, coordenadas arredondadas a 2 casas decimais (~1,1 km), sem rua/número, permissão solicitada somente no momento de uso. Textos de justificativa em `app.json` (iOS/Android). Validação de `accuracy` implementada; feedback de falha de geocodificação reversa implementado.
 - **Supabase seguro**: cliente com `SessionStorageSecureStore` (cifra sessão), `detectSessionInUrl: false`, RLS habilitada em todas as tabelas, políticas restritas por `auth.uid()`, bucket `animal-photos` público, `AuthContext` com rotas protegidas (`expo-router`).
-- **Offline-first**: SQLite local, fila de sync, cursor delta, resolução de conflitos, tombstones.
-- **Sem mapa real**: a tela inicial tem toggle "Lista / Mapa", mas o mapa é um **mock em CSS** com posições fixas (não usa `react-native-maps`, não usa coordenadas reais dos anúncios).
-- **Ausentes**: `react-native-maps`, `react-native-maps-directions`, `react-native-google-places-autocomplete`, `expo-task-manager`, chaves do Google Maps, Edge Functions.
+- **Offline-first**: SQLite local, fila de sync, cursor delta, resolução de conflitos, tombstones e atualização manual por gesto (Pull-to-Refresh com `RefreshControl` nas listas principais).
+- **Mapa real**: implementado com `react-native-maps`, `MapView` com `Marker` por anúncio nas coordenadas `latitude_approx` / `longitude_approx` já armazenadas; `app.json` configurado com plugin `react-native-maps` (chave placeholder a ser preenchida pela equipe).
+- **Ausentes**: `react-native-maps-directions`, `react-native-google-places-autocomplete`, `expo-task-manager`, chaves reais do Google Maps, Edge Functions.
 
 ---
 
 ## O que DEVE ser implementado
 
-São itens em aberto, necessários para coerência com os documentos de arquitetura e com o escopo do projeto (adoção de animais, anúncios públicos, localização aproximada).
+Todos os itens da seção "DEVE ser implementado" da análise anterior foram concluídos:
 
-### 1. Validar `accuracy` da leitura de GPS — GEO-03
+| Item | Status |
+|------|--------|
+| 1. Validar `accuracy` da leitura de GPS (GEO-03) | ✅ Concluído |
+| 2. Mapa real com `react-native-maps` (LOC-05 / GEO-04) | ✅ Concluído |
+| 3. Feedback de falha de geocodificação reversa (GEO-05 / LOC-02) | ✅ Concluído |
 
-**Localização:** `src/infrastructure/device/location/LocationAdapter.ts` (linha 47)
-
-O adapter solicita `accuracy: 3` (≈ 10 m), mas **não inspeciona o campo `accuracy` retornado** no objeto `pos.coords`. Não descarta leituras ruins nem avisa o usuário quando a precisão é insuficiente.
-
-**O que fazer:**
-- Após `getCurrentPositionAsync`, verificar `pos.coords.accuracy`.
-- Se estiver acima de um limite razoável para o caso de uso (ex.: > 100 m), descartar ou alertar que a localização é imprecisa.
-- Tratar `accuracy < 0` como indisponível.
-
----
-
-### 2. Mapa de verdade, ou remover a opção "Mapa" — LOC-05 / GEO-04
-
-**Localização:** `app/(tabs)/index.tsx` (linhas 337-405)
-
-A UI já oferece um toggle Lista/Mapa, mas o mapa é um **desenho em CSS** com pinos em posições fixas (`top: '26%', left: '58%'` etc.), sem relação com as coordenadas reais dos anúncios (`latitude_approx` / `longitude_approx` já armazenadas). Isso é inconsistente com o recurso exposto ao usuário.
-
-**O que fazer (duas opções):**
-
-- **Opção A (recomendada):** instalar `react-native-maps`, configurar chaves do Google Maps em `app.json`, e renderizar os anúncios como `Marker` nas coordenadas já armazenadas. Substituir o mock CSS.
-- **Opção B:** remover o toggle "Mapa" e a UI de mapa, mantendo apenas Lista, até que haja decisão de produto para mapa real.
-
-Não é aceitável manter um botão que simula um mapa sem dados reais.
-
----
-
-### 3. Tratar erro de geocodificação reversa com feedback — GEO-05 / LOC-02
-
-**Localização:** `src/infrastructure/device/location/LocationAdapter.ts` (linhas 55-68)
-
-Se `reverseGeocodeAsync` falhar (offline ou erro), o código mantém valores padrão (`Centro`, `Varginha`) silenciosamente. O usuário não sabe que a localização foi preenchida com fallback.
-
-**O que fazer:**
-- Quando a geocodificação reversa falhar, exibir um aviso claro (ex.: "Não foi possível identificar o bairro automaticamente; preencha manualmente") ou marcar o campo como "não identificado", em vez de silenciosamente preencher com padrão.
+Não há mais itens obrigatórios pendentes nesta análise.
 
 ---
 
@@ -71,7 +42,6 @@ São melhorias alinhadas aos documentos de arquitetura, mas não críticas para 
 
 | Item | Doc(s) | O que é | Por que é opcional |
 |------|--------|---------|-------------------|
-| **Mapa real com `react-native-maps`** | LOC-05, GEO-04 | `MapView` com `Marker` por anúncio, `Polyline` opcional | Só vale a pena se a opção "Mapa" for mantida na UI. Requer chaves do Google Maps. |
 | **Places Autocomplete** | LOC-08 | `GooglePlacesAutocomplete` para sugerir bairro/cidade ao digitar | Facilita preenchimento, mas o preenchimento manual já funciona. |
 | **Rota/direções (MapViewDirections)** | LOC-08 | Desenhar caminho do usuário até o animal | Não é requisito de adoção; aumenta custo (API Directions) e complexidade. |
 | **Edge Function como proxy para chave do Google** | SUP-06, LOC-08 | Se usar mapas reais, expor a chave via Edge Function do Supabase em vez de no app | Necessário somente se for adotar `react-native-maps` com chave do Google no cliente. |
@@ -91,16 +61,4 @@ Conforme os próprios documentos de arquitetura e o contexto do Enlace:
 
 ---
 
-## Ordem sugerida de implementação
-
-Se você decidir avançar, a ordem lógica seria:
-
-1. **Validar `accuracy`** no `LocationAdapter` (pequeno, baixo risco).
-2. **Decidir sobre o mapa:** instalar `react-native-maps` + chaves do Google + substituir o mock, **ou** remover a opção "Mapa" da UI.
-3. **Adicionar feedback quando a geocodificação reversa falhar** no `LocationAdapter`.
-4. **(Opcional)** Places Autocomplete para preenchimento de endereço.
-5. **(Opcional, condicional)** Edge Function como proxy se usar mapa com chave do Google.
-
----
-
-**Observação:** este documento é uma proposta de análise baseada nos documentos de arquitetura e na inspeção do código. Nenhuma verificação foi executada contra o repositório para comprovar a implementação real de cada item; as decisões finais cabem à equipe de produto.
+**Observação:** este documento é uma proposta de análise baseada nos documentos de arquitetura e na inspeção do código. As decisões finais cabem à equipe de produto.

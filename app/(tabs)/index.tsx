@@ -3,6 +3,7 @@ import {
   FlatList,
   Image,
   Modal,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -20,6 +21,7 @@ import { ToggleFavoriteUseCase } from '../../src/application/use-cases/ToggleFav
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useAuth } from '../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
+import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 import { subscribePullCompleted } from '../../src/adapters/sync/pullEvents';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import {
@@ -56,6 +58,8 @@ export default function HomeScreen() {
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [selectedMapAnimal, setSelectedMapAnimal] = useState<Animal | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const runFullSync = useFullSync();
 
   const searchUseCase = useMemo(
     () => new SearchAnimalsUseCase(container.animalRepository, container.syncQueueRepository),
@@ -114,6 +118,28 @@ export default function HomeScreen() {
     const unsub = subscribePullCompleted(loadData);
     return unsub;
   }, [loadData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // 1. Recarrega os dados locais imediatamente a partir do SQLite (resposta instantânea)
+      const localReload = loadData();
+
+      // 2. Se online, inicia a sincronização e aguarda no máximo 800ms para liberar a UI
+      if (isOnline) {
+        await Promise.race([
+          runFullSync(),
+          new Promise((resolve) => setTimeout(resolve, 800)),
+        ]);
+      } else {
+        await localReload;
+      }
+    } catch (err) {
+      console.warn('Erro ao atualizar feed:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [isOnline, runFullSync, loadData]);
 
   const handleToggleFavorite = async (animalId: string) => {
     if (!user) {
@@ -281,6 +307,15 @@ export default function HomeScreen() {
           keyExtractor={(item) => item.id}
           windowSize={7}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              testID="feed-refresh-control"
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.terracotta]}
+              tintColor={COLORS.terracotta}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <Ionicons name="paw-outline" size={38} color={COLORS.brownMuted} />

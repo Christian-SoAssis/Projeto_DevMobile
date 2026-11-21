@@ -192,9 +192,9 @@ Utilizar a referência do servidor; não usar o relógio do aparelho como autori
 
 ### OFF-09 - Acionar sincronização sem criar execuções concorrentes
 
-**Aula:** S0, pp. 7 e 33; S4, p. 22. Gatilhos incluem reconexão, retorno ao foreground, escrita local e atualização manual. NetInfo indica mudança de conectividade. Tarefas em segundo plano não têm horário garantido.
+**Aula:** S0, pp. 7 e 33; S4, p. 22. Gatilhos incluem reconexão, retorno ao foreground, escrita local e atualização manual (como o gesto de puxar para atualizar — *Pull-to-Refresh* com `RefreshControl` nas listas do app). NetInfo indica mudança de conectividade. Tarefas em segundo plano não têm horário garantido.
 
-**Complemento de implementação:** utilizar coordenação efetiva do worker, liberar travas em falhas e não depender exclusivamente de execução em background. Conectado ao Wi-Fi não significa API acessível. Uma trava apenas no componente visual não coordena necessariamente todos os pontos que iniciam sync.
+**Complemento de implementação:** utilizar coordenação efetiva do worker, liberar travas em falhas e não depender exclusivamente de execução em background. Conectado ao Wi-Fi não significa API acessível. A trava `runningPromise` em `RunFullSyncUseCase` garante que o disparo manual (via Pull-to-Refresh ou botão) e o disparo automático via `AutoSync`/`useAutoSync` não criem execuções concorrentes. Se o dispositivo estiver offline durante o gesto de pull-to-refresh, a tela recarrega imediatamente o cache local do SQLite sem travar a interface.
 
 **Verificar:** reconexão e botão manual ao mesmo tempo não duplicam o processamento; um erro não deixa o sync bloqueado para sempre.
 

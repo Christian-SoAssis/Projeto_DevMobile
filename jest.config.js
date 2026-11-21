@@ -34,7 +34,7 @@ module.exports = {
     '^@supabase/supabase-js$': '<rootDir>/src/__tests__/mocks/supabase.mock.ts',
     '^@expo/vector-icons$': '<rootDir>/src/__tests__/mocks/vector-icons.mock.ts',
     '^@expo/vector-icons/.*$': '<rootDir>/src/__tests__/mocks/vector-icons.mock.ts',
-    '^.*/adapters/context/RepositoriesContext$': '<rootDir>/src/__tests__/mocks/RepositoriesContext.mock.ts',
-    '^.*/adapters/context/AuthContext$': '<rootDir>/src/__tests__/mocks/AuthContext.mock.ts',
+    '^.*context/RepositoriesContext$': '<rootDir>/src/__tests__/mocks/RepositoriesContext.mock.ts',
+    '^.*context/AuthContext$': '<rootDir>/src/__tests__/mocks/AuthContext.mock.ts',
   },
 };

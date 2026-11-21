@@ -55,6 +55,7 @@ Requer: Expo Go instalado em dispositivo físico (ou emulator) e builds nativos.
 | V31 | Troca de conta A → B → A | Como A, criar rascunho offline; trocar para B; B não vê nem envia pendência de A; voltar para A preserva dados | DAT-10 |
 | V32 | Localização pontual | Captura de localização apenas na criação de anúncio; não há rastreamento contínuo em segundo plano | OFF-11, RNF06 |
 | V33 | Estado de sync na UI | Ausência de rede, falha permanente, nova tentativa — mensagens coerentes; "publicado" não é mostrado quando existe apenas rascunho local | OFF-10 |
+| V34 | Gesto Pull-to-Refresh (deslizar para atualizar) | Deslizar para baixo no topo das listas (Feed, Meus Anúncios, Favoritos, Notificações, Sincronização). Online: exibe spinner terracotta, dispara `useFullSync` com Supabase e atualiza interface com o SQLite local; Offline: recarrega dados locais imediatamente sem travar a interface | OFF-09, OFF-10, RF17 |
 
 ---
 

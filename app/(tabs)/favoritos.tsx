@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Image,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,6 +16,7 @@ import { ToggleFavoriteUseCase } from '../../src/application/use-cases/ToggleFav
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useAuth } from '../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
+import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 import { subscribePullCompleted } from '../../src/adapters/sync/pullEvents';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import {
@@ -35,6 +37,8 @@ export default function FavoritosScreen() {
   const { user } = useAuth();
   const isOnline = useConnectivity();
   const [favoriteAnimals, setFavoriteAnimals] = useState<Animal[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const runFullSync = useFullSync();
 
   const toggleFavoriteUseCase = useMemo(
     () =>
@@ -65,6 +69,25 @@ export default function FavoritosScreen() {
     const unsub = subscribePullCompleted(loadFavorites);
     return unsub;
   }, [loadFavorites]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const localReload = loadFavorites();
+      if (isOnline) {
+        await Promise.race([
+          runFullSync(),
+          new Promise((resolve) => setTimeout(resolve, 800)),
+        ]);
+      } else {
+        await localReload;
+      }
+    } catch (err) {
+      console.warn('Erro ao atualizar favoritos:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [isOnline, runFullSync, loadFavorites]);
 
   const handleRemoveFavorite = async (animalId: string) => {
     if (!user) return;
@@ -110,6 +133,14 @@ export default function FavoritosScreen() {
         data={favoriteAnimals}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.terracotta]}
+            tintColor={COLORS.terracotta}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Ionicons name="heart-outline" size={40} color={COLORS.brownMuted} />

@@ -3,6 +3,7 @@ import {
   Alert,
   FlatList,
   Image,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -17,6 +18,7 @@ import { MarkAnimalAdoptedUseCase } from '../../src/application/use-cases/MarkAn
 import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useAuth } from '../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
+import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 import { subscribePullCompleted } from '../../src/adapters/sync/pullEvents';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import {
@@ -39,6 +41,8 @@ export default function MeusAnunciosScreen() {
 
   const [myAnimals, setMyAnimals] = useState<Animal[]>([]);
   const [pendingAnimalIds, setPendingAnimalIds] = useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
+  const runFullSync = useFullSync();
 
   const deleteUseCase = useMemo(
     () =>
@@ -80,6 +84,25 @@ export default function MeusAnunciosScreen() {
     const unsub = subscribePullCompleted(loadMyAnimals);
     return unsub;
   }, [loadMyAnimals]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const localReload = loadMyAnimals();
+      if (isOnline) {
+        await Promise.race([
+          runFullSync(),
+          new Promise((resolve) => setTimeout(resolve, 800)),
+        ]);
+      } else {
+        await localReload;
+      }
+    } catch (err) {
+      console.warn('Erro ao atualizar meus anúncios:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [isOnline, runFullSync, loadMyAnimals]);
 
   const handleMarkAdopted = async (animal: Animal) => {
     if (!user) return;
@@ -157,6 +180,14 @@ export default function MeusAnunciosScreen() {
         data={myAnimals}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.terracotta]}
+            tintColor={COLORS.terracotta}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Ionicons name="paw-outline" size={38} color={COLORS.brownMuted} />

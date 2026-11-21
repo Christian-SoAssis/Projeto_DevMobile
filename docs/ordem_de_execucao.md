@@ -48,11 +48,9 @@ Foram implementados 65 testes em 10 suítes (incluindo os 7 testes de domínio e
 - **Fakes in-memory:** `src/__tests__/fakes/in-memory-repositories.ts` com todos os ports e fabricantes de dados
 - **Typecheck:** `tsc --noEmit` limpo
 
-Pendente:
-- Testes de Context API & Hooks (`AuthProvider`, `useAuth`, `RepositoriesContext`, `useConnectivity`, `useFullSync`)
-- Testes de Telas e Componentes (RNTL)
-- Testes de Infraestrutura SQLite e Supabase
-- Testes E2E (fluxos críticos)
+- **Testes de Telas e Componentes (RNTL):** `LoginScreen.test.tsx`, `CadastroScreen.test.tsx`, `HomeScreen.test.tsx` (incluindo teste do gesto Pull-to-Refresh), `EnlaceHeader.test.tsx`
+- **Total de testes no projeto:** 173 testes em 24 suítes, 100% passando.
+- **Mecânica Pull-to-Refresh:** implementada com `RefreshControl` nas telas `index`, `meus-anuncios`, `favoritos`, `notificacoes`, `sync`.
 
 ---
 

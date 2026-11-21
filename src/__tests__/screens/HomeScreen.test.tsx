@@ -117,4 +117,20 @@ describe('HomeScreen (RNTL)', () => {
       );
     });
   });
+
+  it('deve disparar recarga de dados ao acionar o pull-to-refresh (RefreshControl)', async () => {
+    const animal = createTestAnimal({ id: 'pet-refresh', name: 'Fred' });
+    mockRepositories.animalRepository.search.mockResolvedValue([animal]);
+
+    const { getByTestId } = await render(<HomeScreen />);
+
+    const refreshControl = getByTestId('feed-refresh-control');
+    expect(refreshControl).toBeTruthy();
+
+    await fireEvent(refreshControl, 'refresh');
+
+    await waitFor(() => {
+      expect(mockRepositories.animalRepository.search).toHaveBeenCalled();
+    });
+  });
 });

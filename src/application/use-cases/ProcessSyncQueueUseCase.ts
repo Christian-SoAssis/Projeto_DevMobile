@@ -73,9 +73,17 @@ export class ProcessSyncQueueUseCase {
 
       processed += 1;
 
-      // Backoff exponencial: aguarda antes de tentar uma ação que já falhou anteriormente.
+      // Backoff exponencial: verifica se o tempo mínimo decorrido desde a última tentativa já passou.
+      // Em vez de travar a thread com sleep, pula a ação para a próxima rodada se o intervalo ainda não expirou.
       if (action.attempts > 0) {
-        await sleep(retryDelay(action.attempts));
+        const lastAttemptMs = Date.parse(action.changedAt);
+        if (!Number.isNaN(lastAttemptMs)) {
+          const elapsed = Date.now() - lastAttemptMs;
+          const minDelay = retryDelay(action.attempts);
+          if (elapsed < minDelay) {
+            continue;
+          }
+        }
       }
 
       action.startSync();

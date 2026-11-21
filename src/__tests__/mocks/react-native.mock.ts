@@ -31,12 +31,12 @@ export const TextInput = React.forwardRef(({ onChangeText, value, ...props }: an
 );
 (TextInput as any).displayName = 'TextInput';
 
-export const ScrollView = React.forwardRef((props: any, ref: any) =>
-  React.createElement('ScrollView', { ...props, ref })
+export const ScrollView = React.forwardRef(({ refreshControl, children, ...props }: any, ref: any) =>
+  React.createElement('ScrollView', { ...props, ref }, refreshControl, children)
 );
 (ScrollView as any).displayName = 'ScrollView';
 
-export const FlatList = React.forwardRef(({ data, renderItem, ListEmptyComponent, ...props }: any, ref: any) => {
+export const FlatList = React.forwardRef(({ data, renderItem, ListEmptyComponent, refreshControl, ...props }: any, ref: any) => {
   const content = (data && data.length > 0)
     ? data.map((item: any, index: number) => {
         const rendered = renderItem?.({ item, index });
@@ -46,9 +46,14 @@ export const FlatList = React.forwardRef(({ data, renderItem, ListEmptyComponent
           : rendered;
       })
     : (typeof ListEmptyComponent === 'function' ? React.createElement(ListEmptyComponent, { key: 'empty' }) : ListEmptyComponent);
-  return React.createElement('FlatList', { ...props, ref }, content);
+  return React.createElement('FlatList', { ...props, ref }, refreshControl, content);
 });
 (FlatList as any).displayName = 'FlatList';
+
+export const RefreshControl = React.forwardRef((props: any, ref: any) =>
+  React.createElement('RefreshControl', { ...props, ref })
+);
+(RefreshControl as any).displayName = 'RefreshControl';
 
 export const Modal = React.forwardRef(({ visible = true, children, ...props }: any, ref: any) =>
   visible ? React.createElement('Modal', { ...props, ref }, children) : null
@@ -130,6 +135,7 @@ const reactNative = {
   TextInput,
   ScrollView,
   FlatList,
+  RefreshControl,
   Modal,
   Image,
   Button,

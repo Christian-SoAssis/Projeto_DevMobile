@@ -63,6 +63,61 @@ export class RegisterAdoptionInterestUseCase {
     return { interest, synced: false };
   }
 
+  /** Decisões D7 e D9: Permite ao próprio interessado cancelar/retirar sua manifestação (offline-first). */
+  async cancel(
+    interestId: string,
+    actorUserId: string,
+    isOnline: boolean = true
+  ): Promise<{ synced: boolean }> {
+    const existing = await this.interestRepository.findById(interestId);
+    if (!existing) {
+      throw new Error('Manifestação de interesse não encontrada.');
+    }
+    if (existing.userId !== actorUserId) {
+      throw new Error('Somente o próprio interessado pode cancelar sua manifestação.');
+    }
+
+    if (this.interestRepository.remove) {
+      await this.interestRepository.remove(interestId);
+    }
+
+    if (isOnline && this.remoteInterests?.remove) {
+      try {
+        await this.remoteInterests.remove(interestId);
+        return { synced: true };
+      } catch (err) {
+        await this.enqueueCancelInterest(interestId, actorUserId, err);
+        return { synced: false };
+      }
+    }
+
+    await this.enqueueCancelInterest(interestId, actorUserId);
+    return { synced: false };
+  }
+
+  private async enqueueCancelInterest(
+    interestId: string,
+    actorUserId: string,
+    err?: unknown
+  ): Promise<void> {
+    if (!this.syncQueueRepository) return;
+    const action = new SyncAction({
+      id: `sync_interest_delete_${interestId}`,
+      operation: 'DELETE',
+      entityType: 'interest',
+      entityId: interestId,
+      payload: {
+        id: interestId,
+        ownerId: actorUserId,
+        userId: actorUserId,
+      },
+    });
+    if (err instanceof Error) {
+      action.markFailed(err.message);
+    }
+    await this.syncQueueRepository.enqueue(action);
+  }
+
   private async enqueueInterest(interest: AdoptionInterest, err?: unknown): Promise<void> {
     if (!this.syncQueueRepository) return;
     const action = new SyncAction({

@@ -116,6 +116,13 @@ export class SupabaseInterestGateway implements InterestRemoteGateway {
     }
   }
 
+  async remove(id: string): Promise<void> {
+    const { error } = await this.client.from('adoption_interests').delete().eq('id', id);
+    if (error) {
+      throw new Error(`Falha ao cancelar interesse no Supabase: ${error.message}`);
+    }
+  }
+
   async listByUser(userId: string): Promise<AdoptionInterest[]> {
     const { data, error } = await this.client
       .from('adoption_interests')

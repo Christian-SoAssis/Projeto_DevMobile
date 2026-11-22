@@ -1270,25 +1270,31 @@ Ciclo recomendado para cada regra:
 20. **Central de notificações in-app + badge persistido no aparelho** (decisão de produto 08/11/2026): a central é **in-app** (sem `expo-notifications`/push backend nesta fase); o contador de notificações não-vistas **persiste entre aberturas do app** em nova tabela local `app_state (key, value)` (schema.sql, migração idempotente via `CREATE TABLE IF NOT EXISTS`). O feed é **derivado dos dados já existentes** (interesses recebidos, mudanças de status das próprias manifestações, itens FAILED na fila local) — não há serviço de notificações novo; abrir a central grava `notifications_last_seen` e zera o badge.
 21. **Gesto Pull-to-Refresh para atualização manual das páginas** (decisão de produto e UX 21/11/2026): Mecânica de deslizar o dedo para baixo no topo da lista implementada com o componente nativo `<RefreshControl>` do React Native nas telas principais de rolagem: Feed/Explorar (`index`), Meus Anúncios (`meus-anuncios`), Favoritos (`favoritos`), Notificações (`notificacoes`) e Sincronização (`sync`). A mecânica atua com duplo propósito conforme a conectividade (OFF-09, RNF01, RNF02): quando online, dispara a sincronização completa (`useFullSync`), enviando pendências locais e puxando atualizações do Supabase, seguida da recarga dos dados a partir do SQLite local (`loadData`); quando offline, relê o banco de dados SQLite local de forma segura e imediata, desativando o indicador visual sem travar a interface.
 22. **Fluxo de confirmação e auto-adoção** (decisão de produto e UX 21/11/2026 — **implementada**): Três salvaguardas foram adicionadas ao fluxo de adoção para evitar ações acidentais e manter consistência de dados: **(a) Confirmação antes de atualizar status de interesse:** na tela de detalhes do anúncio (visão do responsável), ao tocar em qualquer etapa da trilha de interesse ("Em análise", "Visita combinada", "Concluída", "Recusada"), exibe `Alert.alert` com a mensagem `"Você tem certeza que quer atualizar o status de interesse de <nome do interessado> em <nome do pet> para '<etapa>'?"` — botões "Cancelar" e "Confirmar"; **(b) Auto-adoção ao concluir interesse:** quando o responsável confirma a etapa "Concluída" para uma manifestação de interesse, o animal é **automaticamente marcado como adotado** (`MarkAnimalAdoptedUseCase`) de forma atômica; a alteração é enfileirada na fila de sync se offline (RF12, OFF-01, RNF02); **(c) Confirmação antes de marcar como adotado diretamente:** tanto na tela de detalhes (botão "Marcar como adotado") quanto na tela "Meus Anúncios" (botão "Adotado" no card), exibe `Alert.alert` com a mensagem `"Marcar <nome do pet> como adotado?"` — botões "Cancelar" e "Sim, marcar como adotado".
+23. **Método oficial de autenticação no Supabase (D1 — 22/11/2026)**: Autenticação nativa por **e-mail e senha** (`signInWithPassword` e `signUp` via Supabase Auth), sem exigência de confirmação prévia por link de e-mail no MVP para agilizar testes e uso comunitário, mantendo sessão JWT real para validação das políticas de RLS.
+24. **Campos obrigatórios e limites de tamanho de formulários (D2 — 22/11/2026)**: No anúncio, são obrigatórios: **Nome** (`2–60` caracteres), **Espécie**, **Porte**, **Sexo**, **Idade aproximada** (`1–30` caracteres), **Bairro** (`2–60` caracteres), **Cidade** (`2–60` caracteres) e **1 a 4 fotos WebP**; os campos opcionais **Características**, **Comportamento** e **Cuidados especiais** aceitam até `500` caracteres cada. Na manifestação de interesse, a **Mensagem** é obrigatória (`10–400` caracteres) acompanhada do telefone/contato.
+25. **Exclusão de anúncio já adotado (D3 — 22/11/2026)**: O responsável pode excluir qualquer anúncio próprio (esteja `AVAILABLE` ou `ADOPTED`) mediante diálogo de confirmação (`Alert.alert`), gerando *tombstone* `DELETED` para remoção nos demais dispositivos durante a sincronização incremental.
+26. **Reabertura de anúncio de "Adotado" para "Disponível" (D4 — 22/11/2026)**: O responsável pode reabrir um anúncio marcado como `ADOPTED` de volta para `AVAILABLE` (mediante `Alert.alert` de confirmação), com suporte offline-first na `sync_queue`, permitindo corrigir marcações por engano ou adoções não concretizadas.
+27. **Escopo de moderação administrativa (D5 — 22/11/2026)**: O perfil `ADMIN` realiza exclusivamente as ações de **Ocultar (`HIDE`)** e **Reexibir (`UNHIDE`)** anúncios (`moderation_status` = `'HIDDEN'` ou `'NONE'`), preservando auditoria e propagando ocultação via *tombstone* `HIDDEN`.
+28. **Visibilidade progressiva dos dados de contato (D6 — 22/11/2026)**: Visitantes e público geral visualizam apenas a localização aproximada (Bairro, Cidade, UF) e os dados do animal. O responsável visualiza nome e telefone/e-mail dos interessados na seção "Interessados" do seu anúncio. O interessado acompanha a trilha de 4 etapas e visualiza o aviso de liberação de contato direto com o tutor a partir das etapas `EM_ANALISE` e `VISITA_COMBINADA`.
+29. **Política de retenção e cancelamento de manifestações de interesse (D7 — 22/11/2026)**: As manifestações são mantidas no histórico enquanto o anúncio existir (removidas em cascata se o anúncio for excluído), e o próprio interessado pode **cancelar/retirar sua manifestação de interesse** a qualquer momento mediante confirmação.
+30. **Precisão de arredondamento e anonimização de coordenadas GPS (D8 — 22/11/2026)**: As coordenadas de latitude e longitude são arredondadas para **3 casas decimais** (`Math.round(coord * 1000) / 1000`, precisão de `~110 m`), exibindo publicamente apenas **Bairro, Cidade e UF** (nunca logradouro ou número residencial — RNF05).
+31. **Suporte offline-first completo para favoritos e interesses (D9 — 22/11/2026)**: Todas as mutações de **Favoritos** (`CREATE` e `DELETE`) e de **Manifestações de Interesse** (`CREATE` pelo adotante, `UPDATE` de etapa pelo responsável e `DELETE`/cancelamento pelo adotante) possuem suporte offline-first completo na `sync_queue`.
 
 ---
 
-# 19. Pontos ainda não definidos pela especificação
+# 19. Pontos anteriormente em aberto — todos decididos e consolidados na seção 18
 
-Os itens abaixo não devem ser inventados na implementação sem decisão de produto:
+Todos os pontos levantados na especificação inicial foram decididos pela equipe de produto e estão registrados na seção 18:
 
-- método exato de autenticação no Supabase (e-mail/senha, magic link, OAuth etc.);
-- campos obrigatórios e limites de tamanho de cada formulário;
-- regras de exclusão de anúncio já adotado;
-- possibilidade de reabrir um animal de “Adotado” para “Disponível”;
-- tipo de ação de moderação administrativa além do mínimo (HIDE/UNHIDE);
-- visibilidade exata dos dados de contato;
-- política de retenção de manifestações de interesse;
-- precisão exata usada para arredondar/anonimizar coordenadas;
-- quais mutações de favoritos/interesses terão suporte offline completo.
-
-**Decididos a partir da especificação original (registados na seção 18):**
-
+- ~~método exato de autenticação no Supabase~~ → **E-mail e senha via Supabase Auth sem confirmação obrigatória no MVP** (decisão 23 / D1);
+- ~~campos obrigatórios e limites de tamanho de cada formulário~~ → **Nome (2–60), Idade (1–30), Bairro/Cidade (2–60), Comportamento/Cuidados opcionais (máx. 500), Mensagem de interesse (10–400) e 1–4 fotos** (decisão 24 / D2);
+- ~~regras de exclusão de anúncio já adotado~~ → **Permitida pelo responsável com confirmação e tombstone `DELETED`** (decisão 25 / D3);
+- ~~possibilidade de reabrir um animal de “Adotado” para “Disponível”~~ → **Permitida ao responsável com confirmação e sync offline-first** (decisão 26 / D4);
+- ~~tipo de ação de moderação administrativa além do mínimo (HIDE/UNHIDE)~~ → **Restrito a `HIDE` (Ocultar) e `UNHIDE` (Reexibir)** (decisão 27 / D5);
+- ~~visibilidade exata dos dados de contato~~ → **Privacidade progressiva entre responsável e interessado conforme etapa da trilha** (decisão 28 / D6);
+- ~~política de retenção de manifestações de interesse~~ → **Mantidas enquanto o anúncio existir (`ON DELETE CASCADE`) com opção de cancelamento pelo interessado** (decisão 29 / D7);
+- ~~precisão exata usada para arredondar/anonimizar coordenadas~~ → **3 casas decimais (~110 m) exibindo apenas Bairro, Cidade e UF** (decisão 30 / D8);
+- ~~quais mutações de favoritos/interesses terão suporte offline completo~~ → **Todas (`CREATE`/`DELETE` de favoritos e `CREATE`/`UPDATE`/`DELETE` de interesses na `sync_queue`)** (decisão 31 / D9);
 - ~~limite de fotos por anúncio~~ → **4 fotos** (decisão 13);
 - ~~raio máximo de pesquisa~~ → **10 km** (decisão 14);
 - ~~política definitiva de conflito simples versus revisão~~ → **last-write wins + revisão para divergência de status** (decisão 15);

@@ -56,12 +56,16 @@ export class AdoptionInterest {
     if (!props.userId || !props.animalId) {
       throw new Error('Manifestação de interesse exige usuário e animal válidos.');
     }
+    const cleanMessage = (props.message ?? '').trim();
+    if (cleanMessage.length > 400) {
+      throw new Error('A mensagem de interesse deve ter no máximo 400 caracteres.');
+    }
     this.id = props.id ?? generateUuid();
     this.userId = props.userId;
     this.userName = props.userName;
     this.userEmail = props.userEmail;
     this.animalId = props.animalId;
-    this.message = (props.message ?? '').trim();
+    this.message = cleanMessage;
     this.contactInfo = (props.contactInfo ?? '').trim();
     this._status = normalizeInterestStage(props.status);
     const now = new Date().toISOString();

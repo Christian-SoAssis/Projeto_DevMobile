@@ -204,4 +204,41 @@ describe('Enlace Domain, Offline-First Use Cases & Multi-Account Isolation', () 
     const visibleToCarlos = await searchUseCase.execute({ currentUserId: 'user-carlos' });
     expect(visibleToCarlos.some((a) => a.id === 'offline-pet-ana')).toBe(false);
   });
+
+  it('rounds coordinates to 3 decimal places (~110 m precision, D8) and validates field limits (D2)', () => {
+    const loc = new ApproximateLocation({
+      neighborhood: 'Centro',
+      city: 'Varginha',
+      latitude: -21.55489,
+      longitude: -45.43512,
+    });
+    expect(loc.latitude).toBe(-21.555);
+    expect(loc.longitude).toBe(-45.435);
+
+    expect(
+      () =>
+        new Animal({
+          ownerId: 'user-1',
+          name: 'A',
+          characteristics: sampleCharacteristics,
+          location: sampleLocation,
+        })
+    ).toThrow('entre 2 e 60 caracteres');
+  });
+
+  it('allows owner to reopen an adopted animal back to AVAILABLE (D4)', () => {
+    const animal = new Animal({
+      id: 'animal-reopen',
+      ownerId: 'owner-1',
+      name: 'Bento',
+      characteristics: sampleCharacteristics,
+      location: sampleLocation,
+      photos: [samplePhoto],
+    });
+    animal.markAdopted('owner-1');
+    expect(animal.status.isAdopted()).toBe(true);
+
+    animal.reopenAdoption('owner-1');
+    expect(animal.status.isAvailable()).toBe(true);
+  });
 });

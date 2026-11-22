@@ -31,14 +31,25 @@ export class AnimalCharacteristics {
     if (!species) throw new Error('A espécie do animal é obrigatória.');
     if (!size) throw new Error('O porte do animal é obrigatório.');
     if (!approximateAge) throw new Error('A idade aproximada do animal é obrigatória.');
+    if (approximateAge.length > 30) {
+      throw new Error('A idade aproximada deve ter no máximo 30 caracteres.');
+    }
     if (!sex) throw new Error('O sexo do animal é obrigatório.');
+
+    const characteristics = (props.characteristics ?? '').trim();
+    const behavior = (props.behavior ?? '').trim();
+    const specialCare = (props.specialCare ?? '').trim();
+
+    if (characteristics.length > 500 || behavior.length > 500 || specialCare.length > 500) {
+      throw new Error('Os campos opcionais de comportamento e cuidados devem ter no máximo 500 caracteres.');
+    }
 
     this.species = species;
     this.size = size;
     this.approximateAge = approximateAge;
     this.sex = sex;
-    this.characteristics = (props.characteristics ?? '').trim();
-    this.behavior = (props.behavior ?? '').trim();
-    this.specialCare = (props.specialCare ?? '').trim();
+    this.characteristics = characteristics;
+    this.behavior = behavior;
+    this.specialCare = specialCare;
   }
 }

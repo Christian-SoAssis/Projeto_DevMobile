@@ -1,46 +1,39 @@
-# Decisões pendentes — Enlace
+# Decisões de Produto e Arquitetura — Enlace
 
-Este documento reúne tudo que ainda precisa ser decidido pela equipe de produto antes de ser implementado,
-conforme levantado na documentação (`docs/documentacao-software-rede-adocao-animais.md`, seção 19) e nos demais
-arquivos de `docs/`.
-
-Cada item inclui: a decisão necessária, onde foi registrado, o impacto se não for tomada e o status sugerido.
+Este documento consolida todas as decisões de produto e arquitetura do aplicativo **Enlace**, conforme levantado na documentação principal (`docs/documentacao-software-rede-adocao-animais.md`, seções 18 e 19) e nos demais arquivos de `docs/`.
 
 ---
 
-## 1. Decisões registradas na documentação principal (seção 19 — "Pontos ainda não definidos")
+## 1. Decisões pendentes
 
-| # | Decisão necessária | Fonte | Impacto se não decidido | Status |
-|---|-------------------|-------|-------------------------|--------|
-| D1 | **Método exato de autenticação no Supabase** (e-mail/senha, magic link, OAuth, etc.) | §19 | Não é possível finalizar o fluxo de login/cadastro nem definir políticas de sessão | Pendente |
-| D2 | **Campos obrigatórios e limites de tamanho** de cada formulário | §19 | Validação no domínio e na UI fica incompleta; risco de dados inválidos no banco | Pendente |
-| D3 | **Regras de exclusão de anúncio já adotado** | §19 | Não se sabe se um animal "Adotado" pode ser excluído ou só ocultado | Pendente |
-| D4 | **Possibilidade de reabrir um animal de "Adotado" para "Disponível"** | §19 | O estado de adoção fica irreversível; não há fluxo de correção de erro | Pendente |
-| D5 | **Tipo de ação de moderação administrativa** além do mínimo (HIDE/UNHIDE, remover, suspender) | §19 / UC20 | A moderação do administrador não tem escopo definido | Pendente |
-| D6 | **Visibilidade exata dos dados de contato** do responsável | §19 | Não se sabe qual informação de contato é exposta ao público vs. só ao interessado | Pendente |
-| D7 | **Política de retenção de manifestações de interesse** | §19 | Não se sabe por quanto tempo manter registros de interesse no banco | Pendente |
-| D8 | **Precisão exata para arredondar/anonimizar coordenadas** | §19 | Risco de vazar localização exata do tutor; a aproximação fica subjetiva | Pendente |
-| D9 | **Quais mutações de favoritos/interesses terão suporte offline completo** | §19 | Fila de sync pode ficar incompleta para algumas entidades | Pendente |
+Nenhuma decisão pendente no momento — todos os 9 itens anteriormente abertos na seção 19 (`D1` a `D9`) foram decididos em **22/11/2026** e movidos para a seção 2 abaixo.
 
 ---
 
 ## 2. Decisões já tomadas (registradas na seção 18 do documento principal)
 
-Incluídas aqui para referência — não precisam ser decididas novamente:
-
-| # | Decisão | Valor adotado | Fonte |
-|---|---------|---------------|-------|
-| D13 | Limite de fotos por anúncio | 4 (MAX_PHOTOS_PER_ANIMAL) | §18 item 13 |
-| D14 | Raio máximo de pesquisa | 10 km (SearchRadius) | §18 item 14 |
-| D15 | Política de conflito simples vs revisão | last-write wins + revisão para divergência de status | §18 item 15 |
-| D16 | Etapas da trilha de interesse | ENVIADA → EM ANÁLISE → VISITA COMBINADA → CONCLUÍDA (+ RECUSADA fora da trilha) | §18 item 18 |
-| D19 | Onde o responsável gerencia interesses recebidos | Nos detalhes do anúncio, botão "N interesses" | §18 item 19 |
+| # | Decisão | Valor adotado | Justificativa / Fonte |
+|---|---------|---------------|-----------------------|
+| D1 | **Método exato de autenticação no Supabase** | **E-mail e senha** via Supabase Auth nativo (`signInWithPassword` / `signUp`), sem confirmação de e-mail obrigatória no MVP | Permite fluxo imediato de cadastro/login em testes e uso comunitário mantendo sessão JWT real para RLS (§18 item 23 / §19) |
+| D2 | **Campos obrigatórios e limites de tamanho** | **Obrigatórios no anúncio:** Nome (`2–60` chars), Espécie, Porte, Sexo, Idade aproximada (`1–30` chars), Bairro (`2–60` chars), Cidade (`2–60` chars) e `1 a 4` fotos WebP. **Opcionais no anúncio:** Características, Comportamento e Cuidados especiais (máx. `500` chars cada). **Interesse:** Mensagem obrigatória (`10–400` chars) e telefone/contato | Garante consistência no domínio, SQLite e Supabase e evita textos vazios ou excessivos (§18 item 24 / §19) |
+| D3 | **Regras de exclusão de anúncio já adotado** | **Permitida pelo responsável** mediante diálogo de confirmação (`Alert.alert`), gerando *tombstone* `DELETED` na sincronização | Permite ao tutor remover o anúncio a qualquer momento e limpa o cache local de outros dispositivos no delta sync (§18 item 25 / §19) |
+| D4 | **Possibilidade de reabrir animal de "Adotado" para "Disponível"** | **Sim, permitido ao responsável** mediante diálogo de confirmação (`Alert.alert`), com suporte offline-first na `sync_queue` | Permite corrigir marcação acidental ou reabrir a adoção caso a entrega não se concretize (§18 item 26 / §19) |
+| D5 | **Escopo de moderação administrativa** | Restrito a **Ocultar (`HIDE`) e Reexibir (`UNHIDE`)** anúncios (`moderation_status` = `'HIDDEN'` ou `'NONE'`) | Mantém rastreabilidade/auditoria sem perda destrutiva de dados e propaga ocultação via *tombstone* `HIDDEN` (§18 item 27 / UC20) |
+| D6 | **Visibilidade dos dados de contato (Privacidade progressiva)** | **Público/Visitante:** vê apenas nome do pet, localização aproximada (Bairro, Cidade, UF) e dados do anúncio. **Responsável:** vê nome e telefone/e-mail dos interessados no próprio anúncio. **Interessado:** acompanha a trilha e é informado da liberação do contato direto quando o status avança para `EM_ANALISE` ou `VISITA_COMBINADA` | Protege a privacidade do responsável contra exposição pública de telefone e endereço (RNF04, RNF05, §18 item 28) |
+| D7 | **Política de retenção de manifestações de interesse** | **Histórico mantido enquanto o anúncio existir** (`ON DELETE CASCADE` ao excluir o anúncio) + **opção de o próprio interessado cancelar/retirar sua manifestação** a qualquer momento | Preserva o histórico de acompanhamento para tutor e adotante sem reter dados órfãos após exclusão do anúncio (§18 item 29 / §19) |
+| D8 | **Precisão para arredondar/anonimizar coordenadas GPS** | **3 casas decimais** (`Math.round(coord * 1000) / 1000`, precisão aproximada de `~110 m`) e exibição textual restrita a **Bairro, Cidade e UF** (nunca rua ou número) | Equilibra precisão de raio de busca (até 10 km) e mapa aproximado com anonimização da residência do tutor (RNF05, §18 item 30) |
+| D9 | **Suporte offline completo para mutações de favoritos e interesses** | **Suporte offline-first completo na `sync_queue`** para Favoritos (`CREATE`/`DELETE`) e Interesses (`CREATE` pelo interessado, `UPDATE` de etapa pelo responsável e `DELETE`/cancelamento pelo interessado) | Garante experiência offline-first consistente em todas as interações do usuário (§18 item 31 / OFF-01) |
+| D13 | Limite de fotos por anúncio | 4 (`MAX_PHOTOS_PER_ANIMAL`) | §18 item 13 |
+| D14 | Raio máximo de pesquisa | 10 km (`SearchRadius`) | §18 item 14 |
+| D15 | Política de conflito simples vs revisão | *Last-write wins* + revisão manual para divergência de status (`AVAILABLE` vs `ADOPTED`) | §18 item 15 |
+| D16 | Etapas da trilha de interesse | `ENVIADA` → `EM_ANALISE` → `VISITA_COMBINADA` → `CONCLUIDA` (+ `RECUSADA` fora da trilha) | §18 item 18 |
+| D19 | Onde o responsável gerencia interesses recebidos | Nos detalhes do anúncio, seção/botão "Interessados • N" | §18 item 19 |
 | D20 | Persistência do contador de não-vistas | Tabela local `app_state` (chave/valor) | §18 item 20 |
 | — | Carrossel + visualizador com zoom nas fotos | ≥ 2 fotos = carrossel; 1 foto = simples; tela cheia com zoom 1x–4x | §18 item 16 |
 | — | Características no formulário | Opcionais (espécie, porte, idade, sexo continuam obrigatórios) | §18 item 17 |
-| — | Estratégia de sync | Delta sync com cursor (updated_at, id), sobreposição 60s, paginação 100 | §18 / OFF-06 |
+| — | Estratégia de sync | Delta sync com cursor `(updated_at, id)`, sobreposição 60s, paginação 100 | §18 / OFF-06 |
 | D21 | Mecânica de atualização de páginas (Pull-to-Refresh) | Gesto nativo de deslizar para baixo com `RefreshControl` nas listas (`index`, `meus-anuncios`, `favoritos`, `notificacoes`, `sync`) acionando `useFullSync` quando online e recarga local do SQLite | §18 item 21 / OFF-09 |
-| D22 | Fluxo de confirmação de adoção e auto-adoção ao concluir interesse | (1) Atualizar status de interesse exige `Alert.alert` de confirmação com nome do interessado, nome do pet e etapa destino; (2) Ao confirmar "Concluída", o animal é automaticamente marcado como adotado (atômico, offline-first); (3) Marcar como adotado diretamente (via tela de detalhes ou Meus Anúncios) também exige `Alert.alert` de confirmação com o nome do pet | §18 item 22 / RF12 / D16 |
+| D22 | Fluxo de confirmação de adoção e auto-adoção ao concluir interesse | (1) Atualizar status de interesse exige `Alert.alert` de confirmação com nome do interessado, nome do pet e etapa destino; (2) Ao confirmar "Concluída", o animal é automaticamente marcado como adotado (atômico, offline-first); (3) Marcar como adotado ou reabrir também exige `Alert.alert` de confirmação com o nome do pet | §18 item 22 / RF12 / D16 |
 
 ---
 
@@ -58,6 +51,5 @@ Incluídas aqui para referência — não precisam ser decididas novamente:
 
 ## 4. Como usar este documento
 
-- Antes de implementar qualquer novo fluxo, conferir se há decisão pendente relacionada.
-- Quando uma decisão for tomada, mover o item para a seção 2 (ou adicionar nova linha) e registrar a justificativa.
-- Não inventar valores para itens pendentes sem decisão de produto.
+- Antes de implementar qualquer novo fluxo, conferir as decisões consolidadas na seção 2.
+- Quando uma nova decisão for tomada, adicioná-la à seção 2 e à seção 18 de `docs/documentacao-software-rede-adocao-animais.md`.

@@ -137,7 +137,11 @@ export class ProcessSyncQueueUseCase {
       if (!this.options.interests) {
         throw new Error('Sincronização de interesses indisponível sem backend.');
       }
-      if (action.operation === 'UPDATE') {
+      if (action.operation === 'DELETE') {
+        if (this.options.interests.remove) {
+          await this.options.interests.remove(action.entityId);
+        }
+      } else if (action.operation === 'UPDATE') {
         const status = (action.payload.status as InterestStage) ?? 'ENVIADA';
         await this.options.interests.updateStatus(action.entityId, status);
       } else {

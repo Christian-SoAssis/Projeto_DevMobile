@@ -73,6 +73,10 @@ export class SqliteAdoptionInterestRepository implements AdoptionInterestReposit
     );
   }
 
+  async remove(id: string): Promise<void> {
+    await this.db.runAsync('DELETE FROM adoption_interests WHERE id = ?', [id]);
+  }
+
   private mapRow(row: InterestRow): AdoptionInterest {
     return new AdoptionInterest({
       id: row.id,

@@ -43,6 +43,9 @@ export class Animal {
     if (!trimmedName) {
       throw new Error('O nome do animal é obrigatório.');
     }
+    if (trimmedName.length < 2 || trimmedName.length > 60) {
+      throw new Error('O nome do animal deve ter entre 2 e 60 caracteres.');
+    }
     if (!props.ownerId || !props.ownerId.trim()) {
       throw new Error('O responsável pelo anúncio é obrigatório.');
     }
@@ -123,6 +126,18 @@ export class Animal {
     this.bumpVersion();
   }
 
+  /** Decisão D4: Permite ao responsável reabrir um anúncio de "Adotado" para "Disponível". */
+  reopenAdoption(actorUserId: string): void {
+    if (actorUserId !== this.ownerId) {
+      throw new Error('Somente o responsável pode reabrir o anúncio para adoção.');
+    }
+    if (this._status.isAvailable()) {
+      throw new Error('O animal já está disponível para adoção.');
+    }
+    this._status = AdoptionStatus.available();
+    this.bumpVersion();
+  }
+
   updateData(
     actorUserId: string,
     updates: {
@@ -138,6 +153,9 @@ export class Animal {
     if (updates.name !== undefined) {
       const trimmed = updates.name.trim();
       if (!trimmed) throw new Error('O nome do animal é obrigatório.');
+      if (trimmed.length < 2 || trimmed.length > 60) {
+        throw new Error('O nome do animal deve ter entre 2 e 60 caracteres.');
+      }
       this._name = trimmed;
     }
     if (updates.characteristics) {

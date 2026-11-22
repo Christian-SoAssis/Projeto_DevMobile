@@ -9,9 +9,9 @@ export interface ApproximateLocationProps {
 }
 
 /**
- * Localização aproximada do animal/anunciante (RF24, RF25, RNF05, RNF06).
+ * Localização aproximada do animal/anunciante (RF24, RF25, RNF05, RNF06, D2, D8).
  * Nunca armazena nem expõe rua ou número residencial.
- * Coordenadas são arredondadas em 2 casas decimais (~1,1 km) para anonimização.
+ * Coordenadas são arredondadas em 3 casas decimais (~110 m) para anonimização (Decisão D8).
  */
 export class ApproximateLocation {
   public readonly neighborhood: string;
@@ -27,6 +27,12 @@ export class ApproximateLocation {
     if (!city) {
       throw new Error('A cidade do anúncio é obrigatória.');
     }
+    if (city.length > 60) {
+      throw new Error('A cidade deve ter no máximo 60 caracteres.');
+    }
+    if (neighborhood.length > 60) {
+      throw new Error('O bairro deve ter no máximo 60 caracteres.');
+    }
     this.neighborhood = neighborhood || 'Centro';
     this.city = city;
     this.region = (props.region ?? 'MG').trim() || 'MG';
@@ -37,7 +43,7 @@ export class ApproximateLocation {
 
   static roundCoord(value: number): number {
     if (typeof value !== 'number' || Number.isNaN(value)) return 0;
-    return Math.round(value * 100) / 100;
+    return Math.round(value * 1000) / 1000;
   }
 
   /** Distância Haversine aproximada em km entre duas localizações. */

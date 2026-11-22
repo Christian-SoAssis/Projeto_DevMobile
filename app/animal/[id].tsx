@@ -191,8 +191,8 @@ export default function AnimalDetailsScreen() {
       router.push('/(public)/login');
       return;
     }
-    if (!message.trim()) {
-      Alert.alert('Mensagem obrigatória', 'Conte um pouco sobre você e seu lar.');
+    if (!message.trim() || message.trim().length < 10) {
+      Alert.alert('Mensagem muito curta', 'Conte um pouco sobre você e seu lar (mínimo de 10 caracteres).');
       return;
     }
     setSubmitting(true);
@@ -258,6 +258,54 @@ export default function AnimalDetailsScreen() {
               void runFullSync();
             } catch (err: any) {
               Alert.alert('Erro', err?.message || 'Não foi possível marcar como adotado.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleReopenAdoption = () => {
+    if (!user || !animal) return;
+    Alert.alert(
+      'Reabrir para adoção',
+      `Deseja reabrir o anúncio de ${animal.name} como "Disponível"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sim, reabrir',
+          onPress: async () => {
+            try {
+              await markAdoptedUseCase.reopen(animal.id, user.id, isOnline);
+              await loadDetails();
+              void runFullSync();
+            } catch (err: any) {
+              Alert.alert('Erro', err?.message || 'Não foi possível reabrir o anúncio.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCancelMyInterest = () => {
+    if (!user || !myInterest || !animal) return;
+    Alert.alert(
+      'Cancelar interesse',
+      `Deseja retirar sua manifestação de interesse em ${animal.name}?`,
+      [
+        { text: 'Voltar', style: 'cancel' },
+        {
+          text: 'Retirar interesse',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await registerInterestUseCase.cancel(myInterest.id, user.id, isOnline);
+              setMyInterest(null);
+              await loadDetails();
+              void runFullSync();
+            } catch (err: any) {
+              Alert.alert('Erro', err?.message || 'Não foi possível cancelar o interesse.');
             }
           },
         },
@@ -431,6 +479,23 @@ export default function AnimalDetailsScreen() {
                     );
                   })}
                 </View>
+                <Text style={styles.sectionBody}>
+                  {myInterest.status === 'ENVIADA'
+                    ? 'O responsável recebeu seu contato e entrará em contato assim que iniciar a análise.'
+                    : myInterest.status === 'RECUSADA'
+                    ? 'Esta manifestação foi encerrada pelo responsável.'
+                    : 'Seu contato direto com o responsável está ativo para alinhamento da visita/adoção.'}
+                </Text>
+                <TouchableOpacity
+                  style={[CLAY_SECONDARY_BUTTON_STYLE, { marginTop: 4 }]}
+                  onPress={handleCancelMyInterest}
+                >
+                  <Ionicons name="close-circle-outline" size={18} color={COLORS.danger} />
+                  <Text style={[styles.secondaryButtonText, { color: COLORS.danger }]}>
+                    {' '}
+                    Cancelar meu interesse
+                  </Text>
+                </TouchableOpacity>
               </View>
             ) : (
               animal.status.isAvailable() && (
@@ -469,10 +534,15 @@ export default function AnimalDetailsScreen() {
                 <Text style={styles.secondaryButtonText}> Editar</Text>
               </TouchableOpacity>
 
-              {animal.status.isAvailable() && (
+              {animal.status.isAvailable() ? (
                 <TouchableOpacity style={styles.sageButton} onPress={handleMarkAdopted}>
                   <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.white} />
                   <Text style={styles.sageButtonText}>Marcar como adotado</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.sageButton} onPress={handleReopenAdoption}>
+                  <Ionicons name="refresh-outline" size={18} color={COLORS.white} />
+                  <Text style={styles.sageButtonText}>Reabrir para adoção</Text>
                 </TouchableOpacity>
               )}
 
@@ -573,13 +643,14 @@ export default function AnimalDetailsScreen() {
               keyboardType="phone-pad"
             />
 
-            <Text style={styles.inputLabel}>Sua mensagem</Text>
+            <Text style={styles.inputLabel}>Sua mensagem (10 a 400 caracteres)</Text>
             <TextInput
               style={[CLAY_INSET_INPUT_STYLE, styles.textArea]}
               value={message}
               onChangeText={setMessage}
               placeholder="Conte sobre sua rotina, experiência com pets e espaço disponível..."
               placeholderTextColor={COLORS.brownMuted}
+              maxLength={400}
               multiline
             />
 

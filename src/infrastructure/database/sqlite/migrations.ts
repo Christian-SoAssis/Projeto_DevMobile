@@ -156,6 +156,13 @@ const MIGRATIONS: Migration[] = [
 /**
  * Inicialização e migrations idempotentes do schema SQLite local (DAT-01, OFF-02).
  * Preserva todos os dados existentes ao evoluir a estrutura.
+ *
+ * Como adicionar uma nova migration:
+ * 1. Inserir um novo objeto no array `MIGRATIONS` com `version` incremental (ex.: 3, 4, ...)
+ * 2. Usar apenas `ALTER TABLE ... ADD COLUMN` e `CREATE INDEX IF NOT EXISTS`
+ *    — nunca `DROP TABLE` ou `ALTER TABLE ... DROP COLUMN`, para preservar dados
+ * 3. O `applyMigrations` aplica apenas migrations cuja versão ainda não está
+ *    registrada na tabela `schema_migrations`
  */
 export async function applyMigrations(db: SqliteDatabaseDriver): Promise<void> {
   await db.execAsync(`

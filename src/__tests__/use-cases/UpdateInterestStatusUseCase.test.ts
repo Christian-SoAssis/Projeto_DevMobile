@@ -149,6 +149,29 @@ describe('UpdateInterestStatusUseCase', () => {
     expect(interestActions.length).toBe(0);
   });
 
+  it('deve sincronizar imediatamente o status ADOPTED do animal no servidor remoto ao concluir interesse online', async () => {
+    const animal = createTestAnimal({ id: 'animal-online-adopt', ownerId: 'user-dono', status: 'AVAILABLE' });
+    const interest = createTestInterest({ id: 'int-online-adopt', animalId: 'animal-online-adopt', status: 'VISITA_COMBINADA' });
+    await animalRepository.saveLocal(animal);
+    await remoteAnimalSource.createRemote(animal);
+    await interestRepository.save(interest);
+    await remoteInterests.upsert(interest);
+
+    const result = await useCase.execute('int-online-adopt', 'user-dono', 'CONCLUIDA', true);
+
+    expect(result.synced).toBe(true);
+    expect(result.animalMarkedAdopted).toBe(true);
+
+    const localAnimal = await animalRepository.findById('animal-online-adopt');
+    expect(localAnimal?.status.isAdopted()).toBe(true);
+
+    const remoteAnimal = await remoteAnimalSource.findById('animal-online-adopt');
+    expect(remoteAnimal?.status.isAdopted()).toBe(true);
+
+    const pending = await syncQueueRepository.listPending();
+    expect(pending.length).toBe(0);
+  });
+
   it('deve enfileirar quando sync remoto de interesse falha online', async () => {
     const failingRemote = {
       ...remoteInterests,

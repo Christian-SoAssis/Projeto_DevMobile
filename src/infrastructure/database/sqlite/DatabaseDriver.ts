@@ -22,6 +22,7 @@ export class InMemorySqliteDriver implements SqliteDatabaseDriver {
 
   private initTables(): void {
     const names = [
+      'schema_migrations',
       'animals',
       'animal_photos',
       'local_images',
@@ -32,6 +33,7 @@ export class InMemorySqliteDriver implements SqliteDatabaseDriver {
       'search_preferences',
       'app_state',
       'users',
+      'profiles',
     ];
     for (const name of names) {
       if (!this.tables.has(name)) {
@@ -143,6 +145,9 @@ export class InMemorySqliteDriver implements SqliteDatabaseDriver {
     record: Record<string, unknown>
   ): void {
     const pkMatch = (r: Record<string, unknown>): boolean => {
+      if (table === 'schema_migrations') {
+        return r.version === record.version;
+      }
       if (table === 'favorites') {
         return r.user_id === record.user_id && r.animal_id === record.animal_id;
       }

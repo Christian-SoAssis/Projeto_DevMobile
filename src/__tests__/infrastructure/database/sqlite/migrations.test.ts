@@ -30,6 +30,7 @@ describe('SQLite Migrations (OFF-02, DAT-01)', () => {
       'SELECT version FROM schema_migrations ORDER BY version'
     );
     expect(versions.map((v) => v.version)).toContain(1);
+    expect(versions.map((v) => v.version)).toContain(2);
   });
 
   it('deve ser idempotente: aplicar duas vezes não duplica dados', async () => {

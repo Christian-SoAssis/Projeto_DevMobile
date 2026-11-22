@@ -18,6 +18,7 @@ import { useRepositories } from '../../src/adapters/context/RepositoriesContext'
 import { useAuth } from '../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
 import { useFullSync } from '../../src/adapters/hooks/useFullSync';
+import { notifyPullCompleted } from '../../src/adapters/sync/pullEvents';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import { PhotoCarouselViewer } from '../../src/adapters/components/PhotoCarouselViewer';
 import { exportAnimalPdf } from '../../src/adapters/pdf/exportAnimalPdf';
@@ -259,6 +260,8 @@ export default function AnimalDetailsScreen() {
               // updateInterestUseCase já faz a auto-adoção atomicamente quando nextStage === 'CONCLUIDA'
               await updateInterestUseCase.execute(interest.id, user.id, nextStage, isOnline);
               await loadDetails();
+              notifyPullCompleted();
+              void runFullSync();
             } catch (err: any) {
               Alert.alert('Erro', err?.message || 'Não foi possível atualizar a etapa.');
             }
@@ -281,6 +284,7 @@ export default function AnimalDetailsScreen() {
             try {
               await markAdoptedUseCase.execute(animal.id, user.id, isOnline);
               await loadDetails();
+              notifyPullCompleted();
               void runFullSync();
             } catch (err: any) {
               Alert.alert('Erro', err?.message || 'Não foi possível marcar como adotado.');
@@ -304,6 +308,7 @@ export default function AnimalDetailsScreen() {
             try {
               await markAdoptedUseCase.reopen(animal.id, user.id, isOnline);
               await loadDetails();
+              notifyPullCompleted();
               void runFullSync();
             } catch (err: any) {
               Alert.alert('Erro', err?.message || 'Não foi possível reabrir o anúncio.');

@@ -19,7 +19,7 @@ import { useRepositories } from '../../src/adapters/context/RepositoriesContext'
 import { useAuth } from '../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
 import { useFullSync } from '../../src/adapters/hooks/useFullSync';
-import { subscribePullCompleted } from '../../src/adapters/sync/pullEvents';
+import { notifyPullCompleted, subscribePullCompleted } from '../../src/adapters/sync/pullEvents';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import {
   CLAY_CARD_STYLE,
@@ -117,10 +117,37 @@ export default function MeusAnunciosScreen() {
             try {
               await markAdoptedUseCase.execute(animal.id, user.id, isOnline);
               await loadMyAnimals();
+              notifyPullCompleted();
             } catch (err) {
               Alert.alert(
                 'Atenção',
                 err instanceof Error ? err.message : 'Erro ao marcar como adotado.'
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleReopenAdoption = (animal: Animal) => {
+    if (!user) return;
+    Alert.alert(
+      'Reabrir para adoção',
+      `Deseja reabrir o anúncio de ${animal.name} como "Disponível"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sim, reabrir',
+          onPress: async () => {
+            try {
+              await markAdoptedUseCase.reopen(animal.id, user.id, isOnline);
+              await loadMyAnimals();
+              notifyPullCompleted();
+            } catch (err) {
+              Alert.alert(
+                'Atenção',
+                err instanceof Error ? err.message : 'Erro ao reabrir anúncio.'
               );
             }
           },
@@ -254,12 +281,19 @@ export default function MeusAnunciosScreen() {
                     <Text style={styles.actionPillText}>Editar</Text>
                   </TouchableOpacity>
 
-                  {item.status.isAvailable() && (
+                  {item.status.isAvailable() ? (
                     <TouchableOpacity
                       onPress={() => handleMarkAdopted(item)}
                       style={styles.actionPill}
                     >
                       <Text style={styles.actionPillText}>Adotado</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => handleReopenAdoption(item)}
+                      style={styles.actionPill}
+                    >
+                      <Text style={styles.actionPillText}>Reabrir</Text>
                     </TouchableOpacity>
                   )}
 

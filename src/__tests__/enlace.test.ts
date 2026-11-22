@@ -205,7 +205,7 @@ describe('Enlace Domain, Offline-First Use Cases & Multi-Account Isolation', () 
     expect(visibleToCarlos.some((a) => a.id === 'offline-pet-ana')).toBe(false);
   });
 
-  it('rounds coordinates to 3 decimal places (~110 m precision, D8) and validates field limits (D2)', () => {
+  it('rounds coordinates to 3 decimal places (~110 m, D8), validates WGS84 range (GEO-01) and field limits (D2)', () => {
     const loc = new ApproximateLocation({
       neighborhood: 'Centro',
       city: 'Varginha',
@@ -214,6 +214,16 @@ describe('Enlace Domain, Offline-First Use Cases & Multi-Account Isolation', () 
     });
     expect(loc.latitude).toBe(-21.555);
     expect(loc.longitude).toBe(-45.435);
+
+    expect(
+      () =>
+        new ApproximateLocation({
+          neighborhood: 'Centro',
+          city: 'Varginha',
+          latitude: 95,
+          longitude: -45.43,
+        })
+    ).toThrow('intervalo WGS84 entre -90 e +90');
 
     expect(
       () =>

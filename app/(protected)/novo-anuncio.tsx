@@ -203,6 +203,7 @@ export default function NovoAnuncioScreen() {
             onChangeText={setName}
             placeholder="Ex.: Amora, Bento..."
             placeholderTextColor={COLORS.brownMuted}
+            maxLength={60}
           />
 
           <Text style={styles.label}>Espécie</Text>
@@ -251,6 +252,7 @@ export default function NovoAnuncioScreen() {
             onChangeText={setApproximateAge}
             placeholder="Ex.: 8 meses, 2 anos"
             placeholderTextColor={COLORS.brownMuted}
+            maxLength={30}
           />
 
           <Text style={styles.label}>Comportamento (opcional)</Text>
@@ -260,6 +262,7 @@ export default function NovoAnuncioScreen() {
             onChangeText={setBehavior}
             placeholder="Conte como é o temperamento, convivência com outros animais..."
             placeholderTextColor={COLORS.brownMuted}
+            maxLength={500}
             multiline
           />
 
@@ -270,6 +273,7 @@ export default function NovoAnuncioScreen() {
             onChangeText={setSpecialCare}
             placeholder="Ex.: Vacinado, castrado, medicação..."
             placeholderTextColor={COLORS.brownMuted}
+            maxLength={500}
           />
         </View>
 
@@ -299,6 +303,7 @@ export default function NovoAnuncioScreen() {
             onChangeText={setNeighborhood}
             placeholder="Ex.: Centro, Vila Pinto"
             placeholderTextColor={COLORS.brownMuted}
+            maxLength={60}
           />
 
           <Text style={styles.label}>Cidade</Text>
@@ -308,6 +313,7 @@ export default function NovoAnuncioScreen() {
             onChangeText={setCity}
             placeholder="Ex.: Varginha"
             placeholderTextColor={COLORS.brownMuted}
+            maxLength={60}
           />
           {!locGeocoded && !locating && (
             <Text style={styles.locNotGeocodedText}>

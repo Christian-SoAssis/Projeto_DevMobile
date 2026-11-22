@@ -38,15 +38,18 @@ export class UpdateInterestStatusUseCase {
     // 2. Auto-adoção atômica: se CONCLUIDA e animal ainda disponível,
     //    marca o animal como adotado ANTES de qualquer sync remoto para manter consistência.
     let animalMarkedAdopted = false;
+    let adoptAction: SyncAction | null = null;
+    let previousAnimalVersion = animal.version;
+
     if (nextStatus === 'CONCLUIDA' && animal.status.isAvailable()) {
-      const previousVersion = animal.version;
+      previousAnimalVersion = animal.version;
       animal.markAdopted(actorUserId);
       await this.animalRepository.saveLocal(animal);
       animalMarkedAdopted = true;
 
-      // Enfileira MARK_ADOPTED (será processado pelo sync em sequência com o UPDATE de interesse)
+      // Enfileira MARK_ADOPTED (será removido se o envio imediato online suceder, ou processado pela fila)
       if (this.syncQueueRepository) {
-        const adoptAction = new SyncAction({
+        adoptAction = new SyncAction({
           id: `sync_adopted_${animal.id}_v${animal.version}`,
           operation: 'MARK_ADOPTED',
           entityType: 'animal',
@@ -55,11 +58,32 @@ export class UpdateInterestStatusUseCase {
             id: animal.id,
             ownerId: animal.ownerId,
             status: 'ADOPTED',
-            expectedVersion: previousVersion,
+            expectedVersion: previousAnimalVersion,
             version: animal.version,
           },
         });
         await this.syncQueueRepository.enqueue(adoptAction);
+      }
+
+      // Se online e com fonte remota de animais, já sincroniza o status ADOPTED imediatamente no servidor
+      if (isOnline && this.remoteAnimalSource) {
+        try {
+          const remoteAdopted = await this.remoteAnimalSource.updateRemote(
+            animal,
+            previousAnimalVersion
+          );
+          await this.animalRepository.saveLocal(remoteAdopted);
+          if (adoptAction && this.syncQueueRepository) {
+            await this.syncQueueRepository.delete(adoptAction.id);
+          }
+        } catch (err) {
+          if (adoptAction && this.syncQueueRepository) {
+            adoptAction.markFailed(
+              err instanceof Error ? err.message : 'Falha ao sincronizar adoção automática.'
+            );
+            await this.syncQueueRepository.update(adoptAction);
+          }
+        }
       }
     }
 

@@ -104,12 +104,12 @@ O repositório não tem `android/` nem `ios/`.
 
 ---
 
-## 7. Implementar CI/CD
+## 7. Implementar CI/CD ✅ CONCLUÍDO
 
-Adicionar GitHub Actions que rode no push/PR: `npm run typecheck`, `npm test` (Jest) e lint.
+Adicionado workflow `.github/workflows/ci.yml` que executa no push/PR (`main` e `RealDeal`): `npm run typecheck` e `npm test` (Jest).
 
 ---
 
-## 8. Versionamento de migrations
+## 8. Versionamento de migrations ✅ CONCLUÍDO
 
-Substituir o `CREATE TABLE IF NOT EXISTS` único em `migrations.ts` por migrations versionadas que permitam evolução de schema sem perder dados existentes (critérios OFF-02 e DAT-01).
+Implementado controle incremental de versões na tabela `schema_migrations` em `src/infrastructure/database/sqlite/migrations.ts` (versões 1 e 2 com índices compostos de sincronização e busca) e suporte a chave primária de `schema_migrations` no `InMemorySqliteDriver` (critérios OFF-02 e DAT-01).

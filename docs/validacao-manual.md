@@ -60,6 +60,8 @@ Requer: Expo Go instalado em dispositivo físico (ou emulator) e builds nativos.
 | V36 | Auto-adoção ao concluir interesse | Ao confirmar a etapa "Concluída", o animal deve ser automaticamente marcado como adotado. O badge do anúncio muda de "Disponível" para "Adotado" após a operação; a alteração é enfileirada se offline | RF12, D16 |
 | V37 | Confirmação antes de "Marcar como adotado" (tela de detalhes) | Na tela de detalhes do anúncio (botão "Marcar como adotado"), deve aparecer `Alert.alert` com texto "Marcar <nome do pet> como adotado?" com botões "Cancelar" e "Sim, marcar como adotado" antes de executar a ação | RF12 |
 | V38 | Confirmação antes de "Adotado" (tela Meus Anúncios) | Na listagem "Meus Anúncios", ao tocar no botão "Adotado" do card, deve aparecer `Alert.alert` com texto "Marcar <nome do pet> como adotado?" com botões "Cancelar" e "Sim, marcar como adotado" antes de executar a ação | RF12 |
+| V39 | Reabrir anúncio de "Adotado" para "Disponível" | Quando o animal está como "Adotado", o responsável vê o botão "Reabrir para adoção" (na tela de detalhes) ou "Reabrir" (em Meus Anúncios); ao confirmar no `Alert.alert`, o status retorna para "Disponível" (com sync offline-first) | RF12, D4 |
+| V40 | Cancelar própria manifestação de interesse | Na tela de detalhes do anúncio, o interessado que já enviou manifestação vê o botão "Cancelar meu interesse"; ao confirmar no `Alert.alert`, a manifestação é removida localmente e sincronizada (ou enfileirada na `sync_queue` se offline) | RF16, D7, D9 |
 
 ---
 

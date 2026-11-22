@@ -184,7 +184,12 @@ export default function EditarAnuncioScreen() {
 
         <View style={styles.card}>
           <Text style={styles.label}>Nome do animal</Text>
-          <TextInput style={CLAY_INSET_INPUT_STYLE} value={name} onChangeText={setName} />
+          <TextInput
+            style={CLAY_INSET_INPUT_STYLE}
+            value={name}
+            onChangeText={setName}
+            maxLength={60}
+          />
 
           <Text style={styles.label}>Espécie</Text>
           <View style={styles.chipsRow}>
@@ -217,6 +222,7 @@ export default function EditarAnuncioScreen() {
             style={CLAY_INSET_INPUT_STYLE}
             value={approximateAge}
             onChangeText={setApproximateAge}
+            maxLength={30}
           />
 
           <Text style={styles.label}>Comportamento</Text>
@@ -224,6 +230,7 @@ export default function EditarAnuncioScreen() {
             style={[CLAY_INSET_INPUT_STYLE, styles.textArea]}
             value={behavior}
             onChangeText={setBehavior}
+            maxLength={500}
             multiline
           />
 
@@ -232,6 +239,7 @@ export default function EditarAnuncioScreen() {
             style={CLAY_INSET_INPUT_STYLE}
             value={specialCare}
             onChangeText={setSpecialCare}
+            maxLength={500}
           />
 
           <Text style={styles.label}>Bairro</Text>
@@ -239,10 +247,16 @@ export default function EditarAnuncioScreen() {
             style={CLAY_INSET_INPUT_STYLE}
             value={neighborhood}
             onChangeText={setNeighborhood}
+            maxLength={60}
           />
 
           <Text style={styles.label}>Cidade</Text>
-          <TextInput style={CLAY_INSET_INPUT_STYLE} value={city} onChangeText={setCity} />
+          <TextInput
+            style={CLAY_INSET_INPUT_STYLE}
+            value={city}
+            onChangeText={setCity}
+            maxLength={60}
+          />
         </View>
 
         <TouchableOpacity

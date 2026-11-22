@@ -230,13 +230,13 @@ O armazenamento de sessão agora está desacoplado do cliente Supabase, facilita
 - [ ] Executar `npx expo prebuild` (ou criar development build via EAS) para gerar projetos nativos `android/` e `ios/`.
 - [ ] Testar em dispositivo/emulador: câmera, galeria, permissão de localização, `expo-secure-store` e `expo-sqlite` persistente.
 
-### 4.8. Implementar CI/CD (recomendado)
+### 4.8. Implementar CI/CD (recomendado) ✅ CONCLUÍDO
 
-- [ ] Adicionar GitHub Actions que rode no push/PR: `npm run typecheck`, `npm test` (Jest) e lint (se configurado).
+- [x] Adicionar GitHub Actions (`.github/workflows/ci.yml`) que rode no push/PR: `npm run typecheck` e `npm test` (Jest).
 
-### 4.9. Versionamento de migrations (OFF-02, DAT-01)
+### 4.9. Versionamento de migrations (OFF-02, DAT-01) ✅ CONCLUÍDO
 
-- [ ] Substituir `CREATE TABLE IF NOT EXISTS` único por migrations versionadas que permitam evolução de schema sem perder dados existentes.
+- [x] Implementar migrations versionadas (`schema_migrations`, versões 1 e 2) em `src/infrastructure/database/sqlite/migrations.ts` permitindo evolução de schema sem perder dados existentes.
 
 ---
 

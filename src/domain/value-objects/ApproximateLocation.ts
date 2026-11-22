@@ -33,11 +33,20 @@ export class ApproximateLocation {
     if (neighborhood.length > 60) {
       throw new Error('O bairro deve ter no máximo 60 caracteres.');
     }
+    const rawLat = props.latitude ?? -21.55;
+    const rawLon = props.longitude ?? -45.43;
+    if (typeof rawLat !== 'number' || Number.isNaN(rawLat) || rawLat < -90 || rawLat > 90) {
+      throw new Error('Latitude inválida: deve estar no intervalo WGS84 entre -90 e +90 graus.');
+    }
+    if (typeof rawLon !== 'number' || Number.isNaN(rawLon) || rawLon < -180 || rawLon > 180) {
+      throw new Error('Longitude inválida: deve estar no intervalo WGS84 entre -180 e +180 graus.');
+    }
+
     this.neighborhood = neighborhood || 'Centro';
     this.city = city;
     this.region = (props.region ?? 'MG').trim() || 'MG';
-    this.latitude = ApproximateLocation.roundCoord(props.latitude ?? -21.55);
-    this.longitude = ApproximateLocation.roundCoord(props.longitude ?? -45.43);
+    this.latitude = ApproximateLocation.roundCoord(rawLat);
+    this.longitude = ApproximateLocation.roundCoord(rawLon);
     this.geocoded = props.geocoded ?? false;
   }
 

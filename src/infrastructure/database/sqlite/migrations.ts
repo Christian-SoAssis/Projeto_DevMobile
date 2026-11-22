@@ -138,8 +138,19 @@ const MIGRATIONS: Migration[] = [
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
-`
-  }
+`,
+  },
+  {
+    version: 2,
+    sql: `
+    CREATE INDEX IF NOT EXISTS idx_animals_updated_id ON animals (updated_at, id);
+    CREATE INDEX IF NOT EXISTS idx_animals_owner_status ON animals (owner_id, status);
+    CREATE INDEX IF NOT EXISTS idx_sync_queue_status_changed ON sync_queue (status, changed_at);
+    CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites (user_id);
+    CREATE INDEX IF NOT EXISTS idx_interests_animal ON adoption_interests (animal_id);
+    CREATE INDEX IF NOT EXISTS idx_interests_user ON adoption_interests (user_id);
+`,
+  },
 ];
 
 /**

@@ -1,0 +1,31 @@
+name: Enlace CI
+
+on:
+  push:
+    branches: [main, RealDeal]
+  pull_request:
+    branches: [main, RealDeal]
+
+jobs:
+  verify:
+    name: Typecheck & Automated Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Run Jest test suite
+        run: npm test

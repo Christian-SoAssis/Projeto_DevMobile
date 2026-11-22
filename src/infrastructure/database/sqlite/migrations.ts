@@ -139,12 +139,38 @@ const MIGRATIONS: Migration[] = [
       updated_at TEXT NOT NULL
     );
 `
+  },
+  {
+    version: 2,
+    sql: `
+    -- Evolução do schema (DAT-01, OFF-02): adiciona colunas e índices
+    -- preservando dados existentes. Nenhum DROP TABLE é usado aqui.
+
+    -- Soft delete: marca registro como excluído sem remover do banco
+    ALTER TABLE animals ADD COLUMN deleted_at TEXT;
+
+    -- Índice para busca rápida de anúncios por dono (complementa idx_animals_owner)
+    CREATE INDEX IF NOT EXISTS idx_animals_owner_deleted ON animals (owner_id, deleted_at);
+
+    -- Índice para consulta de sync_queue por status e entidade
+    CREATE INDEX IF NOT EXISTS idx_sync_queue_status_entity ON sync_queue (status, entity_type);
+
+    -- Índice para busca de fotos por animal
+    CREATE INDEX IF NOT EXISTS idx_animal_photos_upload_status ON animal_photos (upload_status);
+`
   }
 ];
 
 /**
  * Inicialização e migrations idempotentes do schema SQLite local (DAT-01, OFF-02).
  * Preserva todos os dados existentes ao evoluir a estrutura.
+ *
+ * Como adicionar uma nova migration:
+ * 1. Inserir um novo objeto no array `MIGRATIONS` com `version` incremental (ex.: 3, 4, ...)
+ * 2. Usar apenas `ALTER TABLE ... ADD COLUMN` e `CREATE INDEX IF NOT EXISTS`
+ *    — nunca `DROP TABLE` ou `ALTER TABLE ... DROP COLUMN`, para preservar dados
+ * 3. O `applyMigrations` aplica apenas migrations cuja versão ainda não está
+ *    registrada na tabela `schema_migrations`
  */
 export async function applyMigrations(db: SqliteDatabaseDriver): Promise<void> {
   await db.execAsync(`

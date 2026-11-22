@@ -40,8 +40,34 @@ export class InMemorySqliteDriver implements SqliteDatabaseDriver {
     }
   }
 
-  async execAsync(_sql: string): Promise<void> {
+  async execAsync(sql: string): Promise<void> {
     this.initTables();
+
+    const normalized = sql.replace(/\s+/g, ' ').trim();
+
+    // ALTER TABLE table ADD COLUMN column type
+    const alterAddColumnMatch = /^ALTER\s+TABLE\s+([a-z_]+)\s+ADD\s+COLUMN\s+([a-z_]+)\s+([a-z]+)/i.exec(
+      normalized
+    );
+    if (alterAddColumnMatch) {
+      const table = alterAddColumnMatch[1].toLowerCase();
+      const column = alterAddColumnMatch[2].toLowerCase();
+      const rows = this.getTable(table);
+      for (const row of rows) {
+        if (!(column in row)) {
+          row[column] = null;
+        }
+      }
+      return;
+    }
+
+    // CREATE INDEX IF NOT EXISTS index_name ON table (cols) — no-op in memory driver
+    const createIndexMatch = /^CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+([a-z_]+)\s+ON\s+([a-z_]+)/i.exec(
+      normalized
+    );
+    if (createIndexMatch) {
+      return;
+    }
   }
 
   async runAsync(sql: string, params: unknown[] = []): Promise<{ changes: number }> {

@@ -75,4 +75,61 @@ describe('SQLite Migrations (OFF-02, DAT-01)', () => {
     const metadataRows = await db.getAllAsync('SELECT * FROM sync_metadata LIMIT 1');
     expect(metadataRows).toBeDefined();
   });
+
+  it('deve aplicar migration versão 2 com ALTER TABLE (evolução de schema)', async () => {
+    const db = new InMemorySqliteDriver();
+
+    await applyMigrations(db);
+
+    // Versões 1 e 2 devem estar registradas
+    const versions = await db.getAllAsync<{ version: number }>(
+      'SELECT version FROM schema_migrations ORDER BY version'
+    );
+    expect(versions.map((v) => v.version)).toContain(1);
+    expect(versions.map((v) => v.version)).toContain(2);
+
+    // A coluna deleted_at deve existir na tabela animals
+    const animals = await db.getAllAsync<{ deleted_at: string | null }>(
+      'SELECT deleted_at FROM animals LIMIT 1'
+    );
+    expect(animals).toBeDefined();
+    expect(Array.isArray(animals)).toBe(true);
+  });
+
+  it('migração versão 2 deve adicionar deleted_at com NULL para linhas existentes', async () => {
+    const db = new InMemorySqliteDriver();
+
+    // Insere um dado antes da migration v2
+    await db.runAsync(
+      "INSERT INTO animals (id, owner_id, name, species, size, approximate_age, sex, status, neighborhood, city, region, latitude, longitude, hidden, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      ['animal-1', 'user-1', 'Amora', 'Cão', 'Médio', '2 anos', 'Fêmea', 'AVAILABLE', 'Centro', 'Varginha', 'MG', -21.55, -45.43, 0, 1, '2026-01-01', '2026-01-01']
+    );
+
+    await applyMigrations(db);
+
+    // O dado deve continuar lá e deleted_at deve ser NULL (valor padrão de ALTER TABLE ADD COLUMN)
+    const animals = await db.getAllAsync<{ id: string; name: string; deleted_at: string | null }>(
+      'SELECT id, name, deleted_at FROM animals WHERE id = ?',
+      ['animal-1']
+    );
+    expect(animals.length).toBe(1);
+    expect(animals[0].name).toBe('Amora');
+    // deleted_at deve ser null ou undefined (coluna recém-adicionada via ALTER TABLE)
+    expect(animals[0].deleted_at).toBeFalsy();
+  });
+
+  it('deve ser idempotente com múltiplas versões', async () => {
+    const db = new InMemorySqliteDriver();
+
+    await applyMigrations(db);
+    await applyMigrations(db);
+    await applyMigrations(db);
+
+    const versions = await db.getAllAsync<{ version: number }>(
+      'SELECT version FROM schema_migrations'
+    );
+    // Cada versão aparece exatamente uma vez
+    expect(versions.filter((v) => v.version === 1).length).toBe(1);
+    expect(versions.filter((v) => v.version === 2).length).toBe(1);
+  });
 });

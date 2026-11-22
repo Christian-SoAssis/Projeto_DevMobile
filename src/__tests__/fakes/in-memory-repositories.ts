@@ -210,6 +210,10 @@ export class InMemoryAdoptionInterestRepository implements AdoptionInterestRepos
     }
   }
 
+  async remove(id: string): Promise<void> {
+    this.interests.delete(id);
+  }
+
   // Métodos auxiliares para testes
   get size(): number {
     return this.interests.size;
@@ -501,6 +505,10 @@ export class InMemoryInterestRemoteGateway implements InterestRemoteGateway {
       interest.transitionTo(status);
       this.interests.set(id, interest);
     }
+  }
+
+  async remove(id: string): Promise<void> {
+    this.interests.delete(id);
   }
 
   async listByUser(userId: string): Promise<AdoptionInterest[]> {

@@ -6,5 +6,5 @@ export interface AdoptionInterestRepository {
   listByUser(userId: string): Promise<AdoptionInterest[]>;
   listByAnimal(animalId: string): Promise<AdoptionInterest[]>;
   updateStatus(id: string, status: InterestStage): Promise<void>;
-  remove?(id: string): Promise<void>;
+  remove(id: string): Promise<void>;
 }

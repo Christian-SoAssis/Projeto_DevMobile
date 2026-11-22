@@ -1,5 +1,6 @@
 import {
   createTestAnimal,
+  createTestInterest,
   createTestSyncAction,
   InMemoryAnimalRepository,
   InMemorySyncQueueRepository,
@@ -134,6 +135,26 @@ describe('ProcessSyncQueueUseCase', () => {
 
     const remoteList = await remoteInterests.listByUser('user-1');
     expect(remoteList.length).toBe(1);
+  });
+
+  it('deve remover remotamente um interesse cancelado que estava na fila offline', async () => {
+    const interest = createTestInterest({ id: 'interest-cancelado', userId: 'user-1' });
+    await remoteInterests.upsert(interest);
+    await syncQueueRepository.enqueue(
+      createTestSyncAction({
+        id: 'action-cancel-interest',
+        operation: 'DELETE',
+        entityType: 'interest',
+        entityId: interest.id,
+        ownerId: interest.userId,
+      })
+    );
+
+    const result = await useCase.execute();
+
+    expect(result.succeeded).toBe(1);
+    expect(await remoteInterests.listByUser(interest.userId)).toEqual([]);
+    expect(await syncQueueRepository.listPending()).toEqual([]);
   });
 
   it('deve detectar conflito quando status diverge (AVAILABLE vs ADOPTED)', async () => {

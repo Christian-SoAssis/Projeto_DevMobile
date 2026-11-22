@@ -5,5 +5,5 @@ export interface InterestRemoteGateway {
   updateStatus(id: string, status: InterestStage): Promise<void>;
   listByUser(userId: string): Promise<AdoptionInterest[]>;
   listByAnimal(animalId: string): Promise<AdoptionInterest[]>;
-  remove?(id: string): Promise<void>;
+  remove(id: string): Promise<void>;
 }

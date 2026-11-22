@@ -21,6 +21,8 @@ import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import { PhotoCarouselViewer } from '../../src/adapters/components/PhotoCarouselViewer';
 import { exportAnimalPdf } from '../../src/adapters/pdf/exportAnimalPdf';
+import { recordInterestWithdrawal } from '../../src/adapters/sync/interestWithdrawalEvents';
+import { notifyNotificationsChanged } from '../../src/adapters/sync/notificationEvents';
 import { Animal } from '../../src/domain/entities/Animal';
 import {
   AdoptionInterest,
@@ -143,12 +145,36 @@ export default function AnimalDetailsScreen() {
           try {
             const remoteList = await container.remoteInterests.listByAnimal(found.id);
             const map = new Map<string, AdoptionInterest>();
+            let withdrawalDetected = false;
             for (const item of merged) map.set(item.id, item);
+            if (user?.id === found.ownerId) {
+              const remoteIds = new Set(remoteList.map((item) => item.id));
+              const pending = await container.syncQueueRepository.listPending();
+              const pendingInterestIds = new Set(
+                pending
+                  .filter((action) => action.entityType === 'interest')
+                  .map((action) => action.entityId)
+              );
+
+              for (const localInterest of merged) {
+                if (remoteIds.has(localInterest.id) || pendingInterestIds.has(localInterest.id)) continue;
+                await container.interestRepository.remove(localInterest.id);
+                await recordInterestWithdrawal(
+                  container.appStateRepository,
+                  user.id,
+                  found.name,
+                  localInterest
+                );
+                map.delete(localInterest.id);
+                withdrawalDetected = true;
+              }
+            }
             for (const remoteItem of remoteList) {
               map.set(remoteItem.id, remoteItem);
               await container.interestRepository.save(remoteItem);
             }
             merged = Array.from(map.values());
+            if (withdrawalDetected) notifyNotificationsChanged();
           } catch {
             // fallback local
           }

@@ -15,6 +15,10 @@ import { useAuth } from '../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
 import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 import { notifyNotificationsChanged } from '../../src/adapters/sync/notificationEvents';
+import {
+  interestWithdrawalsKey,
+  parseInterestWithdrawalEvents,
+} from '../../src/adapters/sync/interestWithdrawalEvents';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import { CLAY_CARD_STYLE, COLORS } from '../../src/adapters/theme/tokens';
 
@@ -87,6 +91,21 @@ export default function NotificacoesScreen() {
           });
         }
       }
+
+      // 4. Retiradas de interesse recebidas durante a sincronização.
+      const withdrawals = parseInterestWithdrawalEvents(
+        await container.appStateRepository.get(interestWithdrawalsKey(user.id))
+      );
+      for (const withdrawal of withdrawals) {
+        feed.push({
+          id: withdrawal.id,
+          title: `${withdrawal.interestedUserName} retirou o interesse`,
+          subtitle: `No anúncio de ${withdrawal.animalName}`,
+          timestamp: withdrawal.withdrawnAt,
+          icon: 'heart',
+          targetRoute: `/animal/${withdrawal.animalId}`,
+        });
+      }
     }
 
     feed.sort((a, b) => (b.timestamp > a.timestamp ? 1 : -1));
@@ -104,15 +123,11 @@ export default function NotificacoesScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const localReload = loadFeed();
       if (isOnline) {
-        await Promise.race([
-          runFullSync(),
-          new Promise((resolve) => setTimeout(resolve, 800)),
-        ]);
-      } else {
-        await localReload;
+        await runFullSync();
       }
+      // Reconstrói a lista após o pull para exibir interesses e etapas recém-chegados.
+      await loadFeed();
     } catch (err) {
       console.warn('Erro ao atualizar notificações:', err);
     } finally {
@@ -136,6 +151,7 @@ export default function NotificacoesScreen() {
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
+            testID="notifications-refresh-control"
             refreshing={refreshing}
             onRefresh={onRefresh}
             colors={[COLORS.terracotta]}

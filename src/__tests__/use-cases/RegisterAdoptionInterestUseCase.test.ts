@@ -164,4 +164,18 @@ describe('RegisterAdoptionInterestUseCase', () => {
 
     expect(result.interest.message).toContain('interesse');
   });
+
+  it('retira o interesse local e remoto para que ele não permaneça para o responsável', async () => {
+    const animal = createTestAnimal({ id: 'animal-1', ownerId: 'dono', status: 'AVAILABLE' });
+    const interest = createTestInterest({ id: 'interest-1', userId: 'interessado', animalId: animal.id });
+    await animalRepository.saveLocal(animal);
+    await interestRepository.save(interest);
+    await remoteInterests.upsert(interest);
+
+    const result = await useCase.cancel(interest.id, interest.userId, true);
+
+    expect(result.synced).toBe(true);
+    expect(await interestRepository.findById(interest.id)).toBeNull();
+    expect(await remoteInterests.listByAnimal(animal.id)).toEqual([]);
+  });
 });

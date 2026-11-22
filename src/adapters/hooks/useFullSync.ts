@@ -3,6 +3,7 @@ import { AppContainer } from '../../infrastructure/composition/loadAppContainer'
 import { useRepositories } from '../context/RepositoriesContext';
 import { ProcessSyncQueueUseCase } from '../../application/use-cases/ProcessSyncQueueUseCase';
 import { PullRemoteAnimalsUseCase } from '../../application/use-cases/PullRemoteAnimalsUseCase';
+import { PullRemoteInterestsUseCase } from '../../application/use-cases/PullRemoteInterestsUseCase';
 import { RunFullSyncUseCase, FullSyncResult } from '../../application/use-cases/RunFullSyncUseCase';
 import { notifyPullCompleted } from '../sync/pullEvents';
 import { notifyNotificationsChanged } from '../sync/notificationEvents';
@@ -47,7 +48,18 @@ export function getFullSync(container: AppContainer): RunFullSyncUseCase {
       )
     : undefined;
 
-  const cycle = new PullNotifyingFullSync(push, pull);
+  const pullInterests = container.remoteInterests
+    ? new PullRemoteInterestsUseCase(
+        container.remoteInterests,
+        container.interestRepository,
+        container.animalRepository,
+        container.syncQueueRepository,
+        container.appStateRepository,
+        { currentUserId: getActiveUserId }
+      )
+    : undefined;
+
+  const cycle = new PullNotifyingFullSync(push, pull, pullInterests);
   cycles.set(container, cycle);
   return cycle;
 }

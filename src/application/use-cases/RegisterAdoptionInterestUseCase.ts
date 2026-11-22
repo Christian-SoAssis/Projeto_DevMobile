@@ -77,11 +77,9 @@ export class RegisterAdoptionInterestUseCase {
       throw new Error('Somente o próprio interessado pode cancelar sua manifestação.');
     }
 
-    if (this.interestRepository.remove) {
-      await this.interestRepository.remove(interestId);
-    }
+    await this.interestRepository.remove(interestId);
 
-    if (isOnline && this.remoteInterests?.remove) {
+    if (isOnline && this.remoteInterests) {
       try {
         await this.remoteInterests.remove(interestId);
         return { synced: true };

@@ -1,9 +1,14 @@
 import { ProcessSyncQueueResult, ProcessSyncQueueUseCase } from './ProcessSyncQueueUseCase';
 import { PullRemoteAnimalsUseCase, PullRemoteResult } from './PullRemoteAnimalsUseCase';
+import {
+  PullRemoteInterestsResult,
+  PullRemoteInterestsUseCase,
+} from './PullRemoteInterestsUseCase';
 
 export interface FullSyncResult {
   push: ProcessSyncQueueResult;
   pull?: PullRemoteResult;
+  interests?: PullRemoteInterestsResult;
   skippedConcurrent?: boolean;
 }
 
@@ -15,7 +20,8 @@ export class RunFullSyncUseCase {
 
   constructor(
     private pushUseCase: ProcessSyncQueueUseCase,
-    private pullUseCase?: PullRemoteAnimalsUseCase
+    private pullUseCase?: PullRemoteAnimalsUseCase,
+    private pullInterestsUseCase?: PullRemoteInterestsUseCase
   ) {}
 
   async execute(): Promise<FullSyncResult> {
@@ -40,6 +46,14 @@ export class RunFullSyncUseCase {
         // Falha no pull não invalida o resultado do push já concluído
       }
     }
-    return { push, pull };
+    let interests: PullRemoteInterestsResult | undefined;
+    if (this.pullInterestsUseCase) {
+      try {
+        interests = await this.pullInterestsUseCase.execute();
+      } catch {
+        // Falha no pull de interesses mantém o cache local já disponível.
+      }
+    }
+    return { push, pull, interests };
   }
 }

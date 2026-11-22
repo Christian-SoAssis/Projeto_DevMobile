@@ -6,6 +6,10 @@ import { useRepositories } from '../../src/adapters/context/RepositoriesContext'
 import { useAuth } from '../../src/adapters/context/AuthContext';
 import { subscribeNotificationsChanged } from '../../src/adapters/sync/notificationEvents';
 import { subscribePullCompleted } from '../../src/adapters/sync/pullEvents';
+import {
+  interestWithdrawalsKey,
+  parseInterestWithdrawalEvents,
+} from '../../src/adapters/sync/interestWithdrawalEvents';
 
 export default function TabsLayout() {
   const container = useRepositories();
@@ -36,6 +40,13 @@ export default function TabsLayout() {
             const createdMs = Date.parse(rec.createdAt) || 0;
             if (createdMs > lastSeenMs) interestEvents += 1;
           }
+        }
+        const withdrawals = parseInterestWithdrawalEvents(
+          await container.appStateRepository.get(interestWithdrawalsKey(user.id))
+        );
+        for (const withdrawal of withdrawals) {
+          const withdrawnMs = Date.parse(withdrawal.withdrawnAt) || 0;
+          if (withdrawnMs > lastSeenMs) interestEvents += 1;
         }
       }
 

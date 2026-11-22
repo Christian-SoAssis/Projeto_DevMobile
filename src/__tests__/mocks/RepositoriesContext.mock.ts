@@ -23,6 +23,7 @@ export const mockRepositories = {
     listByAnimal: jest.fn().mockResolvedValue([]),
     findById: jest.fn().mockResolvedValue(null),
     updateStatus: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined),
   },
   syncQueueRepository: {
     enqueue: jest.fn().mockResolvedValue(undefined),
@@ -70,8 +71,11 @@ export const mockRepositories = {
     remove: jest.fn().mockResolvedValue(undefined),
   },
   remoteInterests: {
-    create: jest.fn().mockResolvedValue(undefined),
+    upsert: jest.fn().mockResolvedValue(undefined),
     updateStatus: jest.fn().mockResolvedValue(undefined),
+    listByUser: jest.fn().mockResolvedValue([]),
+    listByAnimal: jest.fn().mockResolvedValue([]),
+    remove: jest.fn().mockResolvedValue(undefined),
   },
 };
 

@@ -7,14 +7,17 @@ import {
 } from '../../../domain/ports/AuthGateway';
 import { SupabaseClientLike } from '../types';
 
-interface RemoteUserProfileRow {
+interface RemoteUserRow {
   id: string;
   name: string | null;
   email: string | null;
-  contact_info: string | null;
+  phone?: string | null;
+  contact_info?: string | null;
   bio: string | null;
   avatar_url: string | null;
-  role: string | null;
+  interests?: string[] | null;
+  user_type?: string | null;
+  role?: string | null;
 }
 
 /**
@@ -106,9 +109,13 @@ export class SupabaseAuthGateway implements AuthGateway {
     }
 
     const authUser = data.session.user;
+    if (!authUser.email) {
+      return null;
+    }
+
     const user = await this.ensureUserProfile(authUser, {
-      name: authUser.user_metadata?.name || (authUser.email ?? 'Usuário').split('@')[0],
-      email: authUser.email ?? 'usuario@exemplo.com',
+      name: authUser.user_metadata?.name || authUser.email.split('@')[0],
+      email: authUser.email,
       contactInfo: authUser.user_metadata?.phone || '',
     });
 
@@ -120,23 +127,40 @@ export class SupabaseAuthGateway implements AuthGateway {
 
   async updateProfile(input: UpdateProfileInput): Promise<User> {
     const { data: existing } = await this.client
-      .from('profiles')
+      .from('users')
       .select('*')
       .eq('id', input.userId)
       .maybeSingle();
 
-    const email = existing?.email || 'usuario@exemplo.com';
-    const role = (existing?.role as UserRole) || 'USER';
+    const row = existing as RemoteUserRow | null;
+    let email = row?.email || '';
+    if (!email) {
+      const { data: sessionData } = await this.client.auth.getSession();
+      email = sessionData?.session?.user?.email || '';
+    }
+    if (!email) {
+      throw new Error('Sessão sem e-mail válido para atualizar o perfil.');
+    }
 
-    const { error } = await this.client.from('profiles').upsert(
+    const rawRole = row?.user_type ?? row?.role;
+    const role: UserRole = rawRole === 'ADMIN' ? 'ADMIN' : 'USER';
+    const interestsTags =
+      input.interestsTags && input.interestsTags.length > 0
+        ? input.interestsTags
+        : row?.interests && row.interests.length > 0
+        ? row.interests
+        : ['Cães', 'Gatos'];
+
+    const { error } = await this.client.from('users').upsert(
       {
         id: input.userId,
         name: input.name.trim(),
         email,
-        contact_info: input.contactInfo.trim(),
+        phone: input.contactInfo.trim(),
         bio: input.bio.trim(),
         avatar_url: input.avatarUrl ?? null,
-        role,
+        interests: interestsTags,
+        user_type: role,
       },
       { onConflict: 'id' }
     );
@@ -152,7 +176,7 @@ export class SupabaseAuthGateway implements AuthGateway {
       contactInfo: input.contactInfo.trim(),
       bio: input.bio.trim(),
       avatarUrl: input.avatarUrl ?? undefined,
-      interestsTags: input.interestsTags ?? ['Cães', 'Gatos'],
+      interestsTags,
       role,
     });
   }
@@ -167,22 +191,26 @@ export class SupabaseAuthGateway implements AuthGateway {
   ): Promise<User> {
     const userId = String(authUser.id);
     const { data: existing } = await this.client
-      .from('profiles')
+      .from('users')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
 
     if (existing) {
-      const row = existing as RemoteUserProfileRow;
+      const row = existing as RemoteUserRow;
+      const rawRole = row.user_type ?? row.role;
       return new User({
         id: row.id,
         name: row.name || defaults.name,
         email: row.email || defaults.email,
-        contactInfo: row.contact_info || defaults.contactInfo,
+        contactInfo: row.phone || row.contact_info || defaults.contactInfo,
         bio: row.bio || '',
         avatarUrl: row.avatar_url ?? undefined,
-        interestsTags: ['Cães', 'Gatos'],
-        role: row.role === 'ADMIN' ? 'ADMIN' : 'USER',
+        interestsTags:
+          Array.isArray(row.interests) && row.interests.length > 0
+            ? row.interests
+            : ['Cães', 'Gatos'],
+        role: rawRole === 'ADMIN' ? 'ADMIN' : 'USER',
       });
     }
 
@@ -190,12 +218,13 @@ export class SupabaseAuthGateway implements AuthGateway {
       id: userId,
       name: defaults.name,
       email: defaults.email,
-      contact_info: defaults.contactInfo,
+      phone: defaults.contactInfo,
       bio: '',
-      role: 'USER',
+      interests: ['Cães', 'Gatos'],
+      user_type: 'USER',
     };
 
-    await this.client.from('profiles').upsert(insertRow, { onConflict: 'id' });
+    await this.client.from('users').upsert(insertRow, { onConflict: 'id' });
 
     return new User({
       id: userId,

@@ -340,4 +340,66 @@ describe('SupabaseAnimalRepository (DAT-05, OFF-06)', () => {
     expect(page.tombstones[0].animalId).toBe('a1');
     expect(page.tombstones[0].reason).toBe('DELETED');
   });
+
+  it('deve lançar erro quando listTombstonesAfter falha no Supabase', async () => {
+    const client = makeSupabaseClient();
+    client.from = jest.fn(() => ({
+      select: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'column removed_at does not exist' },
+      }),
+    }));
+    const repo = new SupabaseAnimalRepository(client);
+
+    await expect(repo.listTombstonesAfter(null, 10)).rejects.toThrow(
+      'Falha ao consultar tombstones no Supabase: column removed_at does not exist'
+    );
+  });
+
+  it('só deve gravar fotos em animal_photos quando já possuem remoteUrl válida', async () => {
+    const client = makeSupabaseClient({ animals: [] });
+    const repo = new SupabaseAnimalRepository(client);
+
+    const localOnlyPhoto = new AnimalPhoto({
+      id: 'p-local',
+      animalId: 'new-1',
+      localPath: 'file:///local-only.webp',
+    });
+    const uploadedPhoto = new AnimalPhoto({
+      id: 'p-remote',
+      animalId: 'new-1',
+      localPath: 'file:///uploaded.webp',
+      remoteUrl: 'https://proj.supabase.co/storage/v1/object/public/animal-photos/u1/new-1/p-remote.webp',
+    });
+
+    const animal = new Animal({
+      id: 'new-1',
+      ownerId: 'u1',
+      name: 'Novo',
+      characteristics: new AnimalCharacteristics({
+        species: 'Cão',
+        size: 'Médio',
+        approximateAge: '1 ano',
+        sex: 'Fêmea',
+      }),
+      location: new ApproximateLocation({ neighborhood: 'Centro', city: 'Varginha' }),
+      status: AdoptionStatus.available(),
+      photos: [localOnlyPhoto, uploadedPhoto],
+      version: 1,
+    });
+
+    await repo.createRemote(animal);
+
+    const photoCalls = (client.from as jest.Mock).mock.results
+      .map((r: any, i: number) => ({ table: (client.from as jest.Mock).mock.calls[i][0], chain: r.value }))
+      .filter((x: any) => x.table === 'animal_photos' && x.chain.insert.mock.calls.length > 0);
+
+    expect(photoCalls.length).toBe(1);
+    const insertedRows = photoCalls[0].chain.insert.mock.calls[0][0];
+    expect(insertedRows).toHaveLength(1);
+    expect(insertedRows[0].id).toBe('p-remote');
+    expect(insertedRows[0].remote_url).toContain('https://');
+  });
 });

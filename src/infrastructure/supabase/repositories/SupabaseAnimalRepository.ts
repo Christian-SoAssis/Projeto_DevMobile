@@ -11,6 +11,10 @@ import {
   TombstonePage,
 } from '../../../domain/ports/RemoteAnimalSource';
 import { SupabaseClientLike } from '../types';
+import {
+  extractBucketObjectPath,
+  PHOTO_BUCKET,
+} from '../storage/SupabasePhotoStorage';
 
 interface RemoteAnimalRow {
   id: string;
@@ -107,7 +111,7 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
 
     const { data, error } = await query;
     if (error) {
-      return { tombstones: [], nextCursor: null };
+      throw new Error(`Falha ao consultar tombstones no Supabase: ${error.message}`);
     }
 
     const rows = (data ?? []) as Array<{
@@ -156,35 +160,24 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
   }
 
   async updateRemote(animal: Animal, expectedVersion?: number): Promise<Animal> {
-    const rowPayload = this.toRemoteRow(animal);
-    const versionToMatch = typeof expectedVersion === 'number' ? expectedVersion : animal.version - 1;
+    if (expectedVersion !== undefined) {
+      const existing = await this.findById(animal.id);
+      if (existing && existing.version > expectedVersion) {
+        throw new Error(
+          `CONFLICT_VERSION: versão remota (${existing.version}) diverge da esperada (${expectedVersion}).`
+        );
+      }
+    }
 
-    // Bloqueio otimista: só atualiza se a versão remota corresponder à esperada.
-    // Isso impede sobrescrita silenciosa de edição concorrente (RNF03, OFF-05).
+    const rowPayload = this.toRemoteRow(animal);
+
     const { data, error } = await this.client
       .from('animals')
-      .update(rowPayload)
-      .eq('id', animal.id)
-      .eq('version', versionToMatch)
+      .upsert(rowPayload, { onConflict: 'id' })
       .select('*')
       .single();
 
     if (error || !data) {
-      // Verificar se o registro existe com versão diferente (conflito de versão).
-      const { data: existing } = await this.client
-        .from('animals')
-        .select('version')
-        .eq('id', animal.id)
-        .maybeSingle();
-
-      if (existing) {
-        const remoteVersion = Number((existing as { version: number }).version) || 1;
-        if (remoteVersion !== versionToMatch) {
-          throw new Error(
-            `CONFLICT_VERSION: versão remota ${remoteVersion} diverge da versão esperada ${versionToMatch}.`
-          );
-        }
-      }
       throw new Error(error?.message || 'Não foi possível atualizar o anúncio no Supabase.');
     }
 
@@ -193,6 +186,19 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
   }
 
   async deleteRemote(animalId: string): Promise<void> {
+    // Remove fotos do bucket antes de excluir o anúncio para evitar objetos órfãos (DAT-12)
+    try {
+      const existing = await this.findById(animalId);
+      if (existing && existing.photos.length > 0) {
+        const paths = existing.photos
+          .map((p) => extractBucketObjectPath(p.remoteUrl))
+          .filter((p): p is string => Boolean(p));
+        await this.removeBucketPaths(paths);
+      }
+    } catch {
+      // prossegue com exclusão do registro
+    }
+
     const { error } = await this.client.from('animals').delete().eq('id', animalId);
     if (error) {
       throw new Error(`Falha ao excluir anúncio no Supabase: ${error.message}`);
@@ -200,19 +206,34 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
   }
 
   private async syncRemotePhotos(animal: Animal): Promise<void> {
+    // 1. Consulta fotos remotas atuais para remover do bucket quaisquer fotos descartadas na edição
+    const currentPhotoIds = new Set(animal.photos.map((p) => p.id));
+    try {
+      const existing = await this.findById(animal.id);
+      if (existing) {
+        const orphanedPaths = existing.photos
+          .filter((p) => !currentPhotoIds.has(p.id))
+          .map((p) => extractBucketObjectPath(p.remoteUrl))
+          .filter((p): p is string => Boolean(p));
+        await this.removeBucketPaths(orphanedPaths);
+      }
+    } catch {
+      // ignora falha de limpeza prévia
+    }
+
     await this.client.from('animal_photos').delete().eq('animal_id', animal.id);
 
-    const photos = animal.photos;
-    if (photos.length === 0) return;
+    // 2. Só grava na tabela remota fotos que já subiram para o bucket (remoteUrl http/https válida)
+    const uploadedPhotos = animal.photos.filter((p) =>
+      Boolean(p.remoteUrl && /^https?:\/\//i.test(p.remoteUrl))
+    );
+    if (uploadedPhotos.length === 0) return;
 
-    const rows = photos.map((p, idx) => ({
+    const rows = uploadedPhotos.map((p, idx) => ({
       id: p.id,
       animal_id: animal.id,
       local_path: null,
-      remote_url:
-        p.remoteUrl ||
-        p.localPath ||
-        'https://images.unsplash.com/photo-1543466835-00a7907e9de1',
+      remote_url: p.remoteUrl!,
       is_main: idx === 0,
       upload_status: 'SYNCED',
       created_at: p.createdAt,
@@ -221,6 +242,18 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
     const { error } = await this.client.from('animal_photos').insert(rows);
     if (error && !/duplicate/i.test(error.message || '')) {
       throw new Error(`Falha ao registrar fotos no Supabase: ${error.message}`);
+    }
+  }
+
+  private async removeBucketPaths(paths: string[]): Promise<void> {
+    if (paths.length === 0 || !this.client.storage) return;
+    try {
+      const bucket = this.client.storage.from(PHOTO_BUCKET) as any;
+      if (typeof bucket?.remove === 'function') {
+        await bucket.remove(paths);
+      }
+    } catch {
+      // ignora erro de remoção de storage
     }
   }
 
@@ -252,7 +285,7 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
     rawPhotos.sort((a, b) => (a.is_main === b.is_main ? 0 : a.is_main ? -1 : 1));
 
     const photos = rawPhotos
-      .filter((p) => Boolean(p.remote_url || p.local_path))
+      .filter((p) => Boolean(p.remote_url))
       .slice(0, 4)
       .map(
         (p) =>
@@ -260,7 +293,7 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
             id: p.id,
             animalId: row.id,
             localPath: undefined,
-            remoteUrl: p.remote_url ?? p.local_path ?? undefined,
+            remoteUrl: p.remote_url ?? undefined,
             syncState: SyncState.completed(),
             createdAt: p.created_at,
           })

@@ -131,11 +131,12 @@ describe('SupabaseAuthGateway (DAT-03)', () => {
     expect(client.auth.signOut).toHaveBeenCalled();
   });
 
-  it('deve atualizar perfil do usuário', async () => {
+  it('deve atualizar perfil do usuário usando email da sessão quando linha não existe', async () => {
+    const upsertMock = jest.fn().mockResolvedValue({ data: null, error: null });
     const client = makeSupabaseClient({
-      profiles: {
+      users: {
         maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-        upsert: jest.fn().mockResolvedValue({ data: null, error: null }),
+        upsert: upsertMock,
       },
     });
     const gateway = new SupabaseAuthGateway(client);
@@ -151,6 +152,14 @@ describe('SupabaseAuthGateway (DAT-03)', () => {
 
     expect(user).toBeInstanceOf(User);
     expect(user.name).toBe('Nome Atualizado');
-    expect(client.from('profiles').upsert).toHaveBeenCalled();
+    expect(user.email).toBe('test@test.com');
+    expect(upsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'user-1',
+        name: 'Nome Atualizado',
+        email: 'test@test.com',
+      }),
+      { onConflict: 'id' }
+    );
   });
 });

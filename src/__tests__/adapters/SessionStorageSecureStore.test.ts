@@ -71,4 +71,44 @@ describe('SessionStorageSecureStore', () => {
     const raw = storage.getRaw('chave-teste');
     expect(raw).toBe('valor-bruto');
   });
+
+  it('deve fragmentar em chunks sessões maiores que o limite de 2 KB do SecureStore', async () => {
+    const nativeStore = new Map<string, string>();
+    const mockSecureStore = {
+      setItemAsync: jest.fn(async (key: string, value: string) => {
+        if (value.length > 2048) {
+          throw new Error('Value to store is larger than 2048 bytes');
+        }
+        nativeStore.set(key, value);
+      }),
+      getItemAsync: jest.fn(async (key: string) => nativeStore.get(key) ?? null),
+      deleteItemAsync: jest.fn(async (key: string) => {
+        nativeStore.delete(key);
+      }),
+    };
+
+    const chunkedStorage = new SessionStorageSecureStore(mockSecureStore);
+    const largeSession = JSON.stringify({
+      access_token: 'a'.repeat(2200),
+      refresh_token: 'b'.repeat(2200),
+      user: { id: 'user-1', email: 'test@example.com' },
+    });
+
+    await chunkedStorage.setItem('sb-auth-token', largeSession);
+
+    // O manifesto e os 3 chunks foram salvos no SecureStore sem exceder 2048 bytes cada
+    expect(nativeStore.get('sb-auth-token')).toBe('__chunked__:3');
+    expect(nativeStore.has('sb-auth-token__chunk_0')).toBe(true);
+    expect(nativeStore.has('sb-auth-token__chunk_1')).toBe(true);
+    expect(nativeStore.has('sb-auth-token__chunk_2')).toBe(true);
+
+    // Simula reinício do app (nova instância lendo apenas do SecureStore nativo)
+    const restartedStorage = new SessionStorageSecureStore(mockSecureStore);
+    const restored = await restartedStorage.getItem('sb-auth-token');
+    expect(restored).toBe(largeSession);
+
+    // Ao remover, limpa manifesto e todos os chunks
+    await restartedStorage.removeItem('sb-auth-token');
+    expect(nativeStore.size).toBe(0);
+  });
 });

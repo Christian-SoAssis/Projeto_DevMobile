@@ -7,23 +7,26 @@ export interface LoadSupabaseClientOptions {
 }
 
 /**
- * Armazenamento de sessão seguro (DAT-03, DAT-04).
- * Implementado por `SessionStorageSecureStore` (encapsula `expo-secure-store`
- * com fallback em memória para testes).
+ * Armazenamento de sessão seguro com suporte a sessões > 2 KB (DAT-03, DAT-04, SUP-02).
  */
 const sessionStorage = new SessionStorageSecureStore();
 
 let singletonClient: SupabaseClientLike | null = null;
 
+/**
+ * Lê as variáveis públicas de ambiente `EXPO_PUBLIC_SUPABASE_URL` e
+ * `EXPO_PUBLIC_SUPABASE_ANON_KEY` (ou `EXPO_PUBLIC_SUPABASE_KEY`).
+ * Retorna `null` se qualquer uma estiver ausente (sem valores hardcoded no código).
+ */
 export function readSupabaseConfigFromEnv(): SupabaseConfig | null {
   const url =
-    (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUPABASE_URL) ||
-    'https://rmsvprwmrwprmtlsqndo.supabase.co';
+    typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_SUPABASE_URL : undefined;
   const anonKey =
-    (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUPABASE_ANON_KEY) ||
-    'sb_publishable_KWYaB7uP_Myg2FXxgPhDuA_mEnxW9Sr';
+    typeof process !== 'undefined'
+      ? process.env?.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env?.EXPO_PUBLIC_SUPABASE_KEY
+      : undefined;
 
-  if (!url || !anonKey) return null;
+  if (!url?.trim() || !anonKey?.trim()) return null;
   return { url: url.trim(), anonKey: anonKey.trim() };
 }
 

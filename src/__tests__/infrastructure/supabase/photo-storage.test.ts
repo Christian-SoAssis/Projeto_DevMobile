@@ -12,6 +12,7 @@ function makeSupabaseClient() {
     getPublicUrl: jest.fn().mockImplementation((path: string) => ({
       data: { publicUrl: `https://public.url/${path}` },
     })),
+    remove: jest.fn().mockResolvedValue({ data: null, error: null }),
   };
   return {
     auth: {
@@ -126,5 +127,24 @@ describe('SupabasePhotoStorage (DAT-08)', () => {
     await expect(storage.uploadPending(photo)).rejects.toThrow(
       'Faça login para enviar fotos ao servidor.'
     );
+  });
+
+  it('deve remover o objeto do bucket no Supabase Storage ao excluir uma foto', async () => {
+    const client = makeSupabaseClient();
+    const local = new InMemoryPhotoStorage();
+    const storage = new SupabasePhotoStorage({ local, client });
+
+    const photo = new AnimalPhoto({
+      id: 'photo-1',
+      animalId: 'animal-1',
+      localPath: 'file:///photo.webp',
+      remoteUrl: 'https://proj.supabase.co/storage/v1/object/public/animal-photos/user-1/animal-1/photo-1.webp',
+    });
+    await local.persistLocal(photo);
+
+    await storage.remove('photo-1', 'animal-1');
+
+    expect(client._bucketMock.remove).toHaveBeenCalledWith(['user-1/animal-1/photo-1.webp']);
+    expect(local.getPhoto('photo-1')).toBeUndefined();
   });
 });

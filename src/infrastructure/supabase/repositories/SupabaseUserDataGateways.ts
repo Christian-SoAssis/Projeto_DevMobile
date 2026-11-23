@@ -31,7 +31,7 @@ export class SupabaseFavoriteGateway implements FavoriteRemoteGateway {
   async upsert(favorite: Favorite): Promise<void> {
     const { data: existing } = await this.client
       .from('favorites')
-      .select('id')
+      .select('user_id')
       .eq('user_id', favorite.userId)
       .eq('animal_id', favorite.animalId)
       .maybeSingle();
@@ -43,7 +43,7 @@ export class SupabaseFavoriteGateway implements FavoriteRemoteGateway {
       animal_id: favorite.animalId,
     });
 
-    if (error && !String(error.message).includes('duplicate')) {
+    if (error && !/duplicate|23505/i.test(String(error.message))) {
       throw new Error(`Falha ao sincronizar favorito: ${error.message}`);
     }
   }

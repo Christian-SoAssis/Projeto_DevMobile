@@ -32,6 +32,7 @@ Requer: acesso a um projeto Supabase (URL e anon key configurados em .env.local)
 | V17 | Edição durante envio | Confirmar revisão antiga não elimina pendência da nova revisão | OFF-07 |
 | V18 | Worker não trava após falha | Falha no sync não bloqueia novas tentativas; trava é liberada | OFF-09, DAT-11 |
 | V19 | Reconexão + botão manual simultâneo | Não duplicar processamento | OFF-09 |
+| V21 | Limpar falhas pendentes | Na tela de Sync, ao tocar em "Limpar falhas", todas as ações com falha (não conflito) são removidas da fila local | OFF-05, OFF-09 |
 
 ---
 

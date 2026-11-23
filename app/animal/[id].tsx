@@ -145,6 +145,7 @@ export default function AnimalDetailsScreen() {
 
   const handleAdvanceInterest = (interest: AdoptionInterest, nextStage: InterestStage) => {
     if (!user || !animal) return;
+    if (animal.status.isAdopted()) return; // Não permite atualizar interesse de animal adotado
     const nomeInteressado = interest.userName || 'Interessado';
     const statusLabel = INTEREST_STAGE_LABELS[nextStage];
     Alert.alert(

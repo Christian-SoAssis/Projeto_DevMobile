@@ -20,6 +20,7 @@ import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import {
   CLAY_CARD_STYLE,
   CLAY_PRIMARY_BUTTON_STYLE,
+  CLAY_SECONDARY_BUTTON_STYLE,
   COLORS,
   RADII,
 } from '../../src/adapters/theme/tokens';
@@ -67,6 +68,17 @@ export default function SyncScreen() {
     (a) => a.lastError && a.lastError.includes('[CONFLITO]')
   );
 
+  const failedActions = pendingActions.filter(
+    (a) => a.status.isFailed() && !(a.lastError && a.lastError.includes('[CONFLITO]'))
+  );
+
+  const handleClearFailures = async () => {
+    for (const action of failedActions) {
+      await container.syncQueueRepository.delete(action.id);
+    }
+    await loadQueue();
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <EnlaceHeader />
@@ -112,6 +124,20 @@ export default function SyncScreen() {
             <Ionicons name="checkmark-circle" size={16} color={COLORS.green} />
             <Text style={styles.feedbackPillText}>{lastResultSummary}</Text>
           </View>
+        )}
+
+        {failedActions.length > 0 && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            disabled={syncing}
+            onPress={handleClearFailures}
+            style={[CLAY_SECONDARY_BUTTON_STYLE, { marginTop: 8 }]}
+          >
+            <Ionicons name="trash-outline" size={18} color={COLORS.danger} style={{ marginRight: 6 }} />
+            <Text style={[styles.secondaryButtonText, { color: COLORS.danger }]}>
+              Limpar {failedActions.length} falha{failedActions.length > 1 ? 'has' : ''}
+            </Text>
+          </TouchableOpacity>
         )}
 
         <TouchableOpacity
@@ -291,6 +317,11 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '900',
+  },
+  secondaryButtonText: {
+    color: COLORS.espresso,
+    fontSize: 14,
+    fontWeight: '800',
   },
   itemsList: {
     marginTop: 14,

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -65,6 +66,7 @@ export default function AnimalDetailsScreen() {
   const [contactPhone, setContactPhone] = useState(user?.contactInfo || '');
   const [submitting, setSubmitting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadDetails = useCallback(async () => {
     if (!id) return;
@@ -272,6 +274,17 @@ export default function AnimalDetailsScreen() {
     }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadDetails();
+    } catch (err) {
+      console.warn('Erro ao atualizar detalhes do animal:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadDetails]);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -304,7 +317,18 @@ export default function AnimalDetailsScreen() {
         title={isOwner ? 'Detalhes: Responsável' : 'Detalhes: Adoção'}
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.terracotta]}
+            tintColor={COLORS.terracotta}
+          />
+        }
+      >
         <PhotoCarouselViewer photos={animal.photos} />
 
         <View style={styles.headerRow}>

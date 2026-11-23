@@ -53,10 +53,11 @@ O que já está conforme a arquitetura prescrita:
 - **Adapters de hardware:** `CameraGateway`, `LocationGateway`, `ConnectivityGateway` definidos no domínio e implementados em `src/infrastructure/device/`.
 - **Context API:** `AuthContext.tsx` e `RepositoriesContext.tsx` em `src/adapters/context/`.
 - **Custom hooks:** `useAuth`, `useConnectivity`, `useFullSync`, `useAutoSync` em `src/adapters/hooks/`.
-- **Interface e rotas:** Expo Router estruturado em `app/(public)/`, `app/(tabs)/`, `app/(protected)/`, `app/animal/`; telas com `<View>`, `<Text>`, `StyleSheet` e gesto Pull-to-Refresh (`RefreshControl`) nas listas principais.
+- **Interface e rotas:** Expo Router estruturado em `app/(public)/`, `app/(tabs)/`, `app/(protected)/`, `app/animal/`; telas com `<View>`, `<Text>`, `StyleSheet` e gesto Pull-to-Refresh (`RefreshControl`) nas listas principais e na tela de detalhes do animal (`app/animal/[id].tsx`).
 - **Infraestrutura real:** SQLite (`expo-sqlite`) com migrations em `src/infrastructure/database/sqlite/`; Supabase (client, auth, repositories, storage) em `src/infrastructure/supabase/`.
 - **Qualidade de código:** `tsc --noEmit` limpo (TypeScript strict). Testes de domínio passando (`src/__tests__/enlace.test.ts`, 7 testes).
 - **DAT-10 (isolamento entre contas):** implementado e testado (`enlace.test.ts`).
+- **Confirmação de atualização de status de interesse e auto-adoção (RF12, D16, D22):** `Alert.alert` de confirmação antes de atualizar etapa do interesse; ao confirmar "Concluída" o animal é automaticamente marcado como adotado; confirmar também antes de "Marcar como adotado" e "Reabrir". Ao reabrir a adoção, todas as manifestações de interesse do animal retornam para "ENVIADA". Implementado em `UpdateInterestStatusUseCase.ts`, `MarkAnimalAdoptedUseCase.ts`, `app/animal/[id].tsx` e `app/(tabs)/meus-anuncios.tsx`. Testes de use case em `src/__tests__/use-cases/UpdateInterestStatusUseCase.test.ts` e `src/__tests__/use-cases/MarkAnimalAdoptedUseCase.test.ts`. Validado manualmente no Expo Go (V35-V39 em `docs/validacao-manual.md`).
 
 ---
 

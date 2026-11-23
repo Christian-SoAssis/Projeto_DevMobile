@@ -72,6 +72,7 @@ export function useUseCases() {
       markAnimalAdoptedUseCase: new MarkAnimalAdoptedUseCase(
         container.animalRepository,
         container.syncQueueRepository,
+        container.interestRepository,
         container.remoteAnimalSource
       ),
       toggleFavoriteUseCase: new ToggleFavoriteUseCase(

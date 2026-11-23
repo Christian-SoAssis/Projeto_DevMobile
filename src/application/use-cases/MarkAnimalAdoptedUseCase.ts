@@ -1,6 +1,7 @@
 import { Animal } from '../../domain/entities/Animal';
 import { SyncAction } from '../../domain/entities/SyncAction';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
+import { AdoptionInterestRepository } from '../../domain/ports/AdoptionInterestRepository';
 import { RemoteAnimalSource } from '../../domain/ports/RemoteAnimalSource';
 import { SyncQueueRepository } from '../../domain/ports/SyncQueueRepository';
 
@@ -8,6 +9,7 @@ export class MarkAnimalAdoptedUseCase {
   constructor(
     private animalRepository: AnimalRepository,
     private syncQueueRepository: SyncQueueRepository,
+    private adoptionInterestRepository: AdoptionInterestRepository,
     private remoteAnimalSource?: RemoteAnimalSource
   ) {}
 
@@ -70,6 +72,27 @@ export class MarkAnimalAdoptedUseCase {
     animal.reopenAdoption(actorUserId);
 
     await this.animalRepository.saveLocal(animal);
+
+    // Decisão D22: ao reabrir a adoção, todas as manifestações de interesse voltam para "ENVIADA"
+    const interests = await this.adoptionInterestRepository.listByAnimal(animalId);
+    for (const interest of interests) {
+      interest.transitionTo('ENVIADA');
+      await this.adoptionInterestRepository.updateStatus(interest.id, interest.status);
+
+      // Enfileira atualização do interesse para sincronização remota offline-first
+      const action = new SyncAction({
+        id: `sync_interest_status_${interest.id}_v${interest.updatedAt}`,
+        operation: 'UPDATE',
+        entityType: 'interest',
+        entityId: interest.id,
+        payload: {
+          id: interest.id,
+          ownerId: interest.userId,
+          status: interest.status,
+        },
+      });
+      await this.syncQueueRepository.enqueue(action);
+    }
 
     const action = new SyncAction({
       id: `sync_reopen_${animal.id}_v${animal.version}`,

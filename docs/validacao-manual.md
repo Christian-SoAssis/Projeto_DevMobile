@@ -39,8 +39,8 @@ Requer: acesso a um projeto Supabase (URL e anon key configurados em .env.local)
 
 Requer: Expo Go instalado em dispositivo físico (ou emulator) e builds nativos.
 
-| # | Cenário | O que validar | Regras relacionadas |
-|---|---------|---------------|---------------------|
+| # | Cenário | O que validar | Regras relacionadas | Status (validado em) |
+|---|---------|---------------|---------------------|----------------------|
 | V20 | Instalação nova + câmera | Primeira tentativa de captura funciona; não quebra o app | PER-01 |
 | V21 | Negação permanente de câmera | Usuário nega câmera; app oferece alternativa de galeria; não há loop de solicitações | PER-01, PER-02 |
 | V22 | Retorno das configurações do app | Após negar permanentemente, usuário vai às configurações, concede permissão e volta; fluxo reflete novo estado | PER-02 |
@@ -55,13 +55,14 @@ Requer: Expo Go instalado em dispositivo físico (ou emulator) e builds nativos.
 | V31 | Troca de conta A → B → A | Como A, criar rascunho offline; trocar para B; B não vê nem envia pendência de A; voltar para A preserva dados | DAT-10 |
 | V32 | Localização pontual | Captura de localização apenas na criação de anúncio; não há rastreamento contínuo em segundo plano | OFF-11, RNF06 |
 | V33 | Estado de sync na UI | Ausência de rede, falha permanente, nova tentativa — mensagens coerentes; "publicado" não é mostrado quando existe apenas rascunho local | OFF-10 |
-| V34 | Gesto Pull-to-Refresh (deslizar para atualizar) | Deslizar para baixo no topo das listas (Feed, Meus Anúncios, Favoritos, Notificações, Sincronização). Online: exibe spinner terracotta, dispara `useFullSync` com Supabase e atualiza interface com o SQLite local; Offline: recarrega dados locais imediatamente sem travar a interface | OFF-09, OFF-10, RF17 |
-| V35 | Confirmação antes de atualizar status de interesse | Na tela de detalhes do anúncio (visão do responsável), ao tocar em qualquer etapa ("Em análise", "Visita combinada", "Concluída", "Recusada") deve aparecer `Alert.alert` com texto "Você tem certeza que quer atualizar o status de interesse de <nome> em <pet> para <etapa>?" com botões "Cancelar" e "Confirmar" | RF16, D16 |
-| V36 | Auto-adoção ao concluir interesse | Ao confirmar a etapa "Concluída", o animal deve ser automaticamente marcado como adotado. O badge do anúncio muda de "Disponível" para "Adotado" após a operação; a alteração é enfileirada se offline | RF12, D16 |
-| V37 | Confirmação antes de "Marcar como adotado" (tela de detalhes) | Na tela de detalhes do anúncio (botão "Marcar como adotado"), deve aparecer `Alert.alert` com texto "Marcar <nome do pet> como adotado?" com botões "Cancelar" e "Sim, marcar como adotado" antes de executar a ação | RF12 |
-| V38 | Confirmação antes de "Adotado" (tela Meus Anúncios) | Na listagem "Meus Anúncios", ao tocar no botão "Adotado" do card, deve aparecer `Alert.alert` com texto "Marcar <nome do pet> como adotado?" com botões "Cancelar" e "Sim, marcar como adotado" antes de executar a ação | RF12 |
-| V39 | Reabrir anúncio de "Adotado" para "Disponível" | Quando o animal está como "Adotado", o responsável vê o botão "Reabrir para adoção" (na tela de detalhes) ou "Reabrir" (em Meus Anúncios); ao confirmar no `Alert.alert`, o status retorna para "Disponível" (com sync offline-first) | RF12, D4 |
+| V34 | Gesto Pull-to-Refresh (deslizar para atualizar) | Deslizar para baixo no topo das listas (Feed, Meus Anúncios, Favoritos, Notificações, Sincronização) e na tela de detalhes do animal. Online: exibe spinner terracotta, dispara `useFullSync` com Supabase e atualiza interface com o SQLite local; Offline: recarrega dados locais imediatamente sem travar a interface | OFF-09, OFF-10, RF17 |
+| V35 | Confirmação antes de atualizar status de interesse | Na tela de detalhes do anúncio (visão do responsável), ao tocar em qualquer etapa ("Em análise", "Visita combinada", "Concluída", "Recusada") deve aparecer `Alert.alert` com texto "Você tem certeza que quer atualizar o status de interesse de <nome> em <pet> para <etapa>?" com botões "Cancelar" e "Confirmar" | RF16, D16 | ✅ Validado (Expo Go) |
+| V36 | Auto-adoção ao concluir interesse | Ao confirmar a etapa "Concluída", o animal deve ser automaticamente marcado como adotado. O badge do anúncio muda de "Disponível" para "Adotado" após a operação; a alteração é enfileirada se offline | RF12, D16 | ✅ Validado (Expo Go) |
+| V37 | Confirmação antes de "Marcar como adotado" (tela de detalhes) | Na tela de detalhes do anúncio (botão "Marcar como adotado"), deve aparecer `Alert.alert` com texto "Marcar <nome do pet> como adotado?" com botões "Cancelar" e "Sim, marcar como adotado" antes de executar a ação | RF12 | ✅ Validado (Expo Go) |
+| V38 | Confirmação antes de "Adotado" (tela Meus Anúncios) | Na listagem "Meus Anúncios", ao tocar no botão "Adotado" do card, deve aparecer `Alert.alert` com texto "Marcar <nome do pet> como adotado?" com botões "Cancelar" e "Sim, marcar como adotado" antes de executar a ação | RF12 | ✅ Validado (Expo Go) |
+| V39 | Reabrir anúncio de "Adotado" para "Disponível" | Quando o animal está como "Adotado", o responsável vê o botão "Reabrir para adoção" (na tela de detalhes) ou "Reabrir" (em Meus Anúncios); ao confirmar no `Alert.alert`, o status retorna para "Disponível" (com sync offline-first) e todas as manifestações de interesse do animal voltam para "ENVIADA" | RF12, D4 | ✅ Validado (Expo Go) |
 | V40 | Cancelar própria manifestação de interesse | Na tela de detalhes do anúncio, o interessado que já enviou manifestação vê o botão "Cancelar meu interesse"; ao confirmar no `Alert.alert`, a manifestação é removida localmente e sincronizada (ou enfileirada na `sync_queue` se offline) | RF16, D7, D9 |
+| V41 | Pull-to-refresh na tela de detalhes do animal | Na tela de detalhes do animal, puxar para baixo dispara recarga dos dados do animal e dos interesses (etapa da trilha), permitindo que o interessado veja mudanças como "Recusada" feitas pelo dono | OFF-09, OFF-10 |
 
 ---
 

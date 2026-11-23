@@ -165,6 +165,7 @@ describe('Fluxos Críticos E2E', () => {
   // ============================================================================
   it('EF05: Responsável marca animal como adotado', async () => {
     const animalRepository = new InMemoryAnimalRepository();
+    const interestRepository = new InMemoryAdoptionInterestRepository();
     const syncQueueRepository = new InMemorySyncQueueRepository();
 
     const animal = createTestAnimal({
@@ -177,7 +178,8 @@ describe('Fluxos Críticos E2E', () => {
 
     const useCase = new MarkAnimalAdoptedUseCase(
       animalRepository,
-      syncQueueRepository
+      syncQueueRepository,
+      interestRepository
     );
 
     const result = await useCase.execute('animal-adopt', 'user-owner', false);

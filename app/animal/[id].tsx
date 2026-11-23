@@ -1,13 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -18,41 +15,32 @@ import { useRepositories } from '../../src/adapters/context/RepositoriesContext'
 import { useAuth } from '../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
 import { useFullSync } from '../../src/adapters/hooks/useFullSync';
+import { useUseCases } from '../../src/adapters/hooks/useUseCases';
 import { notifyPullCompleted } from '../../src/adapters/sync/pullEvents';
-import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
-import { PhotoCarouselViewer } from '../../src/adapters/components/PhotoCarouselViewer';
-import { exportAnimalPdf } from '../../src/adapters/pdf/exportAnimalPdf';
 import { recordInterestWithdrawal } from '../../src/adapters/sync/interestWithdrawalEvents';
 import { notifyNotificationsChanged } from '../../src/adapters/sync/notificationEvents';
+import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
+import { PhotoCarouselViewer } from '../../src/adapters/components/PhotoCarouselViewer';
+import {
+  INTEREST_STAGE_LABELS,
+  OwnerInterestsCard,
+} from '../../src/adapters/components/OwnerInterestsCard';
+import { AdoptionInterestModal } from '../../src/adapters/components/AdoptionInterestModal';
+import { exportAnimalPdf } from '../../src/adapters/pdf/exportAnimalPdf';
 import { Animal } from '../../src/domain/entities/Animal';
 import {
   AdoptionInterest,
   INTEREST_PIPELINE_STEPS,
   InterestStage,
 } from '../../src/domain/entities/AdoptionInterest';
-import { GetAnimalDetailsUseCase } from '../../src/application/use-cases/GetAnimalDetailsUseCase';
-import { ToggleFavoriteUseCase } from '../../src/application/use-cases/ToggleFavoriteUseCase';
-import { RegisterAdoptionInterestUseCase } from '../../src/application/use-cases/RegisterAdoptionInterestUseCase';
-import { UpdateInterestStatusUseCase } from '../../src/application/use-cases/UpdateInterestStatusUseCase';
-import { MarkAnimalAdoptedUseCase } from '../../src/application/use-cases/MarkAnimalAdoptedUseCase';
-import { DeleteAnimalUseCase } from '../../src/application/use-cases/DeleteAnimalUseCase';
 import {
   CLAY_CARD_STYLE,
-  CLAY_INSET_INPUT_STYLE,
   CLAY_PRIMARY_BUTTON_STYLE,
   CLAY_SECONDARY_BUTTON_STYLE,
   COLORS,
   RADII,
   SPACING,
 } from '../../src/adapters/theme/tokens';
-
-const STAGE_LABELS: Record<InterestStage, string> = {
-  ENVIADA: 'Enviada',
-  EM_ANALISE: 'Em análise',
-  VISITA_COMBINADA: 'Visita combinada',
-  CONCLUIDA: 'Concluída',
-  RECUSADA: 'Recusada',
-};
 
 export default function AnimalDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -61,6 +49,14 @@ export default function AnimalDetailsScreen() {
   const { user } = useAuth();
   const isOnline = useConnectivity();
   const runFullSync = useFullSync();
+  const {
+    getAnimalDetailsUseCase,
+    toggleFavoriteUseCase,
+    registerAdoptionInterestUseCase,
+    updateInterestStatusUseCase,
+    markAnimalAdoptedUseCase,
+    deleteAnimalUseCase,
+  } = useUseCases();
 
   const [animal, setAnimal] = useState<Animal | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -73,73 +69,17 @@ export default function AnimalDetailsScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
 
-  const getDetailsUseCase = useMemo(
-    () => new GetAnimalDetailsUseCase(container.animalRepository, container.remoteAnimalSource),
-    [container]
-  );
-  const toggleFavUseCase = useMemo(
-    () =>
-      new ToggleFavoriteUseCase(
-        container.favoriteRepository,
-        container.syncQueueRepository,
-        container.remoteFavorites
-      ),
-    [container]
-  );
-  const registerInterestUseCase = useMemo(
-    () =>
-      new RegisterAdoptionInterestUseCase(
-        container.interestRepository,
-        container.animalRepository,
-        container.syncQueueRepository,
-        container.remoteInterests
-      ),
-    [container]
-  );
-  const updateInterestUseCase = useMemo(
-    () =>
-      new UpdateInterestStatusUseCase(
-        container.interestRepository,
-        container.animalRepository,
-        container.syncQueueRepository,
-        container.remoteInterests,
-        container.remoteAnimalSource
-      ),
-    [container]
-  );
-  const markAdoptedUseCase = useMemo(
-    () =>
-      new MarkAnimalAdoptedUseCase(
-        container.animalRepository,
-        container.syncQueueRepository,
-        container.remoteAnimalSource
-      ),
-    [container]
-  );
-  const deleteAnimalUseCase = useMemo(
-    () =>
-      new DeleteAnimalUseCase(
-        container.animalRepository,
-        container.syncQueueRepository,
-        container.remoteAnimalSource
-      ),
-    [container]
-  );
-
   const loadDetails = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     try {
-      const found = await getDetailsUseCase.execute(id, isOnline);
+      const found = await getAnimalDetailsUseCase.execute(id, isOnline);
       setAnimal(found);
 
       if (found) {
-        if (user) {
-          const fav = await container.favoriteRepository.isFavorite(user.id, found.id);
-          setIsFavorite(fav);
-        } else {
-          setIsFavorite(false);
-        }
+        setIsFavorite(
+          user ? await container.favoriteRepository.isFavorite(user.id, found.id) : false
+        );
 
         let merged = await container.interestRepository.listByAnimal(found.id);
         if (isOnline && container.remoteInterests) {
@@ -148,6 +88,7 @@ export default function AnimalDetailsScreen() {
             const map = new Map<string, AdoptionInterest>();
             let withdrawalDetected = false;
             for (const item of merged) map.set(item.id, item);
+
             if (user?.id === found.ownerId) {
               const remoteIds = new Set(remoteList.map((item) => item.id));
               const pending = await container.syncQueueRepository.listPending();
@@ -158,7 +99,12 @@ export default function AnimalDetailsScreen() {
               );
 
               for (const localInterest of merged) {
-                if (remoteIds.has(localInterest.id) || pendingInterestIds.has(localInterest.id)) continue;
+                if (
+                  remoteIds.has(localInterest.id) ||
+                  pendingInterestIds.has(localInterest.id)
+                ) {
+                  continue;
+                }
                 await container.interestRepository.remove(localInterest.id);
                 await recordInterestWithdrawal(
                   container.appStateRepository,
@@ -170,6 +116,7 @@ export default function AnimalDetailsScreen() {
                 withdrawalDetected = true;
               }
             }
+
             for (const remoteItem of remoteList) {
               map.set(remoteItem.id, remoteItem);
               await container.interestRepository.save(remoteItem);
@@ -181,18 +128,12 @@ export default function AnimalDetailsScreen() {
           }
         }
         setInterests(merged);
-
-        if (user) {
-          const mine = merged.find((i) => i.userId === user.id) ?? null;
-          setMyInterest(mine);
-        } else {
-          setMyInterest(null);
-        }
+        setMyInterest(user ? merged.find((i) => i.userId === user.id) ?? null : null);
       }
     } finally {
       setLoading(false);
     }
-  }, [id, getDetailsUseCase, isOnline, user, container]);
+  }, [id, getAnimalDetailsUseCase, isOnline, user, container]);
 
   useEffect(() => {
     void loadDetails();
@@ -209,8 +150,9 @@ export default function AnimalDetailsScreen() {
       router.push('/(public)/login');
       return;
     }
-    const res = await toggleFavUseCase.execute(user.id, animal.id, isOnline);
+    const res = await toggleFavoriteUseCase.execute(user.id, animal.id, isOnline);
     setIsFavorite(res.favorited);
+    notifyPullCompleted();
   };
 
   const handleSendInterest = async () => {
@@ -219,12 +161,15 @@ export default function AnimalDetailsScreen() {
       return;
     }
     if (!message.trim() || message.trim().length < 10) {
-      Alert.alert('Mensagem muito curta', 'Conte um pouco sobre você e seu lar (mínimo de 10 caracteres).');
+      Alert.alert(
+        'Mensagem muito curta',
+        'Conte um pouco sobre você e seu lar (mínimo de 10 caracteres).'
+      );
       return;
     }
     setSubmitting(true);
     try {
-      const res = await registerInterestUseCase.execute({
+      const res = await registerAdoptionInterestUseCase.execute({
         userId: user.id,
         userName: user.name,
         userEmail: user.email,
@@ -247,7 +192,7 @@ export default function AnimalDetailsScreen() {
   const handleAdvanceInterest = (interest: AdoptionInterest, nextStage: InterestStage) => {
     if (!user || !animal) return;
     const nomeInteressado = interest.userName || 'Interessado';
-    const statusLabel = STAGE_LABELS[nextStage];
+    const statusLabel = INTEREST_STAGE_LABELS[nextStage];
     Alert.alert(
       'Confirmar atualização',
       `Você tem certeza que quer atualizar o status de interesse de ${nomeInteressado} em ${animal.name} para "${statusLabel}"?`,
@@ -257,8 +202,12 @@ export default function AnimalDetailsScreen() {
           text: 'Confirmar',
           onPress: async () => {
             try {
-              // updateInterestUseCase já faz a auto-adoção atomicamente quando nextStage === 'CONCLUIDA'
-              await updateInterestUseCase.execute(interest.id, user.id, nextStage, isOnline);
+              await updateInterestStatusUseCase.execute(
+                interest.id,
+                user.id,
+                nextStage,
+                isOnline
+              );
               await loadDetails();
               notifyPullCompleted();
               void runFullSync();
@@ -273,26 +222,22 @@ export default function AnimalDetailsScreen() {
 
   const handleMarkAdopted = () => {
     if (!user || !animal) return;
-    Alert.alert(
-      'Confirmar adoção',
-      `Marcar ${animal.name} como adotado?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Sim, marcar como adotado',
-          onPress: async () => {
-            try {
-              await markAdoptedUseCase.execute(animal.id, user.id, isOnline);
-              await loadDetails();
-              notifyPullCompleted();
-              void runFullSync();
-            } catch (err: any) {
-              Alert.alert('Erro', err?.message || 'Não foi possível marcar como adotado.');
-            }
-          },
+    Alert.alert('Confirmar adoção', `Marcar ${animal.name} como adotado?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sim, marcar como adotado',
+        onPress: async () => {
+          try {
+            await markAnimalAdoptedUseCase.execute(animal.id, user.id, isOnline);
+            await loadDetails();
+            notifyPullCompleted();
+            void runFullSync();
+          } catch (err: any) {
+            Alert.alert('Erro', err?.message || 'Não foi possível marcar como adotado.');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleReopenAdoption = () => {
@@ -306,7 +251,7 @@ export default function AnimalDetailsScreen() {
           text: 'Sim, reabrir',
           onPress: async () => {
             try {
-              await markAdoptedUseCase.reopen(animal.id, user.id, isOnline);
+              await markAnimalAdoptedUseCase.reopen(animal.id, user.id, isOnline);
               await loadDetails();
               notifyPullCompleted();
               void runFullSync();
@@ -331,7 +276,7 @@ export default function AnimalDetailsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await registerInterestUseCase.cancel(myInterest.id, user.id, isOnline);
+              await registerAdoptionInterestUseCase.cancel(myInterest.id, user.id, isOnline);
               setMyInterest(null);
               await loadDetails();
               void runFullSync();
@@ -354,6 +299,7 @@ export default function AnimalDetailsScreen() {
         onPress: async () => {
           try {
             await deleteAnimalUseCase.execute(animal.id, user.id, isOnline);
+            notifyPullCompleted();
             void runFullSync();
             router.back();
           } catch (err: any) {
@@ -490,7 +436,7 @@ export default function AnimalDetailsScreen() {
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>Acompanhamento do seu interesse</Text>
                 <Text style={styles.pipelineSub}>
-                  Etapa atual: {STAGE_LABELS[myInterest.status]}
+                  Etapa atual: {INTEREST_STAGE_LABELS[myInterest.status]}
                 </Text>
                 <View style={styles.stagesRow}>
                   {INTEREST_PIPELINE_STEPS.map((stage, idx) => {
@@ -504,7 +450,7 @@ export default function AnimalDetailsScreen() {
                         <Text
                           style={[styles.stageChipText, active && styles.stageChipTextActive]}
                         >
-                          {idx + 1}. {STAGE_LABELS[stage]}
+                          {idx + 1}. {INTEREST_STAGE_LABELS[stage]}
                         </Text>
                       </View>
                     );
@@ -582,58 +528,7 @@ export default function AnimalDetailsScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Interessados • {interests.length}</Text>
-              {interests.length === 0 ? (
-                <Text style={styles.sectionBody}>
-                  Ainda não há manifestações de interesse para este anúncio.
-                </Text>
-              ) : (
-                interests.map((item) => (
-                  <View key={item.id} style={styles.interestItemCard}>
-                    <View style={styles.interestItemHeader}>
-                      <Text style={styles.interestContactName}>
-                        {item.userName || 'Interessado'}
-                      </Text>
-                      <View style={styles.interestStageBadge}>
-                        <Text style={styles.interestStageBadgeText}>
-                          {STAGE_LABELS[item.status]}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={styles.interestPhone}>Contato: {item.contactInfo}</Text>
-                    <Text style={styles.interestMessage}>"{item.message}"</Text>
-
-                    <View style={styles.stageButtonsRow}>
-                      {([...INTEREST_PIPELINE_STEPS, 'RECUSADA'] as InterestStage[]).map(
-                        (stage) => {
-                          const isCurrent = item.status === stage;
-                          return (
-                            <Pressable
-                              key={stage}
-                              style={[
-                                styles.stageSmallBtn,
-                                isCurrent && styles.stageSmallBtnActive,
-                              ]}
-                              onPress={() => handleAdvanceInterest(item, stage)}
-                            >
-                              <Text
-                                style={[
-                                  styles.stageSmallBtnText,
-                                  isCurrent && styles.stageSmallBtnTextActive,
-                                ]}
-                              >
-                                {STAGE_LABELS[stage]}
-                              </Text>
-                            </Pressable>
-                          );
-                        }
-                      )}
-                    </View>
-                  </View>
-                ))
-              )}
-            </View>
+            <OwnerInterestsCard interests={interests} onSelectStage={handleAdvanceInterest} />
           </View>
         )}
 
@@ -655,56 +550,17 @@ export default function AnimalDetailsScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Modal de Demonstrar Interesse */}
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Demonstrar interesse em {animal.name}</Text>
-            <Text style={styles.modalSubtitle}>
-              Envie uma mensagem para o responsável combinando a conversa inicial.
-            </Text>
-
-            <Text style={styles.inputLabel}>Telefone / WhatsApp</Text>
-            <TextInput
-              style={CLAY_INSET_INPUT_STYLE}
-              value={contactPhone}
-              onChangeText={setContactPhone}
-              placeholder="(35) 99999-0000"
-              placeholderTextColor={COLORS.brownMuted}
-              keyboardType="phone-pad"
-            />
-
-            <Text style={styles.inputLabel}>Sua mensagem (10 a 400 caracteres)</Text>
-            <TextInput
-              style={[CLAY_INSET_INPUT_STYLE, styles.textArea]}
-              value={message}
-              onChangeText={setMessage}
-              placeholder="Conte sobre sua rotina, experiência com pets e espaço disponível..."
-              placeholderTextColor={COLORS.brownMuted}
-              maxLength={400}
-              multiline
-            />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[CLAY_SECONDARY_BUTTON_STYLE, { flex: 1 }]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.secondaryButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[CLAY_PRIMARY_BUTTON_STYLE, { flex: 1 }]}
-                onPress={handleSendInterest}
-                disabled={submitting}
-              >
-                <Text style={styles.primaryButtonText}>
-                  {submitting ? 'Enviando...' : 'Enviar'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <AdoptionInterestModal
+        visible={modalVisible}
+        animalName={animal.name}
+        contactPhone={contactPhone}
+        onChangeContactPhone={setContactPhone}
+        message={message}
+        onChangeMessage={setMessage}
+        submitting={submitting}
+        onClose={() => setModalVisible(false)}
+        onSubmit={handleSendInterest}
+      />
     </SafeAreaView>
   );
 }
@@ -913,106 +769,5 @@ const styles = StyleSheet.create({
     borderColor: COLORS.peach,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  interestItemCard: {
-    backgroundColor: COLORS.ivory,
-    padding: SPACING.md,
-    borderRadius: RADII.md,
-    borderWidth: 1,
-    borderColor: COLORS.peach,
-    gap: 6,
-  },
-  interestItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  interestContactName: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: COLORS.espresso,
-  },
-  interestStageBadge: {
-    backgroundColor: COLORS.amberBg,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: RADII.pill,
-  },
-  interestStageBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.terracotta,
-  },
-  interestPhone: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.brown,
-  },
-  interestMessage: {
-    fontSize: 13,
-    color: COLORS.espresso,
-    fontStyle: 'italic',
-  },
-  stageButtonsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
-  },
-  stageSmallBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: RADII.pill,
-    backgroundColor: COLORS.cream,
-    borderWidth: 1,
-    borderColor: COLORS.peach,
-  },
-  stageSmallBtnActive: {
-    backgroundColor: COLORS.terracotta,
-    borderColor: COLORS.terracotta,
-  },
-  stageSmallBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.espresso,
-  },
-  stageSmallBtnTextActive: {
-    color: COLORS.white,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(58, 31, 20, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: COLORS.ivory,
-    borderTopLeftRadius: RADII.xl,
-    borderTopRightRadius: RADII.xl,
-    padding: SPACING.lg,
-    gap: SPACING.sm,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: COLORS.espresso,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: COLORS.brown,
-    marginBottom: 4,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.espresso,
-  },
-  textArea: {
-    minHeight: 90,
-    textAlignVertical: 'top',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginTop: SPACING.sm,
   },
 });

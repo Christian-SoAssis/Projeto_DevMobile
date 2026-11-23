@@ -166,24 +166,29 @@ export class SqliteAnimalRepository implements AnimalRepository {
   }
 
   async upsertCache(animals: Animal[]): Promise<void> {
+    const ownedLocalRows = await this.db.getAllAsync<{ id: string; local_path: string | null }>(
+      'SELECT id, local_path FROM local_images'
+    );
+    const ownedLocalByPhotoId = new Map(
+      ownedLocalRows
+        .filter((r) => Boolean(r.local_path))
+        .map((r) => [r.id, r.local_path ?? undefined])
+    );
+
     for (const animal of animals) {
-      // Preserva localPath de fotos locais já existentes no dispositivo
-      const existing = await this.findById(animal.id);
-      if (existing) {
-        const localByPhotoId = new Map(existing.photos.map((p) => [p.id, p.localPath]));
-        const mergedPhotos = animal.photos.map(
-          (p) =>
-            new AnimalPhoto({
-              id: p.id,
-              animalId: p.animalId,
-              localPath: p.localPath ?? localByPhotoId.get(p.id),
-              remoteUrl: p.remoteUrl,
-              syncState: p.syncState,
-              createdAt: p.createdAt,
-            })
-        );
-        animal.setPhotos(mergedPhotos);
-      }
+      // Preserva localPath apenas de fotos que foram efetivamente salvas NESTE dispositivo (presentes em local_images)
+      const mergedPhotos = animal.photos.map(
+        (p) =>
+          new AnimalPhoto({
+            id: p.id,
+            animalId: p.animalId,
+            localPath: ownedLocalByPhotoId.get(p.id) ?? p.localPath,
+            remoteUrl: p.remoteUrl,
+            syncState: p.syncState,
+            createdAt: p.createdAt,
+          })
+      );
+      animal.setPhotos(mergedPhotos);
       await this.saveLocal(animal);
     }
   }

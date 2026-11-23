@@ -151,6 +151,16 @@ const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS idx_interests_user ON adoption_interests (user_id);
 `,
   },
+  {
+    version: 3,
+    sql: `
+    UPDATE animal_photos
+    SET local_path = NULL
+    WHERE remote_url IS NOT NULL
+      AND remote_url LIKE 'http%'
+      AND id NOT IN (SELECT id FROM local_images);
+`,
+  },
 ];
 
 /**

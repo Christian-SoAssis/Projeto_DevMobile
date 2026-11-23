@@ -9,6 +9,7 @@ export interface EnlaceHeaderProps {
   onBack?: () => void;
   title?: string;
   largeLogo?: boolean;
+  onLocationPress?: () => void;
 }
 
 /**
@@ -20,6 +21,7 @@ export function EnlaceHeader({
   onBack,
   title,
   largeLogo = false,
+  onLocationPress,
 }: EnlaceHeaderProps) {
   if (largeLogo) {
     return (
@@ -57,11 +59,21 @@ export function EnlaceHeader({
 
       {title ? (
         <Text style={styles.screenTitle}>{title}</Text>
+      ) : onLocationPress ? (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`Filtrar localização atual: ${cityLabel}`}
+          onPress={onLocationPress}
+          style={styles.locationPill}
+        >
+          <Ionicons name="location-sharp" size={14} color={COLORS.terracotta} />
+          <Text style={styles.locationText}>{cityLabel}</Text>
+          <Ionicons name="chevron-down" size={13} color={COLORS.brown} />
+        </TouchableOpacity>
       ) : (
         <View style={styles.locationPill}>
           <Ionicons name="location-sharp" size={14} color={COLORS.terracotta} />
           <Text style={styles.locationText}>{cityLabel}</Text>
-          <Ionicons name="chevron-down" size={13} color={COLORS.brown} />
         </View>
       )}
     </View>

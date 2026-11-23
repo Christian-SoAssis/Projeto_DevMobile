@@ -208,7 +208,7 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
     const rows = photos.map((p, idx) => ({
       id: p.id,
       animal_id: animal.id,
-      local_path: p.localPath ?? null,
+      local_path: null,
       remote_url:
         p.remoteUrl ||
         p.localPath ||
@@ -259,8 +259,8 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
           new AnimalPhoto({
             id: p.id,
             animalId: row.id,
-            localPath: p.local_path ?? undefined,
-            remoteUrl: p.remote_url ?? undefined,
+            localPath: undefined,
+            remoteUrl: p.remote_url ?? p.local_path ?? undefined,
             syncState: SyncState.completed(),
             createdAt: p.created_at,
           })

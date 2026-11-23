@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,11 +18,12 @@ import { useRepositories } from '../../../src/adapters/context/RepositoriesConte
 import { useAuth } from '../../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../../src/adapters/hooks/useConnectivity';
 import { useFullSync } from '../../../src/adapters/hooks/useFullSync';
+import { useUseCases } from '../../../src/adapters/hooks/useUseCases';
+import { notifyPullCompleted } from '../../../src/adapters/sync/pullEvents';
 import { EnlaceHeader } from '../../../src/adapters/components/EnlaceHeader';
 import { AnimalPhoto } from '../../../src/domain/entities/AnimalPhoto';
 import { AnimalCharacteristics } from '../../../src/domain/value-objects/AnimalCharacteristics';
 import { ApproximateLocation } from '../../../src/domain/value-objects/ApproximateLocation';
-import { UpdateAnimalUseCase } from '../../../src/application/use-cases/UpdateAnimalUseCase';
 import {
   CLAY_CARD_STYLE,
   CLAY_INSET_INPUT_STYLE,
@@ -39,6 +40,7 @@ export default function EditarAnuncioScreen() {
   const { user } = useAuth();
   const isOnline = useConnectivity();
   const runFullSync = useFullSync();
+  const { updateAnimalUseCase } = useUseCases();
 
   const [loading, setLoading] = useState(true);
   const [photos, setPhotos] = useState<AnimalPhoto[]>([]);
@@ -53,20 +55,8 @@ export default function EditarAnuncioScreen() {
   const [city, setCity] = useState('');
   const [latitude, setLatitude] = useState(-21.55);
   const [longitude, setLongitude] = useState(-45.43);
+  const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  const updateUseCase = useMemo(
-    () =>
-      new UpdateAnimalUseCase(
-        container.animalRepository,
-        container.syncQueueRepository,
-        container.photoStorage,
-        container.unitOfWork,
-        container.remoteAnimalSource,
-        container.remotePhotoStorage
-      ),
-    [container]
-  );
 
   useEffect(() => {
     async function load() {
@@ -91,8 +81,30 @@ export default function EditarAnuncioScreen() {
     void load();
   }, [id, container]);
 
+  const handleCaptureCamera = async () => {
+    if (!id) return;
+    if (photos.length >= 4) {
+      Alert.alert('Limite atingido', 'Cada anúncio pode ter até 4 fotos.');
+      return;
+    }
+    const res = await container.cameraGateway.capturePhoto();
+    if (res?.uri) {
+      setPhotos((prev) => [
+        ...prev,
+        new AnimalPhoto({
+          animalId: id,
+          localPath: res.uri,
+        }),
+      ]);
+    }
+  };
+
   const handlePickGallery = async () => {
-    if (!id || photos.length >= 4) return;
+    if (!id) return;
+    if (photos.length >= 4) {
+      Alert.alert('Limite atingido', 'Cada anúncio pode ter até 4 fotos.');
+      return;
+    }
     const res = await container.cameraGateway.pickImageFromGallery();
     if (res?.uri) {
       setPhotos((prev) => [
@@ -105,6 +117,21 @@ export default function EditarAnuncioScreen() {
     }
   };
 
+  const handleUseMyLocation = async () => {
+    setLocating(true);
+    try {
+      const loc = await container.locationGateway.getCurrentLocation();
+      setNeighborhood(loc.neighborhood);
+      setCity(loc.city);
+      setLatitude(loc.latitude);
+      setLongitude(loc.longitude);
+    } catch {
+      Alert.alert('Localização', 'Preencha o bairro e a cidade manualmente.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!user || !id) return;
     if (photos.length === 0) {
@@ -113,7 +140,7 @@ export default function EditarAnuncioScreen() {
     }
     setSaving(true);
     try {
-      await updateUseCase.execute({
+      await updateAnimalUseCase.execute({
         animalId: id,
         actorUserId: user.id,
         name: name.trim(),
@@ -134,6 +161,7 @@ export default function EditarAnuncioScreen() {
         photos,
         isOnline,
       });
+      notifyPullCompleted();
       void runFullSync();
       router.replace(`/animal/${id}`);
     } catch (err: any) {
@@ -175,10 +203,16 @@ export default function EditarAnuncioScreen() {
             ))}
           </View>
           {photos.length < 4 && (
-            <TouchableOpacity style={styles.photoActionBtn} onPress={handlePickGallery}>
-              <Ionicons name="images-outline" size={18} color={COLORS.terracotta} />
-              <Text style={styles.photoActionText}>Adicionar foto da galeria</Text>
-            </TouchableOpacity>
+            <View style={styles.photoButtonsRow}>
+              <TouchableOpacity style={styles.photoActionBtn} onPress={handleCaptureCamera}>
+                <Ionicons name="camera-outline" size={18} color={COLORS.terracotta} />
+                <Text style={styles.photoActionText}>Câmera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.photoActionBtn} onPress={handlePickGallery}>
+                <Ionicons name="images-outline" size={18} color={COLORS.terracotta} />
+                <Text style={styles.photoActionText}>Galeria</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -200,6 +234,19 @@ export default function EditarAnuncioScreen() {
                 onPress={() => setSpecies(sp)}
               >
                 <Text style={[styles.chipText, species === sp && styles.chipTextActive]}>{sp}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Sexo</Text>
+          <View style={styles.chipsRow}>
+            {(['Fêmea', 'Macho'] as const).map((sx) => (
+              <Pressable
+                key={sx}
+                style={[styles.chip, sex === sx && styles.chipActive]}
+                onPress={() => setSex(sx)}
+              >
+                <Text style={[styles.chipText, sex === sx && styles.chipTextActive]}>{sx}</Text>
               </Pressable>
             ))}
           </View>
@@ -241,6 +288,26 @@ export default function EditarAnuncioScreen() {
             onChangeText={setSpecialCare}
             maxLength={500}
           />
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.locHeader}>
+            <Text style={styles.sectionTitle}>Localização aproximada</Text>
+            <TouchableOpacity
+              style={styles.gpsButton}
+              onPress={handleUseMyLocation}
+              disabled={locating}
+            >
+              {locating ? (
+                <ActivityIndicator size="small" color={COLORS.green} />
+              ) : (
+                <>
+                  <Ionicons name="locate-outline" size={16} color={COLORS.green} />
+                  <Text style={styles.gpsButtonText}>Usar minha localização</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
 
           <Text style={styles.label}>Bairro</Text>
           <TextInput
@@ -324,7 +391,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  photoButtonsRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
   photoActionBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -372,6 +444,27 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: COLORS.white,
+  },
+  locHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  gpsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.greenBg,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: RADII.pill,
+  },
+  gpsButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.green,
   },
   saveButtonText: {
     color: COLORS.white,

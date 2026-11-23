@@ -54,12 +54,60 @@ export default function HomeScreen() {
   const [filterSex, setFilterSex] = useState<string>('Todos');
   const [filterAge, setFilterAge] = useState<string>('');
   const [filterDistanceKm, setFilterDistanceKm] = useState<number | undefined>(undefined);
+  const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number }>({
+    latitude: -21.55,
+    longitude: -45.43,
+  });
 
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [selectedMapAnimal, setSelectedMapAnimal] = useState<Animal | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const runFullSync = useFullSync();
+
+  useEffect(() => {
+    let active = true;
+    async function restorePreferences() {
+      try {
+        const saved = await container.searchPreferencesRepository.get();
+        if (!saved || !active) return;
+        if (saved.species) {
+          setFilterSpecies(saved.species);
+          if (saved.species === 'Cão' || saved.species === 'Gato') {
+            setQuickSpecies(saved.species);
+          }
+        }
+        if (saved.size) setFilterSize(saved.size);
+        if (saved.sex) setFilterSex(saved.sex);
+        if (saved.approximateAge) setFilterAge(saved.approximateAge);
+        if (saved.radius) setFilterDistanceKm(saved.radius.km);
+      } catch {
+        // mantém filtros padrão
+      }
+    }
+    void restorePreferences();
+    return () => {
+      active = false;
+    };
+  }, [container]);
+
+  useEffect(() => {
+    if (filterDistanceKm === undefined) return;
+    let active = true;
+    container.locationGateway
+      .getCurrentLocation()
+      .then((loc) => {
+        if (active) {
+          setUserCoords({ latitude: loc.latitude, longitude: loc.longitude });
+        }
+      })
+      .catch(() => {
+        // mantém fallback de Varginha (-21.55, -45.43) se o GPS estiver indisponível
+      });
+    return () => {
+      active = false;
+    };
+  }, [filterDistanceKm, container]);
 
   const searchUseCase = useMemo(
     () => new SearchAnimalsUseCase(container.animalRepository, container.syncQueueRepository),
@@ -85,8 +133,8 @@ export default function HomeScreen() {
       sex: filterSex === 'Todos' ? undefined : filterSex,
       approximateAge: filterAge || undefined,
       maxDistanceKm: filterDistanceKm,
-      latitude: filterDistanceKm !== undefined ? -21.55 : undefined,
-      longitude: filterDistanceKm !== undefined ? -45.43 : undefined,
+      latitude: filterDistanceKm !== undefined ? userCoords.latitude : undefined,
+      longitude: filterDistanceKm !== undefined ? userCoords.longitude : undefined,
       currentUserId: user?.id ?? null,
     });
     setAnimals(list);
@@ -110,6 +158,7 @@ export default function HomeScreen() {
     filterSex,
     filterAge,
     filterDistanceKm,
+    userCoords,
     user,
   ]);
 
@@ -184,7 +233,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <EnlaceHeader />
+      <EnlaceHeader onLocationPress={() => setFilterModalOpen(true)} />
 
       <View style={styles.topSection}>
         {viewMode === 'LIST' && (

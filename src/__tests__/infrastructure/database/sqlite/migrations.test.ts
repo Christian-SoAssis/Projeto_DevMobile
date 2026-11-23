@@ -31,6 +31,7 @@ describe('SQLite Migrations (OFF-02, DAT-01)', () => {
     );
     expect(versions.map((v) => v.version)).toContain(1);
     expect(versions.map((v) => v.version)).toContain(2);
+    expect(versions.map((v) => v.version)).toContain(3);
   });
 
   it('deve ser idempotente: aplicar duas vezes não duplica dados', async () => {

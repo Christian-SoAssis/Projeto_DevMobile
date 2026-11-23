@@ -155,6 +155,12 @@ export default function SyncScreen() {
                     router.push(`/(protected)/conflito/${action.entityId}`);
                   } else if (action.entityType === 'animal') {
                     router.push(`/animal/${action.entityId}`);
+                  } else if (action.payload?.animalId) {
+                    router.push(`/animal/${String(action.payload.animalId)}`);
+                  } else if (action.entityType === 'favorite') {
+                    router.push('/(tabs)/favoritos');
+                  } else {
+                    router.push('/(tabs)/notificacoes');
                   }
                 }}
                 style={styles.queueItemCard}

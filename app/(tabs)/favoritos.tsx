@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
-  Image,
   RefreshControl,
   StyleSheet,
   Text,
@@ -12,61 +11,43 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Animal } from '../../src/domain/entities/Animal';
-import { ToggleFavoriteUseCase } from '../../src/application/use-cases/ToggleFavoriteUseCase';
-import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useAuth } from '../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
 import { useFullSync } from '../../src/adapters/hooks/useFullSync';
+import { useUseCases } from '../../src/adapters/hooks/useUseCases';
 import { subscribePullCompleted } from '../../src/adapters/sync/pullEvents';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
+import { AnimalCard } from '../../src/adapters/components/AnimalCard';
 import {
-  CLAY_CARD_STYLE,
   CLAY_PRIMARY_BUTTON_STYLE,
   COLORS,
-  RADII,
 } from '../../src/adapters/theme/tokens';
-
-const FALLBACK_PHOTO = 'https://images.unsplash.com/photo-1543466835-00a7907e9de1';
 
 /**
  * V07 • Favoritos ("Guardados no coração" — Prancha 01/02)
  */
 export default function FavoritosScreen() {
   const router = useRouter();
-  const container = useRepositories();
   const { user } = useAuth();
   const isOnline = useConnectivity();
   const [favoriteAnimals, setFavoriteAnimals] = useState<Animal[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const runFullSync = useFullSync();
-
-  const toggleFavoriteUseCase = useMemo(
-    () =>
-      new ToggleFavoriteUseCase(
-        container.favoriteRepository,
-        container.syncQueueRepository,
-        container.remoteFavorites
-      ),
-    [container]
-  );
+  const { toggleFavoriteUseCase, listFavoriteAnimals } = useUseCases();
 
   const loadFavorites = useCallback(async () => {
     if (!user) {
       setFavoriteAnimals([]);
       return;
     }
-    const favs = await container.favoriteRepository.listByUser(user.id);
-    const loaded: Animal[] = [];
-    for (const fav of favs) {
-      const anim = await container.animalRepository.findById(fav.animalId);
-      if (anim) loaded.push(anim);
-    }
-    setFavoriteAnimals(loaded);
-  }, [container, user]);
+    setFavoriteAnimals(await listFavoriteAnimals(user.id));
+  }, [listFavoriteAnimals, user]);
 
   useEffect(() => {
-    loadFavorites();
-    const unsub = subscribePullCompleted(loadFavorites);
+    void loadFavorites();
+    const unsub = subscribePullCompleted(() => {
+      void loadFavorites();
+    });
     return unsub;
   }, [loadFavorites]);
 
@@ -151,34 +132,12 @@ export default function FavoritosScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <TouchableOpacity
-            activeOpacity={0.9}
+          <AnimalCard
+            animal={item}
+            isFavorite
             onPress={() => router.push(`/animal/${item.id}`)}
-            style={styles.card}
-          >
-            <Image
-              source={{ uri: item.photos[0]?.displayUri || FALLBACK_PHOTO }}
-              style={styles.thumb}
-            />
-            <View style={{ flex: 1 }}>
-              <View style={styles.cardTopRow}>
-                <Text style={styles.animalName}>{item.name}</Text>
-                <TouchableOpacity onPress={() => handleRemoveFavorite(item.id)}>
-                  <Ionicons name="heart" size={22} color={COLORS.terracotta} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.badgeAvailable}>
-                <Text style={styles.badgeText}>
-                  {item.status.isAvailable() ? 'Disponível' : 'Adotado'}
-                </Text>
-              </View>
-              <Text style={styles.metaText}>
-                🐾 {item.characteristics.approximateAge} • {item.characteristics.sex} •{' '}
-                {item.characteristics.size}
-              </Text>
-              <Text style={styles.locationText}>📍 {item.location.displayLabel}</Text>
-            </View>
-          </TouchableOpacity>
+            onToggleFavorite={() => handleRemoveFavorite(item.id)}
+          />
         )}
       />
     </SafeAreaView>
@@ -223,52 +182,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: 24,
     gap: 12,
-  },
-  card: {
-    ...CLAY_CARD_STYLE,
-    flexDirection: 'row',
-    padding: 12,
-    gap: 12,
-    alignItems: 'center',
-  },
-  thumb: {
-    width: 96,
-    height: 96,
-    borderRadius: 18,
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  animalName: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: COLORS.espresso,
-  },
-  badgeAvailable: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.green,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: RADII.pill,
-    marginVertical: 4,
-  },
-  badgeText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  metaText: {
-    fontSize: 12,
-    color: COLORS.brown,
-    fontWeight: '700',
-  },
-  locationText: {
-    fontSize: 12,
-    color: COLORS.espresso,
-    fontWeight: '800',
-    marginTop: 2,
   },
   guestBox: {
     flex: 1,

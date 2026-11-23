@@ -143,4 +143,38 @@ describe('PullRemoteInterestsUseCase', () => {
     await expect(pull.execute()).resolves.toMatchObject({ withdrawals: 0 });
     expect(JSON.parse((await appState.get('interest_withdrawals:dono')) ?? '[]')).toHaveLength(1);
   });
+
+  it('syncForAnimal sincroniza interesses de um único anúncio e detecta desistências para o responsável', async () => {
+    const animal = createTestAnimal({ id: 'animal-1', ownerId: 'dono', name: 'Amora' });
+    const withdrawn = createTestInterest({
+      id: 'int-withdrawn',
+      userId: 'interessado-1',
+      animalId: animal.id,
+    });
+    const activeRemote = createTestInterest({
+      id: 'int-active',
+      userId: 'interessado-2',
+      animalId: animal.id,
+      status: 'EM_ANALISE',
+    });
+
+    await animals.saveLocal(animal);
+    await localInterests.save(withdrawn);
+    await remote.upsert(activeRemote);
+
+    const pull = new PullRemoteInterestsUseCase(
+      remote,
+      localInterests,
+      animals,
+      queue,
+      appState,
+      { currentUserId: () => 'dono' }
+    );
+
+    const res = await pull.syncForAnimal(animal, 'dono', true);
+    expect(res.withdrawalDetected).toBe(true);
+    expect(res.interests).toHaveLength(1);
+    expect(res.interests[0].id).toBe('int-active');
+    expect(await localInterests.findById('int-withdrawn')).toBeNull();
+  });
 });

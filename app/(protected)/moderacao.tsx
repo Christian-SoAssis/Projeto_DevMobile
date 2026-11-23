@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,42 +11,28 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useAuth } from '../../src/adapters/context/AuthContext';
+import { useUseCases } from '../../src/adapters/hooks/useUseCases';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import { Animal } from '../../src/domain/entities/Animal';
-import { ModerateAnimalUseCase } from '../../src/application/use-cases/ModerateAnimalUseCase';
 import { CLAY_CARD_STYLE, COLORS, RADII, SPACING } from '../../src/adapters/theme/tokens';
 
 export default function ModeracaoScreen() {
   const router = useRouter();
-  const container = useRepositories();
   const { user } = useAuth();
+  const { moderateAnimalUseCase, listModerationAnimals } = useUseCases();
 
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const moderateUseCase = useMemo(
-    () => new ModerateAnimalUseCase(container.animalRepository, container.moderationGateway),
-    [container]
-  );
-
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      if (container.moderationGateway) {
-        const remoteList = await container.moderationGateway.listAllForModeration();
-        if (remoteList.length > 0) {
-          setAnimals(remoteList);
-          return;
-        }
-      }
-      const localList = await container.animalRepository.search({ includeHidden: true });
-      setAnimals(localList);
+      setAnimals(await listModerationAnimals());
     } finally {
       setLoading(false);
     }
-  }, [container]);
+  }, [listModerationAnimals]);
 
   useEffect(() => {
     void loadAll();
@@ -56,7 +42,7 @@ export default function ModeracaoScreen() {
     if (!user) return;
     const action = animal.hidden ? 'UNHIDE' : 'HIDE';
     try {
-      await moderateUseCase.execute(user, animal.id, action);
+      await moderateAnimalUseCase.execute(user, animal.id, action);
       await loadAll();
     } catch (err: any) {
       Alert.alert('Erro na moderação', err?.message || 'Operação não permitida.');

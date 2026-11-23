@@ -11,13 +11,11 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useAuth } from '../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
 import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 import { useUseCases } from '../../src/adapters/hooks/useUseCases';
 import { notifyPullCompleted } from '../../src/adapters/sync/pullEvents';
-import { recordInterestWithdrawal } from '../../src/adapters/sync/interestWithdrawalEvents';
 import { notifyNotificationsChanged } from '../../src/adapters/sync/notificationEvents';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import { PhotoCarouselViewer } from '../../src/adapters/components/PhotoCarouselViewer';
@@ -45,7 +43,6 @@ import {
 export default function AnimalDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const container = useRepositories();
   const { user } = useAuth();
   const isOnline = useConnectivity();
   const runFullSync = useFullSync();
@@ -73,67 +70,22 @@ export default function AnimalDetailsScreen() {
     if (!id) return;
     setLoading(true);
     try {
-      const found = await getAnimalDetailsUseCase.execute(id, isOnline);
-      setAnimal(found);
-
-      if (found) {
-        setIsFavorite(
-          user ? await container.favoriteRepository.isFavorite(user.id, found.id) : false
-        );
-
-        let merged = await container.interestRepository.listByAnimal(found.id);
-        if (isOnline && container.remoteInterests) {
-          try {
-            const remoteList = await container.remoteInterests.listByAnimal(found.id);
-            const map = new Map<string, AdoptionInterest>();
-            let withdrawalDetected = false;
-            for (const item of merged) map.set(item.id, item);
-
-            if (user?.id === found.ownerId) {
-              const remoteIds = new Set(remoteList.map((item) => item.id));
-              const pending = await container.syncQueueRepository.listPending();
-              const pendingInterestIds = new Set(
-                pending
-                  .filter((action) => action.entityType === 'interest')
-                  .map((action) => action.entityId)
-              );
-
-              for (const localInterest of merged) {
-                if (
-                  remoteIds.has(localInterest.id) ||
-                  pendingInterestIds.has(localInterest.id)
-                ) {
-                  continue;
-                }
-                await container.interestRepository.remove(localInterest.id);
-                await recordInterestWithdrawal(
-                  container.appStateRepository,
-                  user.id,
-                  found.name,
-                  localInterest
-                );
-                map.delete(localInterest.id);
-                withdrawalDetected = true;
-              }
-            }
-
-            for (const remoteItem of remoteList) {
-              map.set(remoteItem.id, remoteItem);
-              await container.interestRepository.save(remoteItem);
-            }
-            merged = Array.from(map.values());
-            if (withdrawalDetected) notifyNotificationsChanged();
-          } catch {
-            // fallback local
-          }
-        }
-        setInterests(merged);
-        setMyInterest(user ? merged.find((i) => i.userId === user.id) ?? null : null);
+      const details = await getAnimalDetailsUseCase.loadFullDetails({
+        animalId: id,
+        currentUserId: user?.id ?? null,
+        isOnline,
+      });
+      setAnimal(details.animal);
+      setIsFavorite(details.isFavorite);
+      setInterests(details.interests);
+      setMyInterest(details.myInterest);
+      if (details.withdrawalDetected) {
+        notifyNotificationsChanged();
       }
     } finally {
       setLoading(false);
     }
-  }, [id, getAnimalDetailsUseCase, isOnline, user, container]);
+  }, [id, getAnimalDetailsUseCase, isOnline, user?.id]);
 
   useEffect(() => {
     void loadDetails();
@@ -381,7 +333,6 @@ export default function AnimalDetailsScreen() {
           </View>
         </View>
 
-        {/* 4 Attribute Clay Cards (V06) */}
         <View style={styles.attributesGrid}>
           <View style={styles.attrCard}>
             <Text style={styles.attrLabel}>Espécie</Text>
@@ -401,7 +352,6 @@ export default function AnimalDetailsScreen() {
           </View>
         </View>
 
-        {/* Comportamento e Cuidados */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Comportamento e história</Text>
           <Text style={styles.sectionBody}>
@@ -420,7 +370,6 @@ export default function AnimalDetailsScreen() {
           ) : null}
         </View>
 
-        {/* Privacidade de Localização (RNF05) */}
         <View style={styles.privacyBanner}>
           <Ionicons name="shield-checkmark-outline" size={18} color={COLORS.green} />
           <Text style={styles.privacyText}>
@@ -429,7 +378,6 @@ export default function AnimalDetailsScreen() {
           </Text>
         </View>
 
-        {/* Visão do Visitante / Interessado (V06) */}
         {!isOwner && (
           <View style={styles.actionSection}>
             {myInterest ? (
@@ -499,7 +447,6 @@ export default function AnimalDetailsScreen() {
           </View>
         )}
 
-        {/* Visão do Responsável (V16: Detalhes: Responsável) */}
         {isOwner && (
           <View style={styles.ownerSection}>
             <View style={styles.ownerActionsRow}>
@@ -532,7 +479,6 @@ export default function AnimalDetailsScreen() {
           </View>
         )}
 
-        {/* Exportar PDF (V06 e V16) */}
         <TouchableOpacity
           style={CLAY_SECONDARY_BUTTON_STYLE}
           onPress={handleExportPdf}

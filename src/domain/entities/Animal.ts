@@ -6,6 +6,8 @@ import { generateUuid } from '../services/IdGenerator';
 
 /** Decisão 13 (RF09): limite máximo de 4 fotos por anúncio. */
 export const MAX_PHOTOS_PER_ANIMAL = 4;
+export const MIN_ANIMAL_NAME_LENGTH = 2;
+export const MAX_ANIMAL_NAME_LENGTH = 60;
 
 export interface AnimalProps {
   id?: string;

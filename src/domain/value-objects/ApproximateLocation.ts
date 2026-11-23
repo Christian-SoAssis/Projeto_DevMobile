@@ -1,3 +1,5 @@
+export const MAX_LOCATION_TEXT_LENGTH = 60;
+
 export interface ApproximateLocationProps {
   neighborhood: string;
   city: string;

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -13,14 +13,13 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Animal } from '../../src/domain/entities/Animal';
-import { DeleteAnimalUseCase } from '../../src/application/use-cases/DeleteAnimalUseCase';
-import { MarkAnimalAdoptedUseCase } from '../../src/application/use-cases/MarkAnimalAdoptedUseCase';
-import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
 import { useAuth } from '../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
 import { useFullSync } from '../../src/adapters/hooks/useFullSync';
+import { useUseCases } from '../../src/adapters/hooks/useUseCases';
 import { notifyPullCompleted, subscribePullCompleted } from '../../src/adapters/sync/pullEvents';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
+import { ANIMAL_FALLBACK_PHOTO } from '../../src/adapters/components/AnimalCard';
 import {
   CLAY_CARD_STYLE,
   CLAY_PRIMARY_BUTTON_STYLE,
@@ -28,41 +27,23 @@ import {
   RADII,
 } from '../../src/adapters/theme/tokens';
 
-const FALLBACK_PHOTO = 'https://images.unsplash.com/photo-1543466835-00a7907e9de1';
-
 /**
  * V09 • Meus anúncios ("Histórias que você cuida" — Prancha 02/02)
  */
 export default function MeusAnunciosScreen() {
   const router = useRouter();
-  const container = useRepositories();
   const { user } = useAuth();
   const isOnline = useConnectivity();
+  const runFullSync = useFullSync();
+  const {
+    deleteAnimalUseCase,
+    markAnimalAdoptedUseCase,
+    listOwnedAnimalsWithPendingStatus,
+  } = useUseCases();
 
   const [myAnimals, setMyAnimals] = useState<Animal[]>([]);
   const [pendingAnimalIds, setPendingAnimalIds] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
-  const runFullSync = useFullSync();
-
-  const deleteUseCase = useMemo(
-    () =>
-      new DeleteAnimalUseCase(
-        container.animalRepository,
-        container.syncQueueRepository,
-        container.remoteAnimalSource
-      ),
-    [container]
-  );
-
-  const markAdoptedUseCase = useMemo(
-    () =>
-      new MarkAnimalAdoptedUseCase(
-        container.animalRepository,
-        container.syncQueueRepository,
-        container.remoteAnimalSource
-      ),
-    [container]
-  );
 
   const loadMyAnimals = useCallback(async () => {
     if (!user) {
@@ -70,18 +51,17 @@ export default function MeusAnunciosScreen() {
       setPendingAnimalIds(new Set());
       return;
     }
-    const list = await container.animalRepository.findByOwner(user.id);
-    setMyAnimals(list);
-
-    const pending = await container.syncQueueRepository.listPending();
-    setPendingAnimalIds(
-      new Set(pending.filter((p) => p.entityType === 'animal').map((p) => p.entityId))
-    );
-  }, [container, user]);
+    const { animals, pendingAnimalIds: pendingIds } =
+      await listOwnedAnimalsWithPendingStatus(user.id);
+    setMyAnimals(animals);
+    setPendingAnimalIds(pendingIds);
+  }, [listOwnedAnimalsWithPendingStatus, user]);
 
   useEffect(() => {
-    loadMyAnimals();
-    const unsub = subscribePullCompleted(loadMyAnimals);
+    void loadMyAnimals();
+    const unsub = subscribePullCompleted(() => {
+      void loadMyAnimals();
+    });
     return unsub;
   }, [loadMyAnimals]);
 
@@ -106,28 +86,24 @@ export default function MeusAnunciosScreen() {
 
   const handleMarkAdopted = (animal: Animal) => {
     if (!user) return;
-    Alert.alert(
-      'Confirmar adoção',
-      `Marcar ${animal.name} como adotado?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Sim, marcar como adotado',
-          onPress: async () => {
-            try {
-              await markAdoptedUseCase.execute(animal.id, user.id, isOnline);
-              await loadMyAnimals();
-              notifyPullCompleted();
-            } catch (err) {
-              Alert.alert(
-                'Atenção',
-                err instanceof Error ? err.message : 'Erro ao marcar como adotado.'
-              );
-            }
-          },
+    Alert.alert('Confirmar adoção', `Marcar ${animal.name} como adotado?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sim, marcar como adotado',
+        onPress: async () => {
+          try {
+            await markAnimalAdoptedUseCase.execute(animal.id, user.id, isOnline);
+            await loadMyAnimals();
+            notifyPullCompleted();
+          } catch (err) {
+            Alert.alert(
+              'Atenção',
+              err instanceof Error ? err.message : 'Erro ao marcar como adotado.'
+            );
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleReopenAdoption = (animal: Animal) => {
@@ -141,7 +117,7 @@ export default function MeusAnunciosScreen() {
           text: 'Sim, reabrir',
           onPress: async () => {
             try {
-              await markAdoptedUseCase.reopen(animal.id, user.id, isOnline);
+              await markAnimalAdoptedUseCase.reopen(animal.id, user.id, isOnline);
               await loadMyAnimals();
               notifyPullCompleted();
             } catch (err) {
@@ -158,25 +134,21 @@ export default function MeusAnunciosScreen() {
 
   const handleDelete = (animal: Animal) => {
     if (!user) return;
-    Alert.alert(
-      'Excluir anúncio',
-      `Deseja excluir o anúncio de ${animal.name}?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteUseCase.execute(animal.id, user.id, isOnline);
-              await loadMyAnimals();
-            } catch (err) {
-              Alert.alert('Erro', err instanceof Error ? err.message : 'Falha ao excluir.');
-            }
-          },
+    Alert.alert('Excluir anúncio', `Deseja excluir o anúncio de ${animal.name}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteAnimalUseCase.execute(animal.id, user.id, isOnline);
+            await loadMyAnimals();
+          } catch (err) {
+            Alert.alert('Erro', err instanceof Error ? err.message : 'Falha ao excluir.');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   if (!user) {
@@ -248,7 +220,7 @@ export default function MeusAnunciosScreen() {
               style={styles.card}
             >
               <Image
-                source={{ uri: item.photos[0]?.displayUri || FALLBACK_PHOTO }}
+                source={{ uri: item.photos[0]?.displayUri || ANIMAL_FALLBACK_PHOTO }}
                 style={styles.thumb}
               />
               <View style={{ flex: 1 }}>
@@ -299,11 +271,9 @@ export default function MeusAnunciosScreen() {
 
                   <TouchableOpacity
                     onPress={() => handleDelete(item)}
-                    style={styles.actionPill}
+                    style={[styles.actionPill, styles.deletePill]}
                   >
-                    <Text style={[styles.actionPillText, { color: COLORS.danger }]}>
-                      Excluir
-                    </Text>
+                    <Text style={styles.deletePillText}>Excluir</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -354,14 +324,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   thumb: {
-    width: 92,
-    height: 92,
+    width: 102,
+    height: 102,
     borderRadius: 18,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: 6,
   },
   animalName: {
@@ -372,8 +343,10 @@ const styles = StyleSheet.create({
   savedOnDeviceChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#F7E5D2',
+    gap: 4,
+    backgroundColor: COLORS.ivory,
+    borderWidth: 1,
+    borderColor: COLORS.peach,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: RADII.pill,
@@ -392,7 +365,7 @@ const styles = StyleSheet.create({
     marginVertical: 6,
   },
   statusBadgeAdopted: {
-    backgroundColor: '#6E8B63',
+    backgroundColor: COLORS.brown,
   },
   statusBadgeText: {
     color: COLORS.white,
@@ -401,21 +374,31 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 6,
-    marginTop: 2,
+    marginTop: 4,
   },
   actionPill: {
     backgroundColor: COLORS.ivory,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.peach,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: RADII.pill,
   },
   actionPillText: {
     fontSize: 12,
     fontWeight: '800',
     color: COLORS.espresso,
+  },
+  deletePill: {
+    borderColor: '#E8B5A8',
+    backgroundColor: '#FBE9E5',
+  },
+  deletePillText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.danger,
   },
   guestBox: {
     flex: 1,

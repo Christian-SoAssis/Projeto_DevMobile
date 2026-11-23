@@ -30,7 +30,7 @@ export class SupabaseModerationRepository implements ModerationGateway {
       .from('animals')
       .update({
         moderation_status: moderationStatus,
-        moderated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq('id', animalId);
 

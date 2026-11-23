@@ -257,7 +257,7 @@ export class SupabaseAnimalRepository implements RemoteAnimalSource {
     }
   }
 
-  private toRemoteRow(animal: Animal): Record<string, unknown> {
+  private toRemoteRow(animal: Animal) {
     return {
       id: animal.id,
       owner_id: animal.ownerId,

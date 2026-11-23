@@ -12,10 +12,10 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { AnimalPhoto } from '../../src/domain/entities/AnimalPhoto';
 import { useAuth } from '../../src/adapters/context/AuthContext';
-import { useRepositories } from '../../src/adapters/context/RepositoriesContext';
+import { useUseCases } from '../../src/adapters/hooks/useUseCases';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
+import { VisitorAccountView } from '../../src/adapters/components/VisitorAccountView';
 import {
   CLAY_CARD_STYLE,
   CLAY_INSET_INPUT_STYLE,
@@ -32,8 +32,8 @@ const INTEREST_TAG_OPTIONS = ['Cães', 'Gatos', 'Filhotes', 'Adultos'];
  */
 export default function ContaScreen() {
   const router = useRouter();
-  const container = useRepositories();
   const { user, updateProfile, logout } = useAuth();
+  const { pickAndUploadAvatar } = useUseCases();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -60,31 +60,9 @@ export default function ContaScreen() {
 
   const handlePickAvatar = async (source: 'CAMERA' | 'GALLERY') => {
     if (!user) return;
-    const res =
-      source === 'CAMERA'
-        ? await container.cameraGateway.capturePhoto()
-        : await container.cameraGateway.pickImageFromGallery();
-
-    if (!res?.uri) return;
-
-    try {
-      const photo = new AnimalPhoto({
-        animalId: `user:${user.id}`,
-        localPath: res.uri,
-      });
-      const persisted = await container.photoStorage.persistLocal(photo);
-      if (container.remotePhotoStorage) {
-        try {
-          const uploaded = await container.remotePhotoStorage.uploadPending(persisted);
-          setAvatarUrl(uploaded.remoteUrl || uploaded.displayUri);
-          return;
-        } catch {
-          // mantém foto local
-        }
-      }
-      setAvatarUrl(persisted.displayUri);
-    } catch {
-      setAvatarUrl(res.uri);
+    const nextUri = await pickAndUploadAvatar(user.id, source);
+    if (nextUri) {
+      setAvatarUrl(nextUri);
     }
   };
 
@@ -111,63 +89,17 @@ export default function ContaScreen() {
     }
   };
 
-  // V08 • Conta: Visitante
   if (!user) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.visitorContainer}>
-          <EnlaceHeader largeLogo />
-
-          <View style={styles.visitorArtCircle}>
-            <Ionicons name="paw" size={54} color={COLORS.terracotta} />
-            <Ionicons name="heart" size={28} color={COLORS.orange} />
-          </View>
-
-          <Text style={styles.visitorTitle}>Você está como{'\n'}visitante</Text>
-          <Text style={styles.visitorSubtitle}>
-            Entre para favoritar, demonstrar interesse e anunciar.
-          </Text>
-
-          <View style={styles.featureTriadRow}>
-            <View style={styles.featurePillar}>
-              <View style={styles.featureCircle}>
-                <Ionicons name="heart-outline" size={22} color={COLORS.terracotta} />
-              </View>
-              <Text style={styles.featureLabel}>Favoritar{'\n'}animais</Text>
-            </View>
-            <View style={styles.featurePillar}>
-              <View style={styles.featureCircle}>
-                <Ionicons name="paw-outline" size={22} color={COLORS.terracotta} />
-              </View>
-              <Text style={styles.featureLabel}>Demonstrar{'\n'}interesse</Text>
-            </View>
-            <View style={styles.featurePillar}>
-              <View style={styles.featureCircle}>
-                <Ionicons name="home-outline" size={22} color={COLORS.terracotta} />
-              </View>
-              <Text style={styles.featureLabel}>Anunciar{'\n'}resgates</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            onPress={() => router.push('/(public)/login')}
-            style={[CLAY_PRIMARY_BUTTON_STYLE, { width: '100%', marginTop: 22 }]}
-          >
-            <Text style={styles.primaryBtnText}>Entrar</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => router.push('/(public)/cadastro')}
-            style={[CLAY_SECONDARY_BUTTON_STYLE, { width: '100%', marginTop: 12 }]}
-          >
-            <Text style={styles.secondaryBtnText}>Criar conta</Text>
-          </TouchableOpacity>
-        </ScrollView>
+        <VisitorAccountView
+          onLoginPress={() => router.push('/(public)/login')}
+          onRegisterPress={() => router.push('/(public)/cadastro')}
+        />
       </SafeAreaView>
     );
   }
 
-  // V12 • Conta: Perfil
   const initialLetter = (user.name || 'A').charAt(0).toUpperCase();
 
   return (
@@ -314,65 +246,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.ivory,
-  },
-  visitorContainer: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  visitorArtCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: COLORS.cream,
-    borderWidth: 2,
-    borderColor: COLORS.peach,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 6,
-    marginVertical: 14,
-  },
-  visitorTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: COLORS.espresso,
-    textAlign: 'center',
-    lineHeight: 31,
-  },
-  visitorSubtitle: {
-    fontSize: 14,
-    color: COLORS.brown,
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 18,
-  },
-  featureTriadRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    gap: 10,
-  },
-  featurePillar: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  featureCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: COLORS.cream,
-    borderWidth: 1.5,
-    borderColor: COLORS.peach,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  featureLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.espresso,
-    textAlign: 'center',
   },
   primaryBtnText: {
     color: COLORS.white,

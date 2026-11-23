@@ -1,3 +1,6 @@
+export const MAX_APPROXIMATE_AGE_LENGTH = 30;
+export const MAX_CHARACTERISTICS_TEXT_LENGTH = 500;
+
 export interface AnimalCharacteristicsProps {
   species: string;
   size: string;

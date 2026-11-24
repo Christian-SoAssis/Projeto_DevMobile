@@ -1,4 +1,4 @@
-import { InterestStage } from '../../domain/entities/AdoptionInterest';
+import { InterestStage, INTEREST_PIPELINE_STEPS, pipelineStepsBetween } from '../../domain/entities/AdoptionInterest';
 import { SyncAction } from '../../domain/entities/SyncAction';
 import { AdoptionInterestRepository } from '../../domain/ports/AdoptionInterestRepository';
 import { AnimalRepository } from '../../domain/ports/AnimalRepository';
@@ -32,6 +32,19 @@ export class UpdateInterestStatusUseCase {
     }
 
     // 1. Persiste o novo status do interesse localmente (sempre primeiro)
+    const previousStatus = interest.status;
+
+    // Bloqueia recuo na trilha: não permite voltar a um estágio anterior.
+    // RECUSADA tem regras próprias em transitionTo; voltar de RECUSADA para a trilha é permitido.
+    const isPipelineStep = (s: InterestStage) => INTEREST_PIPELINE_STEPS.includes(s);
+    if (isPipelineStep(previousStatus) && isPipelineStep(nextStatus)) {
+      const prevIdx = INTEREST_PIPELINE_STEPS.indexOf(previousStatus);
+      const nextIdx = INTEREST_PIPELINE_STEPS.indexOf(nextStatus);
+      if (nextIdx < prevIdx) {
+        throw new Error('Não é permitido voltar a etapa anterior da trilha de interesse.');
+      }
+    }
+
     interest.transitionTo(nextStatus);
     await this.interestRepository.updateStatus(interest.id, interest.status);
 
@@ -87,19 +100,79 @@ export class UpdateInterestStatusUseCase {
       }
     }
 
-    // 3. Tenta sync remoto do interesse (online-first, fallback para fila)
+    // 3. Tenta sync remoto do interesse (online-first, fallback para fila).
+    //    Quando há pulo de etapa (ex: ENVIADA -> CONCLUIDA), envia cada etapa
+    //    intermediária individualmente para que o servidor aceite a transição,
+    //    chegando finalmente ao status alvo. Isso faz com quem manifestou o
+    //    interesse veja o status atualizado (ex: "Concluída") em vez de ficar
+    //    travado em "Enviada".
     if (isOnline && this.remoteInterests) {
       try {
-        await this.remoteInterests.updateStatus(interest.id, interest.status);
+        await this.syncInterestStatusOnline(interest.id, previousStatus, nextStatus);
         return { synced: true, animalMarkedAdopted };
       } catch (err) {
-        await this.enqueueUpdate(interest.id, actorUserId, interest.status, err);
+        await this.enqueueUpdateSteps(interest.id, actorUserId, previousStatus, nextStatus, err);
         return { synced: false, animalMarkedAdopted };
       }
     }
 
-    await this.enqueueUpdate(interest.id, actorUserId, interest.status);
+    await this.enqueueUpdateSteps(interest.id, actorUserId, previousStatus, nextStatus);
     return { synced: false, animalMarkedAdopted };
+  }
+
+  /**
+   * Envia ao servidor remoto cada etapa da trilha do interesse, do status anterior
+   * até o status alvo, uma por uma. O servidor aceita cada passo individualmente
+   * (ENVIADA -> EM_ANALISE -> VISITA_COMBINADA -> CONCLUIDA), então um pulo de etapa
+   * local fica consistente com o remoto.
+   */
+  private async syncInterestStatusOnline(
+    interestId: string,
+    previousStatus: InterestStage,
+    nextStatus: InterestStage
+  ): Promise<void> {
+    const steps = pipelineStepsBetween(previousStatus, nextStatus);
+    // Cada etapa intermediária é um passo válido que o servidor aceita.
+    for (const step of steps) {
+      await this.remoteInterests!.updateStatus(interestId, step);
+    }
+    // Finalmente o status alvo (pode coincidir com a última etapa intermediária se não houver pulo).
+    await this.remoteInterests!.updateStatus(interestId, nextStatus);
+  }
+
+  private async enqueueUpdateSteps(
+    interestId: string,
+    actorUserId: string,
+    previousStatus: InterestStage,
+    nextStatus: InterestStage,
+    err?: unknown
+  ): Promise<void> {
+    if (!this.syncQueueRepository) return;
+
+    const steps = pipelineStepsBetween(previousStatus, nextStatus);
+    const allSteps = [...steps, nextStatus];
+
+    // Enfileira uma ação por etapa, com id único incluindo a etapa, para não
+    // sobrescrever umas às outras no INSERT OR REPLACE da fila.
+    for (const step of allSteps) {
+      const action = new SyncAction({
+        id: `sync_interest_status_${interestId}_${step}`,
+        operation: 'UPDATE',
+        entityType: 'interest',
+        entityId: interestId,
+        payload: {
+          id: interestId,
+          ownerId: actorUserId,
+          status: step,
+        },
+      });
+      // Não marca como falha se for erro de transição do servidor (ex: não aceita recuo ou pulo de etapa).
+      // O estado local já foi atualizado; apenas não sincronizou com o remoto.
+      if (err instanceof Error && !/transição|transition/i.test(err.message)) {
+        action.markFailed(err.message);
+      }
+      await this.syncQueueRepository.enqueue(action);
+    }
   }
 
   private async enqueueUpdate(

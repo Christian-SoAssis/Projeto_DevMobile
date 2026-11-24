@@ -18,6 +18,22 @@ export const INTEREST_PIPELINE_STEPS: InterestStage[] = [
   'CONCLUIDA',
 ];
 
+/**
+ * Retorna as etapas intermediárias (excluindo `from`) entre `from` e `to` na trilha de adoção.
+ * Útil para suavizar um pulo de etapa (ex: ENVIADA -> CONCLUIDA) em passos que o servidor
+ * aceita individualmente (ENVIADA -> EM_ANALISE -> VISITA_COMBINADA -> CONCLUIDA).
+ * RETORNA VAZIO quando `to` está fora da trilha (ex: RECUSADA) ou não há intermediárias.
+ */
+export function pipelineStepsBetween(from: InterestStage, to: InterestStage): InterestStage[] {
+  if (from === to || !INTEREST_PIPELINE_STEPS.includes(from) || !INTEREST_PIPELINE_STEPS.includes(to)) {
+    return [];
+  }
+  const fromIndex = INTEREST_PIPELINE_STEPS.indexOf(from);
+  const toIndex = INTEREST_PIPELINE_STEPS.indexOf(to);
+  if (toIndex <= fromIndex) return [];
+  return INTEREST_PIPELINE_STEPS.slice(fromIndex + 1, toIndex);
+}
+
 export function normalizeInterestStage(raw?: string | null): InterestStage {
   if (!raw || raw === 'PENDING' || raw === 'ENVIADA') return 'ENVIADA';
   if (raw === 'EM_ANALISE') return 'EM_ANALISE';

@@ -48,11 +48,22 @@ export function OwnerInterestsCard({ interests, onSelectStage }: OwnerInterestsC
             <View style={styles.stageButtonsRow}>
               {([...INTEREST_PIPELINE_STEPS, 'RECUSADA'] as InterestStage[]).map((stage) => {
                 const isCurrent = item.status === stage;
+                const currentStepIndex = INTEREST_PIPELINE_STEPS.indexOf(item.status);
+                // Só permite avançar na trilha (não voltar estágios). RECUSADA segue a regra de negócio.
+                const canSelectStage =
+                  stage === 'RECUSADA'
+                    ? item.status === 'ENVIADA' || item.status === 'EM_ANALISE'
+                    : INTEREST_PIPELINE_STEPS.indexOf(stage) >= currentStepIndex;
                 return (
                   <Pressable
                     key={stage}
-                    style={[styles.stageSmallBtn, isCurrent && styles.stageSmallBtnActive]}
-                    onPress={() => onSelectStage(item, stage)}
+                    style={[
+                      styles.stageSmallBtn,
+                      isCurrent && styles.stageSmallBtnActive,
+                      !canSelectStage && styles.stageSmallBtnDisabled,
+                    ]}
+                    disabled={!canSelectStage}
+                    onPress={!canSelectStage ? undefined : () => onSelectStage(item, stage)}
                   >
                     <Text
                       style={[
@@ -153,5 +164,8 @@ const styles = StyleSheet.create({
   },
   stageSmallBtnTextActive: {
     color: COLORS.white,
+  },
+  stageSmallBtnDisabled: {
+    opacity: 0.5,
   },
 });

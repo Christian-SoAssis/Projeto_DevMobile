@@ -120,6 +120,7 @@ export default function MeusAnunciosScreen() {
               await markAnimalAdoptedUseCase.reopen(animal.id, user.id, isOnline);
               await loadMyAnimals();
               notifyPullCompleted();
+              void runFullSync();
             } catch (err) {
               Alert.alert(
                 'Atenção',

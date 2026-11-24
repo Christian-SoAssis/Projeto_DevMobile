@@ -16,7 +16,7 @@ import { useAuth } from '../../src/adapters/context/AuthContext';
 import { useConnectivity } from '../../src/adapters/hooks/useConnectivity';
 import { useFullSync } from '../../src/adapters/hooks/useFullSync';
 import { useUseCases } from '../../src/adapters/hooks/useUseCases';
-import { notifyPullCompleted } from '../../src/adapters/sync/pullEvents';
+import { notifyPullCompleted, subscribePullCompleted } from '../../src/adapters/sync/pullEvents';
 import { notifyNotificationsChanged } from '../../src/adapters/sync/notificationEvents';
 import { EnlaceHeader } from '../../src/adapters/components/EnlaceHeader';
 import { PhotoCarouselViewer } from '../../src/adapters/components/PhotoCarouselViewer';
@@ -91,6 +91,10 @@ export default function AnimalDetailsScreen() {
 
   useEffect(() => {
     void loadDetails();
+    const unsub = subscribePullCompleted(() => {
+      void loadDetails();
+    });
+    return unsub;
   }, [loadDetails]);
 
   useEffect(() => {

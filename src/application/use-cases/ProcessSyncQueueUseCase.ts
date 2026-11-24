@@ -141,7 +141,19 @@ export class ProcessSyncQueueUseCase {
         await this.options.interests.remove(action.entityId);
       } else if (action.operation === 'UPDATE') {
         const status = (action.payload.status as InterestStage) ?? 'ENVIADA';
-        await this.options.interests.updateStatus(action.entityId, status);
+        try {
+          await this.options.interests.updateStatus(action.entityId, status);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : '';
+          // Servidor não aceita essa transição de interesse (ex: recuo ou pulo de etapa).
+          // Marca como completada para não travar a fila; estado local já está correto.
+          if (/transição|transition/i.test(message)) {
+            action.markCompleted();
+            await this.syncQueueRepository.delete(action.id);
+            return;
+          }
+          throw err;
+        }
       } else {
         const interest = new AdoptionInterest({
           id: action.entityId,

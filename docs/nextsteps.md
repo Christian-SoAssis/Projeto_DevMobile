@@ -53,7 +53,7 @@ O que já está conforme a arquitetura prescrita:
 - **Adapters de hardware:** `CameraGateway`, `LocationGateway`, `ConnectivityGateway` definidos no domínio e implementados em `src/infrastructure/device/`.
 - **Context API:** `AuthContext.tsx` e `RepositoriesContext.tsx` em `src/adapters/context/`.
 - **Custom hooks:** `useAuth`, `useConnectivity`, `useFullSync`, `useAutoSync` em `src/adapters/hooks/`.
-- **Interface e rotas:** Expo Router estruturado em `app/(public)/`, `app/(tabs)/`, `app/(protected)/`, `app/animal/`; telas com `<View>`, `<Text>`, `StyleSheet` e gesto Pull-to-Refresh (`RefreshControl`) nas listas principais e na tela de detalhes do animal (`app/animal/[id].tsx`).
+- **Interface e rotas:** Expo Router estruturado em `app/(public)/`, `app/(tabs)/`, `app/(protected)/`, `app/animal/`; telas com `<View>`, `<Text>`, `StyleSheet` e gesto Pull-to-Refresh (`RefreshControl`) nas listas principais e na tela de detalhes do animal (`app/animal/[id].tsx`), que também re-carrega automaticamente quando uma sincronização é concluída via `subscribePullCompleted`.
 - **Infraestrutura real:** SQLite (`expo-sqlite`) com migrations em `src/infrastructure/database/sqlite/`; Supabase (client, auth, repositories, storage) em `src/infrastructure/supabase/`.
 - **Qualidade de código:** `tsc --noEmit` limpo (TypeScript strict). Testes de domínio passando (`src/__tests__/enlace.test.ts`, 7 testes).
 - **DAT-10 (isolamento entre contas):** implementado e testado (`enlace.test.ts`).

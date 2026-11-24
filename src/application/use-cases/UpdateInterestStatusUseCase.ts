@@ -120,7 +120,9 @@ export class UpdateInterestStatusUseCase {
         status,
       },
     });
-    if (err instanceof Error) {
+    // Não marca como falha se for erro de transição do servidor (ex: não aceita recuo ou pulo de etapa).
+    // O estado local já foi atualizado; apenas não sincronizou com o remoto.
+    if (err instanceof Error && !/transição|transition/i.test(err.message)) {
       action.markFailed(err.message);
     }
     await this.syncQueueRepository.enqueue(action);

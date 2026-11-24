@@ -200,4 +200,59 @@ describe('UpdateInterestStatusUseCase', () => {
     const interestActions = pending.filter((a) => a.entityType === 'interest');
     expect(interestActions.length).toBe(1);
   });
+
+  it('deve permitir voltar atrás de RECUSADA para EM_ANALISE', async () => {
+    const animal = createTestAnimal({ id: 'animal-1', ownerId: 'user-dono', status: 'AVAILABLE' });
+    const interest = createTestInterest({ id: 'int-1', animalId: 'animal-1', status: 'RECUSADA' });
+    await animalRepository.saveLocal(animal);
+    await interestRepository.save(interest);
+
+    const result = await useCase.execute('int-1', 'user-dono', 'EM_ANALISE', false);
+
+    expect(result.animalMarkedAdopted).toBe(false);
+    const updated = await interestRepository.findById('int-1');
+    expect(updated?.status).toBe('EM_ANALISE');
+  });
+
+  it('deve permitir voltar atrás de RECUSADA para ENVIADA', async () => {
+    const animal = createTestAnimal({ id: 'animal-1', ownerId: 'user-dono', status: 'AVAILABLE' });
+    const interest = createTestInterest({ id: 'int-1', animalId: 'animal-1', status: 'RECUSADA' });
+    await animalRepository.saveLocal(animal);
+    await interestRepository.save(interest);
+
+    const result = await useCase.execute('int-1', 'user-dono', 'ENVIADA', false);
+
+    expect(result.animalMarkedAdopted).toBe(false);
+    const updated = await interestRepository.findById('int-1');
+    expect(updated?.status).toBe('ENVIADA');
+  });
+
+  it('deve permitir voltar atrás de RECUSADA para VISITA_COMBINADA', async () => {
+    const animal = createTestAnimal({ id: 'animal-1', ownerId: 'user-dono', status: 'AVAILABLE' });
+    const interest = createTestInterest({ id: 'int-1', animalId: 'animal-1', status: 'RECUSADA' });
+    await animalRepository.saveLocal(animal);
+    await interestRepository.save(interest);
+
+    const result = await useCase.execute('int-1', 'user-dono', 'VISITA_COMBINADA', false);
+
+    expect(result.animalMarkedAdopted).toBe(false);
+    const updated = await interestRepository.findById('int-1');
+    expect(updated?.status).toBe('VISITA_COMBINADA');
+  });
+
+  it('deve permitir voltar atrás de RECUSADA para CONCLUIDA e marcar animal como adotado', async () => {
+    const animal = createTestAnimal({ id: 'animal-1', ownerId: 'user-dono', status: 'AVAILABLE' });
+    const interest = createTestInterest({ id: 'int-1', animalId: 'animal-1', status: 'RECUSADA' });
+    await animalRepository.saveLocal(animal);
+    await interestRepository.save(interest);
+
+    const result = await useCase.execute('int-1', 'user-dono', 'CONCLUIDA', false);
+
+    expect(result.animalMarkedAdopted).toBe(true);
+    const updatedInterest = await interestRepository.findById('int-1');
+    expect(updatedInterest?.status).toBe('CONCLUIDA');
+
+    const updatedAnimal = await animalRepository.findById('animal-1');
+    expect(updatedAnimal?.status.isAdopted()).toBe(true);
+  });
 });
